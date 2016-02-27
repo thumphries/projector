@@ -13,9 +13,9 @@ description:           ambiata-project
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , transformers                    >= 0.3        && < 0.5
-                     , either                          >= 4.3        && < 4.5
                      , ambiata-p
+                     , ambiata-x-eithert
+                     , transformers                    >= 0.4        && < 0.6
 
   ghc-options:
                        -Wall
@@ -39,9 +39,9 @@ test-suite test
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-project
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
                      , ambiata-p
-                     , QuickCheck                      == 2.7.*
+                     , ambiata-project
+                     , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
