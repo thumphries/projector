@@ -1,14 +1,14 @@
-name:                  ambiata-project
+name:                  ambiata-projector-core
 version:               0.0.1
 license:               AllRightsReserved
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2015 Ambiata.
-synopsis:              ambiata-project
+synopsis:              ambiata-projector-core
 category:              System
 cabal-version:         >= 1.8
 build-type:            Simple
-description:           ambiata-project
+description:           ambiata-projector-core
 
 library
   build-depends:
@@ -24,8 +24,8 @@ library
                        src
 
   exposed-modules:
-                       Paths_ambiata_project
-                       Project
+                       Paths_ambiata_projector_core
+                       Projector.Core
 
 test-suite test
   type:                exitcode-stdio-1.0
@@ -42,6 +42,6 @@ test-suite test
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
                      , ambiata-p
-                     , ambiata-project
+                     , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
