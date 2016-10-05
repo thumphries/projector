@@ -4,18 +4,24 @@ Projector is a templating language that aims to be typed and total.
 
 ## Types
 
-Projector should support all of the constructs permitted in
-[Machinator](https://github.com/ambiata/machinator). At the very
-least, this means we need inductive sums, records, and higher-kinded
-types.
+The type system should support
+- Inductive sums / variants
+- Records
+- List and Maybe
+- A configurable set of ground types
 
-Ground types should be configurable. The core language should not be
-tied to any particular frontend or backend.
+The core language should not be tied to any particular frontend or
+backend.
+
+Anything expressible in
+[Machinator](https://github.com/ambiata/machinator) should have a
+straightforward equivalent in Projector's core.
 
 ## Foundations
 
 - The core calculus should be strongly normalizing
-  - System F / HM with records?
+  - System F / HM with records
+  - Maybe even STLC if we can get away with it
 - The template syntax permits only function application, variable
   substitution, and case statements.
 - Other templates (partials) are represented as lambda abstractions;
@@ -29,15 +35,7 @@ There will be no lambda exposed to the user. We may not need
 inference. Stick closely to HM, though, in case we eventually do need
 it.
 
-## Dynamics
-
-In comes a rose tree of expressions, out comes a rose tree of
-values. We combine the tree according to some user-supplied fold.
-
-We can reduce as far as we like at compile time, and apply rewrite
-rules to simplify the expression tree.
-
-## Frontend syntax
+## Frontend sketch
 
 (This is a strawman, truly terrible. The frontend will be one of the last
 things built.)
@@ -49,41 +47,6 @@ things built.)
   language.
 - Type annotations for templates: ??? open question. likewise, can
   templates have arity greater than 1? should input be bound to `this`?
-- Figuring out case syntax is pretty hard; the below is not acceptable
-
-
-```handlebars
-<html>
-  <div id={{ attr this.nameid }}>
-    {{# case this.content of
-	      Foo a b -> b
-          Bar c d -> { some kind of template block here {{ renderInt d }} }
-    }}
-  </div>
-</html>
-```
-
-... where the types look like this:
-
-```haskell
-data Input = Input {
-    nameid :: Text
-  , content :: FooBar
-  }
-
-data FooBar
-  = Foo Int Text
-  | Bar Int Int
-```
-
-... and we have defined the following custom functions:
-
-```haskell
-attr :: Text -> AttributeValue
-renderInt :: Int -> Text
-```
-
-... with quite some handwaving.
 
 ## Backends
 
