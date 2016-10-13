@@ -3,7 +3,7 @@ version:               0.0.1
 license:               AllRightsReserved
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
-copyright:             (c) 2015 Ambiata.
+copyright:             (c) 2016 Ambiata.
 synopsis:              ambiata-projector-core
 category:              System
 cabal-version:         >= 1.8
@@ -16,6 +16,8 @@ library
                      , ambiata-p
                      , ambiata-x-eithert
                      , transformers                    >= 0.4        && < 0.6
+                     , bound                           == 1.0.*
+                     , prelude-extras
 
   ghc-options:
                        -Wall
@@ -25,7 +27,11 @@ library
 
   exposed-modules:
                        Paths_ambiata_projector_core
+
                        Projector.Core
+                       Projector.Core.Simplify
+                       Projector.Core.Syntax
+                       Projector.Core.Type
 
 test-suite test
   type:                exitcode-stdio-1.0
@@ -41,7 +47,10 @@ test-suite test
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
+                     , ambiata-disorder-jack
                      , ambiata-p
                      , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
+                     , bound
+                     , mtl
