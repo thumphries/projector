@@ -2,6 +2,30 @@
 
 Projector is a templating language that aims to be typed and total.
 
+## Motivation
+
+We need a templating system that
+- Allows our designers to keep writing mostly-markup, not mostly-code
+- Can be used interchangeably on the frontend and the backend
+- Rejects ill-formed templates, and knows why it does so
+- Enables good tooling
+
+Since a templating language is just a simple term rewriting system,
+it made sense to build one based on a lambda calculus.
+
+In pursuit of the above requirements, a few goals:
+- The language should be statically typed
+- It should be built on a strongly-normalizing calculus. Templates should be finite folds over finite data.
+  We can get this guarantee cheaply, so it is worthwhile.
+- It should operate over idiomatic Haskell/Purescript datatypes. We should not need to pack JSON to use it.
+
+For Ambiata specifically,
+- bikeshed.hs should not exist
+- Replace JSON + QuickCheck with a typechecker
+- Compile to both Pux and blaze-html, sharing datatypes across all three languages
+- Provide better errors
+- Provide more direct templating syntax instead of dataflow-style Handlebars
+
 ## Types
 
 The type system should support
