@@ -7,9 +7,8 @@ module Test.Projector.Core.Arbitrary where
 
 
 import qualified Bound as B
+import qualified Bound.Name as B
 import qualified Bound.Var as B
-
-import Control.Monad.State.Strict (State, evalState, get, put)
 
 import Disorder.Corpus
 import Disorder.Jack
@@ -32,8 +31,8 @@ genType g =
 
   in oneOfRec nonrec recc
 
-genExpr :: Jack (Type l) -> Jack (Value l) -> Jack (Expr l Text)
-genExpr t v =
+genExpr :: Jack Text -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l Text Text)
+genExpr n t v =
   let shrink z = case z of
         ELit _ ->
           []
@@ -46,33 +45,34 @@ genExpr t v =
 
         ELam _ x ->
           -- need to walk under binders with fromScope
-          -- and give sensible names to all the anonymous bound variables
-          [freshish (B.fromScope x)]
+          -- and give sensible names to all the anonymous bound variables.
+          -- luckily, we were tracking their source names using Bound.Name!
+          [uninstantiate (B.fromScope x)]
 
       nonrec = [
           ELit <$> v
-        , EVar <$> elements boats
+        , EVar <$> n
         ]
 
       recc = [
-          EApp <$> genExpr t v <*> genExpr t v
-        , lam <$> elements muppets <*> t <*> genExpr t v
+          EApp <$> genExpr n t v <*> genExpr n t v
+        , genLam n t v
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
--- Provide fresh-ish names for some function body.
--- The real solution here is to use something like Bound.Name
--- https://hackage.haskell.org/package/bound-1.0.7/docs/Bound-Name.html
-freshish :: Expr l (B.Var () Text) -> Expr l Text
-freshish =
-  flip evalState 0 . traverse (B.unvar fresh pure)
-  where
-    fresh :: () -> State Int Text
-    fresh _ = do
-      i <- get
-      put $! i+1
-      pure $ "v" <> renderIntegral i
+genLam :: Jack Text -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l Text Text)
+genLam n t v = do
+  nam <- n
+  typ <- t
+  -- Make it likely that we'll actually use the bound name
+  let n' = oneOf [pure nam, n]
+  bdy <- genExpr n' t v
+  pure (lam nam typ bdy)
 
+-- Use source metadata in Bound.Name to restore names to instantiated variables.
+uninstantiate :: Expr l Text (B.Var (B.Name Text ()) Text) -> Expr l Text Text
+uninstantiate =
+  fmap (B.unvar B.name id)
 
 -- A simple set of literals for testing purposes
 data TestLitT
@@ -109,6 +109,6 @@ genTestLitValue =
     , VString <$> elements muppets
     ]
 
-genTestExpr :: Jack (Expr TestLitT Text)
+genTestExpr :: Jack (Expr TestLitT Text Text)
 genTestExpr =
-  genExpr (genType genTestLitT) genTestLitValue
+  genExpr (elements muppets) (genType genTestLitT) genTestLitValue

@@ -12,7 +12,8 @@ module Projector.Core.Syntax (
   ) where
 
 
-import           Bound (Scope (..),  (>>>=), abstract1)
+import           Bound (Scope (..),  (>>>=))
+import           Bound.Name (Name (..), abstract1Name)
 
 import           P
 
@@ -23,16 +24,23 @@ import           Projector.Core.Type (Type (..), Ground (..))
 
 -- | The type of Projector expressions.
 --
--- The first type parameter refers to the type of literal.
---
 -- This uses the Bound style, where an AST is parameterised by the type of names.
 -- The Functor, Applicative, Monad, Foldable and Traversable instances operate
 -- on all the free variables in the syntax tree.
-data Expr l a
+--
+-- The first type parameter, 'l', refers to the type of literal. This is
+-- invariant. Literals must have a 'Ground' instance.
+--
+-- The second parameter, 'n', refers to the original type of name, in the
+-- source code. It's carried around for error reporting. This is invariant.
+--
+-- The third parameter, 'a', refers to the current type of name, in
+-- the Bound style. 'Expr' is covariant in 'a'.
+data Expr l n a
   = ELit (Value l)
   | EVar a
-  | ELam (Type l) (Scope () (Expr l) a)
-  | EApp (Expr l a) (Expr l a)
+  | ELam (Type l) (Scope (Name n ()) (Expr l n) a)
+  | EApp (Expr l n a) (Expr l n a)
   deriving (Functor, Foldable, Traversable)
 
 -- Default instances for various functor classes (Eq1, Show1, etc)
@@ -42,21 +50,23 @@ data Expr l a
 -- prelude-extras, which is already a transitive dependency.
 --
 -- We need these to achieve 'Eq' and 'Show' on 'Expr'.
-instance (Eq l, Eq (Value l)) => Eq1 (Expr l)
-deriving instance (Eq l, Eq (Value l), Eq a) => Eq (Expr l a)
+-- 'Eq' is alpha equivalence, thanks to Bound.
+-- 'Show' does not respect alpha equivalence.
+instance (Eq l, Eq (Value l), Eq n) => Eq1 (Expr l n)
+deriving instance (Eq l, Eq (Value l), Eq n, Eq a) => Eq (Expr l n a)
 
-instance (Ord l, Ord (Value l)) => Ord1 (Expr l)
-deriving instance (Ord l, Ord (Value l), Ord a) => Ord (Expr l a)
+instance (Ord l, Ord (Value l), Ord n) => Ord1 (Expr l n)
+deriving instance (Ord l, Ord (Value l), Ord n, Ord a) => Ord (Expr l n a)
 
-instance (Show l, Show (Value l)) => Show1 (Expr l)
-deriving instance (Show l, Show (Value l), Show a) => Show (Expr l a)
+instance (Show l, Show (Value l), Show n) => Show1 (Expr l n)
+deriving instance (Show l, Show (Value l), Show n, Show a) => Show (Expr l n a)
 
 
-instance Applicative (Expr l) where
+instance Applicative (Expr l n) where
   pure = EVar
   (<*>) = ap
 
-instance Monad (Expr l) where
+instance Monad (Expr l n) where
   return = pure
   a >>= f = case a of
     ELit l ->
@@ -78,9 +88,9 @@ instance Monad (Expr l) where
 
 
 -- | Construct a lambda abstraction from a name, a type, and an expression.
-lam :: Eq a => a -> Type l -> Expr l a -> Expr l a
+lam :: Eq a => a -> Type l -> Expr l a a -> Expr l a a
 lam v t b =
-  -- abstract1 constructs a scope from a name and an expr
-  -- abstract1 :: (Eq a, Monad f) => a -> f a -> Scope () f a
-  -- abstract1 :: a -> Expr l a -> Scope () (Expr l) a
-  ELam t (abstract1 v b)
+  -- abstract1Name constructs a scope from a name and an expr
+  -- abstract1Name :: (Monad f, Eq a) => a -> f a -> Scope (Name a ()) f a
+  -- abstract1Name :: a -> Expr l a -> Scope (Name a ()) (Expr l) a
+  ELam t (abstract1Name v b)

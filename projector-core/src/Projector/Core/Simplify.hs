@@ -7,7 +7,8 @@ module Projector.Core.Simplify (
   ) where
 
 
-import           Bound
+import           Bound (Scope, toScope, fromScope)
+import           Bound.Name (instantiate1Name)
 
 import           P
 
@@ -15,7 +16,7 @@ import           Projector.Core.Syntax (Expr (..))
 
 
 -- | Reduce an expression to weak head normal form, i.e. to the outermost abstraction.
-whnf :: Expr l a -> Expr l a
+whnf :: Expr l n a -> Expr l n a
 whnf e = case e of
   ELit _ ->
     e
@@ -28,16 +29,16 @@ whnf e = case e of
 
   EApp f a -> case whnf f of
     (ELam _ b) ->
-      -- instantiate1 enters a scope, instantiating its outermost bound variable.
-      -- instantiate1 :: Monad f => f a -> Scope n f a -> f a
-      -- instantiate1 :: Expr l a -> Scope () (Expr l) a -> Expr l a
-      whnf (instantiate1 a b)
+      -- instantiate1Name enters a scope, instantiating its outermost bound variable.
+      -- instantiate1Name :: Monad f => f a -> Scope n f a -> f a
+      -- instantiate1Name :: Expr l a -> Scope () (Expr l) a -> Expr l a
+      whnf (instantiate1Name a b)
     g ->
       -- Ill-typed term
       EApp g a
 
 -- | Reduce an expression to normal form.
-nf :: Expr l a -> Expr l a
+nf :: Expr l n a -> Expr l n a
 nf e = case e of
   ELit _ ->
     e
@@ -51,7 +52,7 @@ nf e = case e of
   EApp f a ->
     case whnf f of
       (ELam _ b) ->
-        nf (instantiate1 a b)
+        nf (instantiate1Name a b)
       g ->
         -- Ill-typed term
         EApp (nf g) (nf a)
@@ -59,7 +60,7 @@ nf e = case e of
 -- | Apply a function under binders. This translates the expression
 -- under a 'Scope' back into an 'Expr' for a while.
 overScope ::
-     (forall c. Expr l c -> Expr l c)
-  -> Scope b (Expr l) a
-  -> Scope b (Expr l) a
+     (forall c. Expr l n c -> Expr l n c)
+  -> Scope b (Expr l n) a
+  -> Scope b (Expr l n) a
 overScope f = toScope . f . fromScope
