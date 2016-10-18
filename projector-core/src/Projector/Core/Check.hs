@@ -27,7 +27,10 @@ data TypeError l a
   | FreeVariable a
   deriving (Eq, Show)
 
-typeCheck :: (Eq l, Ground l) => Expr l n a -> Either [TypeError l a] (Type l)
+typeCheck ::
+     Ground l
+  => Expr l n a
+  -> Either [TypeError l a] (Type l)
 typeCheck =
   first D.toList . typeCheck' . fmap Unknown
 
@@ -46,7 +49,7 @@ annotate ty e =
       a
 
 typeCheck' ::
-     (Eq l, Ground l)
+     Ground l
   => Expr l n (Annotated l a)
   -> Either (DList (TypeError l a)) (Type l)
 typeCheck' expr =

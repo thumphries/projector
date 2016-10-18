@@ -18,6 +18,6 @@ data Type l
   | TArrow (Type l) (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
-class Ground l where
+class Eq l => Ground l where
   data Value l
   typeOf :: Value l -> l
