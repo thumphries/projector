@@ -30,6 +30,7 @@ library
                        Paths_ambiata_projector_core
 
                        Projector.Core
+                       Projector.Core.Check
                        Projector.Core.Simplify
                        Projector.Core.Syntax
                        Projector.Core.Type
@@ -55,3 +56,4 @@ test-suite test
                      , quickcheck-instances            == 0.3.*
                      , bound
                      , mtl
+                     , containers                      == 0.5.*
