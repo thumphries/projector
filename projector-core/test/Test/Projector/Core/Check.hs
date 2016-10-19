@@ -21,6 +21,11 @@ prop_welltyped =
     gamble (genWellTypedTestExpr ty) $ \e ->
       typeCheck e === pure ty
 
+prop_welltyped_shrink =
+  gamble (genType genTestLitT) $ \ty ->
+    jackShrinkProp 100 (genWellTypedTestExpr ty) $ \e ->
+      typeCheck e === pure ty
+
 prop_consistent =
   gamble (genType genTestLitT) $ \ty ->
     gamble (genWellTypedTestExpr ty) $ \e ->

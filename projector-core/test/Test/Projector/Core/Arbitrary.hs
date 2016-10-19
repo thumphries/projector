@@ -11,6 +11,9 @@ import qualified Bound as B
 import qualified Bound.Name as B
 import qualified Bound.Var as B
 
+import           Control.Comonad (Comonad (..))
+
+import           Data.List as L
 import           Data.Map.Strict  (Map)
 import qualified Data.Map.Strict as M
 import           Disorder.Corpus
@@ -21,6 +24,9 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
+
+-- -----------------------------------------------------------------------------
+-- Generating completely arbitrary expressions (mostly ill-typed)
 
 genType :: Jack l -> Jack (Type l)
 genType g =
@@ -78,6 +84,11 @@ uninstantiate =
   fmap (B.unvar B.name id)
 
 
+-- -----------------------------------------------------------------------------
+-- Generating well-typed expressions
+
+-- need to track the types of things we've generated so we can use variables
+-- need to be careful about shadowing
 newtype Context l = Context { unContext :: Map Text (Type l) }
   deriving (Eq, Show)
 
@@ -90,7 +101,7 @@ cextend c t n =
 
 clookup :: (Ground l, Ord l) => Context l -> Type l -> Maybe [Text]
 clookup c t =
-   -- this is extraordinarily dumb
+   -- this is extraordinarily dumb but does the job
    (M.lookup t (foldl' (\m (k, v) -> M.insertWith (<>) v [k] m) mempty (M.toList (unContext c))))
 
 genWellTypedExpr ::
@@ -158,9 +169,18 @@ genWellTypedApp ty names genty genval = do
   pure (EApp fun arg)
 
 
+-- -----------------------------------------------------------------------------
+-- a dodgy way to test jack shrinking invariants
+
+jackShrinkProp :: Show a => Int -> Jack a -> (a -> Property) -> Property
+jackShrinkProp n gen prop =
+  gamble (mapTree duplicate gen) $ \t ->
+    conjoin . take n $ fmap (prop . outcome) (shrinks t)
 
 
+-- -----------------------------------------------------------------------------
 -- A simple set of literals for testing purposes
+
 data TestLitT
   = TBool
   | TInt
@@ -202,7 +222,9 @@ genWellTypedTestLitValue t =
     TInt -> VInt <$> chooseInt (0, 100)
     TString -> VString <$> elements cooking
 
+-- -----------------------------------------------------------------------------
 -- Generators you might actually use
+
 genTestExpr :: Jack (Expr TestLitT Text Text)
 genTestExpr =
   genExpr (elements muppets) (genType genTestLitT) genTestLitValue
