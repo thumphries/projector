@@ -6,6 +6,15 @@ module Projector.Core.Check (
   -- * User interface
     typeCheck
   , TypeError (..)
+  -- * Guts
+  , Check (..)
+  , typeError
+  , typeCheck'
+  , checkPair
+  , checkList
+  -- * Reusable stuff
+  , apE
+  , pairE
   ) where
 
 
@@ -32,13 +41,21 @@ typeCheck ::
   => Expr l n a
   -> Either [TypeError l a] (Type l)
 typeCheck =
-  first D.toList . typeCheck' . fmap Unknown
+  first D.toList . unCheck . typeCheck' . fmap Unknown
+
+
+-- -----------------------------------------------------------------------------
+
+newtype Check l n a = Check {
+    unCheck :: Either (DList (TypeError l n)) a
+  } deriving (Functor, Applicative, Monad)
 
 data Annotated l a
   = Unknown a
   | Known (Type l)
   deriving (Eq, Show, Functor)
 
+-- Mark all uses of the immediately-bound variable ('B') with its type.
 annotate :: Type l -> B.Var (B.Name n ()) (Annotated l a) -> Annotated l a
 annotate ty e =
   case e of
@@ -48,10 +65,13 @@ annotate ty e =
     B.F a ->
       a
 
+-- As we've got an explicitly-typed calculus, typechecking is
+-- straightforward and syntax-directed. All we have to do is propagate
+-- our type annotations around the tree and use (==) in the right spots.
 typeCheck' ::
      Ground l
   => Expr l n (Annotated l a)
-  -> Either (DList (TypeError l a)) (Type l)
+  -> Check l a (Type l)
 typeCheck' expr =
   case expr of
     ELit v ->
@@ -67,36 +87,56 @@ typeCheck' expr =
       tb <- typeCheck' (fmap (annotate ty) (B.fromScope e))
       pure (TArrow ty tb)
 
-    EApp a b ->
-      let
-        ta = typeCheck' a
-        tb = typeCheck' b
-      in
-        case econcat ta tb of
-          Left e ->
-            Left e
-          Right (TArrow c d, e) ->
-            if c == e then pure d else typeError (Mismatch c e)
-          Right (c, d) ->
-            typeError (ExpectedArrow d c)
+    EApp a b -> do
+      typs <- checkPair a b
+      case typs of
+        (TArrow c d, e) ->
+          if c == e then pure d else typeError (Mismatch c e)
+        (c, d) ->
+          typeError (ExpectedArrow d c)
 
-typeError :: TypeError l a -> Either (DList (TypeError l a)) b
+
+typeError :: TypeError l a -> Check l a b
 typeError =
-  Left . D.singleton
+  Check . Left . D.singleton
 
--- hmm this is basically accvalidation from Data.Validation
--- so let's move over to that once we know what's going on
-econcat :: Monoid m => Either m b -> Either m c -> Either m (b, c)
-econcat l r =
+-- Check a list of 'Expr', using 'apE' to accumulate the errors.
+checkList :: Ground l => [Expr l n (Annotated l a)] -> Check l a [Type l]
+checkList =
+  -- This could be written with foldl' and DList if laziness / space
+  -- became important.
+  Check . foldr fun (pure [])
+  where
+    -- fun :: Expr l n (Annotated l a) -> Check l a [Type l] -> Check l a [Type l]
+    fun l r =
+      (unCheck $ fmap (:) (typeCheck' l)) `apE` r
+
+-- Check a pair of 'Expr', using 'apE' to accumulate the errors.
+checkPair ::
+     Ground l
+  => Expr l n (Annotated l a)
+  -> Expr l n (Annotated l a)
+  -> Check l a (Type l, Type l)
+checkPair a =
+  Check . (pairE `on` (unCheck . typeCheck')) a
+
+
+-- -----------------------------------------------------------------------------
+
+pairE :: Monoid e => Either e b -> Either e c -> Either e (b, c)
+pairE l r =
+  apE (fmap (,) l) r
+
+-- A version of 'ap' that accumulates errors.
+-- Useful when expressions do not relate to one another at all.
+apE :: Monoid e => Either e (a -> b) -> Either e a -> Either e b
+apE l r =
   case (l, r) of
-    (Left e1, Left e2) ->
-      Left (e1 <> e2)
-
-    (Left e1, _) ->
-      Left e1
-
-    (Right _, Left e1) ->
-      Left e1
-
-    (Right a, Right b) ->
-      Right (a, b)
+    (Right f, Right a) ->
+      pure (f a)
+    (Left a, Right _) ->
+      Left a
+    (Right _, Left b) ->
+      Left b
+    (Left a, Left b) ->
+      Left (a <> b)
