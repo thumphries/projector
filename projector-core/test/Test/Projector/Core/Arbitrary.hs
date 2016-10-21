@@ -21,6 +21,7 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core.Simplify
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
@@ -110,68 +111,109 @@ genWellTypedExpr ::
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l Text Text)
-genWellTypedExpr ty genty genval = do
-  genWellTypedExpr' ty centy genty genval
+genWellTypedExpr ty genty genval =
+  sized $ \n -> do
+    k <- choose (0, n)
+    genWellTypedExpr' k ty centy genty genval
 
 genWellTypedExpr' ::
      (Ground l, Ord l)
-  => Type l
+  => Int
+  -> Type l
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l Text Text)
-genWellTypedExpr' ty names genty genval =
-  -- try to look something up from the context
-  let mname = clookup names ty
-      gen =  case ty of
+genWellTypedExpr' n ty names genty genval =
+  let gen = case ty of
         TLit l ->
-          let nonrec = [
-                  ELit <$> genval l
-                ]
-
-              recc = [
-                  genWellTypedApp ty names genty genval
-                ]
-
-          in oneOfRec nonrec recc
+          if n <= 1
+            then ELit <$> genval l
+            else genWellTypedApp n ty names genty genval
 
         TArrow t1 t2 ->
-          genWellTypedLam t1 t2 names genty genval
+          genWellTypedLam n t1 t2 names genty genval
 
-  in case mname of
+  -- try to look something appropriate up from the context
+  in case clookup names ty of
        Nothing -> gen
-       Just xs -> elements (fmap EVar xs)
+       Just xs ->
+         if n <= 1
+           then elements (fmap EVar xs)
+           else gen
 
 genWellTypedLam ::
      (Ground l, Ord l)
-  => Type l -- bound type
+  => Int
+  -> Type l -- bound type
   -> Type l -- result type
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l Text Text)
-genWellTypedLam bnd ty names genty genval = do
+genWellTypedLam n bnd ty names genty genval = do
   name <- elements muppets -- FIX parameterise this
-  bdy <- genWellTypedExpr' ty (cextend names bnd name) genty genval
+  bdy <- genWellTypedExpr' (n `div` 2) ty (cextend names bnd name) genty genval
   pure (lam name bnd bdy)
 
 genWellTypedApp ::
      (Ground l, Ord l)
-  => Type l
+  => Int
+  -> Type l
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l Text Text)
-genWellTypedApp ty names genty genval = do
+genWellTypedApp n ty names genty genval = do
   bnd <- genty
-  fun <- genWellTypedLam bnd ty names genty genval
-  arg <- genWellTypedExpr' bnd names genty genval
+  fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
+  arg <- genWellTypedExpr' (n `div` 2) bnd names genty genval
+  reshrink (\x -> [whnf x]) $
+    pure (EApp fun arg)
+
+
+-- -----------------------------------------------------------------------------
+-- Generating ill-typed expressions
+
+-- generating well-typed expressions, but at small sizes always pick an inappropriate type.
+
+genIllTypedExpr ::
+     (Ground l, Ord l)
+  => Jack (Type l)
+  -> (l -> Jack (Value l))
+  -> Jack (Expr l Text Text)
+genIllTypedExpr genty genval =
+  sized $ \n -> do
+    k <- choose (0, n)
+    genIllTypedExpr' k centy genty genval
+
+genIllTypedExpr' ::
+     (Ground l, Ord l)
+  => Int
+  -> Context l
+  -> Jack (Type l)
+  -> (l -> Jack (Value l))
+  -> Jack (Expr l Text Text)
+genIllTypedExpr' n names genty genval = do
+  -- it can only be an app afaict
+  ty <- genty
+  bnd <- genty
+  nbnd <- genty `suchThat` (/= bnd)
+  fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
+  arg <- genWellTypedExpr' (n `div` 2) nbnd names genty genval
   pure (EApp fun arg)
 
 
 -- -----------------------------------------------------------------------------
--- a dodgy way to test jack shrinking invariants
+-- XXX Useful Jack combinators
 
+genUniquePair :: Eq a => Jack a -> Jack (a, a)
+genUniquePair g = do
+  a <- g
+  b <- g `suchThat` (/= a)
+  pure (a, b)
+
+-- | a dodgy way to test jack shrinking invariants
 jackShrinkProp :: Show a => Int -> Jack a -> (a -> Property) -> Property
 jackShrinkProp n gen prop =
   gamble (mapTree duplicate gen) $ \t ->
@@ -232,3 +274,7 @@ genTestExpr =
 genWellTypedTestExpr :: Type TestLitT -> Jack (Expr TestLitT Text Text)
 genWellTypedTestExpr ty = do
   genWellTypedExpr ty (genType genTestLitT) genWellTypedTestLitValue
+
+genIllTypedTestExpr :: Jack (Expr TestLitT Text Text)
+genIllTypedTestExpr = do
+  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
