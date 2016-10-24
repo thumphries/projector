@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Projector.Core.Check (
   -- * User interface
     typeCheck
@@ -107,7 +108,11 @@ checkList =
   -- became important.
   Check . foldr fun (pure [])
   where
-    -- fun :: Expr l n (Annotated l a) -> Check l a [Type l] -> Check l a [Type l]
+    fun ::
+         Ground l
+      => Expr l n (Annotated l a)
+      -> Either (DList (TypeError l a)) [Type l]
+      -> Either (DList (TypeError l a)) [Type l]
     fun l r =
       (unCheck $ fmap (:) (typeCheck' l)) `apE` r
 
