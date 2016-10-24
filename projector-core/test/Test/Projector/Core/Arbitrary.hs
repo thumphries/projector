@@ -175,8 +175,6 @@ genWellTypedApp n ty names genty genval = do
 -- -----------------------------------------------------------------------------
 -- Generating ill-typed expressions
 
--- generating well-typed expressions, but at small sizes always pick an inappropriate type.
-
 genIllTypedExpr ::
      (Ground l, Ord l)
   => Jack (Type l)
