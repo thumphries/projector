@@ -1,0 +1,55 @@
+* Projector Core Language
+
+** Syntactic forms
+
+#+BEGIN_SRC
+t ::=
+  x            Var
+  λa:T. e      Abstraction
+  t t          Application
+  l            Primitive
+#+END_SRC
+
+** Types
+
+#+BEGIN_SRC
+T ::=
+  T → T        Arrow
+  L            Ground type
+#+END_SRC
+
+** Evaluation
+
+*** STLC
+
+#+BEGIN_SRC
+
+   t1 → t1'                      t2 → t2'
+-------------- (E-App1)       -------------- (E-App2)
+t1 t2 → t1' t2                v1 t2 → v1 t2'
+
+(λx:T11.t12) v2 → [x ↣ v2]t12  (E-AppAbs)
+
+#+END_SRC
+
+** Typing rules
+
+#+BEGIN_SRC
+
+ x:T ∈ Γ
+--------- (T-Var)
+Γ ⊢ x : T
+
+
+  Γ, x : T1 ⊢ t2 : T2
+------------------------ (T-Abs)
+Γ ⊢ λx:T2.t2 : T1 -> T2
+
+Γ ⊢ t1 : T11 -> T12    Γ ⊢ t2 : T11
+------------------------------------ (T-App)
+           Γ ⊢ t1 t2 : T12
+
+
+---------------- (T-Prim)
+Γ ⊢ l : typeOf l
+#+END_SRC
