@@ -17,7 +17,8 @@ library
                      , ambiata-x-eithert
                      , transformers                    >= 0.4        && < 0.6
                      , bound                           == 1.0.*
-                     , prelude-extras
+                     , prelude-extras                  == 0.4.*
+                     , dlist                           == 0.8.*
 
   ghc-options:
                        -Wall
@@ -29,6 +30,7 @@ library
                        Paths_ambiata_projector_core
 
                        Projector.Core
+                       Projector.Core.Check
                        Projector.Core.Simplify
                        Projector.Core.Syntax
                        Projector.Core.Type
@@ -53,4 +55,6 @@ test-suite test
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , bound
+                     , comonad                         == 4.2.*
                      , mtl
+                     , containers                      == 0.5.*

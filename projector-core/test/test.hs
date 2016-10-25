@@ -1,9 +1,11 @@
 import           Disorder.Core.Main
 
+import qualified Test.Projector.Core.Check as Check
 import qualified Test.Projector.Core.Simplify as Simplify
 
 main :: IO ()
 main =
   disorderMain [
-      Simplify.tests
+      Check.tests
+    , Simplify.tests
     ]
