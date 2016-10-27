@@ -10,7 +10,7 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Simplify (nf, whnf)
+import           Projector.Core.Simplify (alpha, nf, whnf)
 
 import           Test.Projector.Core.Arbitrary
 
@@ -22,6 +22,10 @@ prop_nf_idem =
 prop_whnf_idem =
   gamble genTestExpr $ \e ->
     whnf (whnf e) === whnf e
+
+prop_alpha_idem =
+  gamble genTestExpr $ \e ->
+    alpha (alpha e) === alpha e
 
 
 return []

@@ -11,7 +11,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Check (typeCheck)
-import           Projector.Core.Simplify (nf)
+import           Projector.Core.Simplify (alpha, nf, whnf)
 
 import           Test.Projector.Core.Arbitrary
 
@@ -34,10 +34,20 @@ prop_illtyped_shrink =
   jackShrinkProp 100 genIllTypedTestExpr $ \e ->
     property (isLeft (typeCheck e))
 
-prop_consistent =
+prop_nf_consistent =
   gamble (genType genTestLitT) $ \ty ->
     gamble (genWellTypedTestExpr ty) $ \e ->
       typeCheck (nf e) === pure ty
+
+prop_whnf_consistent =
+  gamble (genType genTestLitT) $ \ty ->
+    gamble (genWellTypedTestExpr ty) $ \e ->
+      typeCheck (whnf e) === pure ty
+
+prop_welltyped_alpha_idem =
+  gamble (genType genTestLitT) $ \ty ->
+    gamble (genWellTypedTestExpr ty) $ \e ->
+      typeCheck (alpha e) === pure ty
 
 
 return []

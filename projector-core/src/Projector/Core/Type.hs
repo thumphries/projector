@@ -21,3 +21,5 @@ data Type l
 class Eq l => Ground l where
   data Value l
   typeOf :: Value l -> l
+  ppGroundType :: l -> Text
+  ppGroundValue :: Value l -> Text
