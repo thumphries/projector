@@ -11,7 +11,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Check (typeCheck)
-import           Projector.Core.Simplify (alpha, nf, whnf)
+import           Projector.Core.Simplify (nf, whnf)
 
 import           Test.Projector.Core.Arbitrary
 
@@ -43,11 +43,6 @@ prop_whnf_consistent =
   gamble (genType genTestLitT) $ \ty ->
     gamble (genWellTypedTestExpr ty) $ \e ->
       typeCheck (whnf e) === pure ty
-
-prop_welltyped_alpha_idem =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      typeCheck (alpha e) === pure ty
 
 
 return []

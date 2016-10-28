@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -281,3 +282,11 @@ genWellTypedTestExpr ty = do
 genIllTypedTestExpr :: Jack (Expr TestLitT)
 genIllTypedTestExpr = do
   genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
+
+
+-- equal up to alpha
+-- TODO would be nice to bring the Eq along for free
+(=@@=) ::
+     (Eq (Value l), Show l, Show (Value l), Ground l)
+  => Expr l -> Expr l -> Property
+(=@@=) = (===) `on` anf
