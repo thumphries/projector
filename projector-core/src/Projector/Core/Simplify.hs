@@ -3,6 +3,7 @@
 module Projector.Core.Simplify (
     nf
   , whnf
+  , anf
   , alpha
   ) where
 
@@ -30,17 +31,18 @@ whnf' ctx expr = case expr of
     expr
 
   EVar x ->
-    maybe expr (whnf' ctx) (M.lookup x ctx)
+    fromMaybe expr (M.lookup x ctx)
 
   ELam x ty e ->
     -- need to finish substituting, even though we're done.
     -- this means this is quite inefficient.
-    ELam x ty (whnf'' ctx e)
+--    ELam x ty (whnf'' ctx e)
+    expr
 
   EApp f g ->
     case whnf' ctx f of
       (ELam x _ e) ->
-        whnf' (M.insert x g ctx) e
+        whnf' (M.insert x (whnf' ctx g) ctx) e
 
       f' ->
         -- Ill-typed term
@@ -54,7 +56,7 @@ whnf'' ctx expr =
       expr
 
     EVar x ->
-      maybe expr (whnf'' ctx) (M.lookup x ctx)
+      fromMaybe expr (M.lookup x ctx)
 
     ELam x ty e ->
       -- need to finish substituting, even though we're done.
@@ -78,31 +80,39 @@ nf' ctx expr =
     expr
 
   EVar x ->
-    maybe expr (nf' ctx) (M.lookup x ctx)
+    fromMaybe expr (M.lookup x ctx)
 
   ELam n ty e ->
     ELam n ty (nf' ctx e) -- wince here
 
   EApp f g ->
-    case whnf' ctx f of
+    case nf' ctx f of
       (ELam n _ e) ->
-        nf' (M.insert n g ctx) e
+        nf' (M.insert n (nf' ctx g) ctx) e
 
       f' ->
         -- Ill-typed term
-        EApp (nf' ctx f') (nf' ctx g)
+        EApp f' (nf' ctx g)
 
+-- | Alpha normalisation.
+--
+-- This replaces all bound names with something in the format "x_1234".
+-- If you care about the original names, use 'alpha\''.
+anf :: Expr l -> Expr l
+anf expr =
+  evalState (alpha' mempty (const (Name "x")) expr) mempty
 
 -- | Alpha conversion.
 --
--- This is very heavy-handed.
+-- This is very heavy-handed. A name is allowed to be bound once only.
+-- All other bindings are suffixed with a number.
 alpha :: Expr l -> Expr l
 alpha expr =
-  evalState (alpha' mempty expr) mempty
+  evalState (alpha' mempty id expr) mempty
 
 -- | Records every name ever bound in the program, freshifying every reuse.
-alpha' :: Map Name Name -> Expr l -> State (Map Name Int) (Expr l)
-alpha' rebinds expr =
+alpha' :: Map Name Name -> (Name -> Name) -> Expr l -> State (Map Name Int) (Expr l)
+alpha' rebinds rename expr =
   case expr of
     ELit _ ->
       pure expr
@@ -111,11 +121,11 @@ alpha' rebinds expr =
       pure (EVar (fromMaybe x (M.lookup x rebinds)))
 
     ELam x ty e -> do
-      new <- freshen x
-      ELam new ty <$> alpha' (M.insert x new rebinds) e
+      new <- freshen (rename x)
+      ELam new ty <$> alpha' (M.insert x new rebinds) rename e
 
     EApp f g ->
-      EApp <$> alpha' rebinds f <*> alpha' rebinds g
+      EApp <$> alpha' rebinds rename f <*> alpha' rebinds rename g
 
 -- | Given some name, modify it such that it is unique, and perform the bookkeeping.
 freshen :: Name -> State (Map Name Int) Name

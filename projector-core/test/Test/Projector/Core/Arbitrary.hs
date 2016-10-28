@@ -158,8 +158,8 @@ genWellTypedApp n ty names genty genval = do
   bnd <- genty
   fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
   arg <- genWellTypedExpr' (n `div` 2) bnd names genty genval
---  reshrink (\x -> [whnf x]) $
-  pure (EApp fun arg)
+  reshrink (\x -> [whnf x]) $
+    pure (EApp fun arg)
 
 
 -- -----------------------------------------------------------------------------
