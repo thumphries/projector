@@ -20,6 +20,8 @@ import           Projector.Core.Syntax (Expr (..), Name (..))
 
 
 -- | Reduce an expression to weak head normal form, i.e. to the outermost abstraction.
+--
+-- This is O(N), buyer beware.
 whnf :: Expr l -> Expr l
 whnf =
   whnf' mempty . alpha
@@ -36,8 +38,7 @@ whnf' ctx expr = case expr of
   ELam x ty e ->
     -- need to finish substituting, even though we're done.
     -- this means this is quite inefficient.
---    ELam x ty (whnf'' ctx e)
-    expr
+    ELam x ty (whnf'' ctx e)
 
   EApp f g ->
     case whnf' ctx f of

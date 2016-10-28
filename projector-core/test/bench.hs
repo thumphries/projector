@@ -16,66 +16,16 @@ import           Projector.Core
 
 import           System.IO (IO)
 
+import           Test.Projector.Core.Arbitrary
+import           Test.Projector.Core.Simplify (mul, nth)
 
--- very simple set of ground types
-
-data BenchLitT
-  = TUnit
-  deriving (Eq, Ord, Show)
-
-instance Ground BenchLitT where
-  data Value BenchLitT = VUnit deriving (Eq, Ord, Show)
-  typeOf _ = TUnit
-  ppGroundType _ = "()"
-  ppGroundValue _ = "()"
-
-unit :: Type BenchLitT
-unit =
-  TLit TUnit
-
--- church numerals
-
-church :: Type BenchLitT
-church =
-  TArrow (TArrow unit unit) (TArrow unit unit)
-
-zero :: Expr BenchLitT
-zero =
-  lam_ "f" (TArrow unit unit)
-    (lam_ "x" unit (var_ "x"))
-
-succ :: Expr BenchLitT
-succ =
-  lam_ "n" church
-    (lam_ "f" (TArrow unit unit)
-      (lam_ "x" unit
-        (EApp
-          (var_ "f")
-          (EApp (EApp (var_ "n") (var_ "f")) (var_ "x")))))
-
-mult :: Expr BenchLitT
-mult =
-  lam_ "m" church
-    (lam_ "n" church
-      (lam_ "f" (TArrow unit unit)
-        (EApp
-          (var_ "m")
-          (EApp (var_ "n") (var_ "f")))))
-
-nth :: Int -> Expr BenchLitT
-nth 0 = zero
-nth n = EApp succ (nth (n - 1))
-
-mul2 :: Int -> Expr BenchLitT
-mul2 n =
-  EApp (EApp mult (nth 2)) (nth n)
 
 -- big lambda billy
 
-buildExpr :: Int -> Expr BenchLitT
+buildExpr :: Int -> Expr TestLitT
 buildExpr n = case n of
   0 -> var_ "billy"
-  m -> EApp (lam_ "billy" unit (buildExpr (m - 1))) (ELit VUnit)
+  m -> EApp (lam_ "billy" (TLit TBool) (buildExpr (m - 1))) (ELit (VBool True))
 
 main :: IO ()
 main = do
@@ -87,6 +37,7 @@ main = do
 
       norm f = C.whnf nf . f
       tc f = C.whnf typeCheck . f
+      mul2 = mul 2
 
   defaultMainWith cfg [
       bgroup "normalise-billy" [
@@ -99,7 +50,6 @@ main = do
         , bench "check-billy-200" $ tc buildExpr 200
         , bench "check-billy-1000" $ tc buildExpr 1000
         ]
-    -- this one is kinda cheating as we never substitute
     , bgroup "normalise-church" [
           bench "normalise-church-100" $ norm nth 100
         , bench "normalise-church-200" $ norm nth 200
