@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -19,77 +18,78 @@ module Projector.Core.Check (
   ) where
 
 
-import qualified Bound as B
-import qualified Bound.Name as B
-
 import           Data.DList (DList)
 import qualified Data.DList as D
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 
 import           P
 
-import           Projector.Core.Syntax (Expr (..))
+import           Projector.Core.Syntax (Expr (..), Name (..))
 import           Projector.Core.Type (Type (..), Ground (..), typeOf)
 
 
-data TypeError l a
+data TypeError l
   = Mismatch (Type l) (Type l)
   | ExpectedArrow (Type l) (Type l)
-  | FreeVariable a
+  | FreeVariable Name
   deriving (Eq, Show)
 
 typeCheck ::
      Ground l
-  => Expr l n a
-  -> Either [TypeError l a] (Type l)
+  => Expr l
+  -> Either [TypeError l] (Type l)
 typeCheck =
-  first D.toList . unCheck . typeCheck' . fmap Unknown
+  first D.toList . unCheck . typeCheck' mempty
 
 
 -- -----------------------------------------------------------------------------
 
-newtype Check l n a = Check {
-    unCheck :: Either (DList (TypeError l n)) a
+newtype Check l a = Check {
+    unCheck :: Either (DList (TypeError l)) a
   } deriving (Functor, Applicative, Monad)
 
-data Annotated l a
-  = Unknown a
-  | Known (Type l)
-  deriving (Eq, Show, Functor)
+-- typing context
+newtype Ctx l = Ctx { unCtx :: Map Name (Type l) }
 
--- Mark all uses of the immediately-bound variable ('B') with its type.
-annotate :: Type l -> B.Var (B.Name n ()) (Annotated l a) -> Annotated l a
-annotate ty e =
-  case e of
-    B.B _ ->
-      Known ty
+instance Monoid (Ctx l) where
+  mempty = Ctx mempty
+  mappend (Ctx a) (Ctx b) = Ctx (mappend a b)
 
-    B.F a ->
-      a
+cextend :: Name -> Type l -> Ctx l -> Ctx l
+cextend n t =
+  Ctx . M.insert n t . unCtx
+
+clookup :: Name -> Ctx l -> Maybe (Type l)
+clookup n =
+  M.lookup n . unCtx
 
 -- As we've got an explicitly-typed calculus, typechecking is
 -- straightforward and syntax-directed. All we have to do is propagate
 -- our type annotations around the tree and use (==) in the right spots.
 typeCheck' ::
      Ground l
-  => Expr l n (Annotated l a)
-  -> Check l a (Type l)
-typeCheck' expr =
+  => Ctx l
+  -> Expr l
+  -> Check l (Type l)
+typeCheck' ctx expr =
   case expr of
     ELit v ->
       pure (TLit (typeOf v))
 
-    EVar (Known ty) ->
-      pure ty
+    EVar n ->
+      case clookup n ctx of
+        Just t ->
+          pure t
+        Nothing ->
+          typeError (FreeVariable n)
 
-    EVar (Unknown a) ->
-      typeError (FreeVariable a)
-
-    ELam ty e -> do
-      tb <- typeCheck' (fmap (annotate ty) (B.fromScope e))
-      pure (TArrow ty tb)
+    ELam n ta e -> do
+      tb <- typeCheck' (cextend n ta ctx) e
+      pure (TArrow ta tb)
 
     EApp a b -> do
-      typs <- checkPair a b
+      typs <- checkPair ctx a b
       case typs of
         (TArrow c d, e) ->
           if c == e then pure d else typeError (Mismatch c e)
@@ -97,33 +97,35 @@ typeCheck' expr =
           typeError (ExpectedArrow d c)
 
 
-typeError :: TypeError l a -> Check l a b
+typeError :: TypeError l -> Check l a
 typeError =
   Check . Left . D.singleton
 
 -- Check a list of 'Expr', using 'apE' to accumulate the errors.
-checkList :: Ground l => [Expr l n (Annotated l a)] -> Check l a [Type l]
-checkList =
+checkList :: Ground l => Ctx l -> [Expr l] -> Check l [Type l]
+checkList ctx =
   -- This could be written with foldl' and DList if laziness / space
   -- became important.
-  Check . foldr fun (pure [])
+  Check . foldr (fun ctx) (pure [])
   where
     fun ::
          Ground l
-      => Expr l n (Annotated l a)
-      -> Either (DList (TypeError l a)) [Type l]
-      -> Either (DList (TypeError l a)) [Type l]
-    fun l r =
-      (unCheck $ fmap (:) (typeCheck' l)) `apE` r
+      => Ctx l
+      -> Expr l
+      -> Either (DList (TypeError l)) [Type l]
+      -> Either (DList (TypeError l)) [Type l]
+    fun ctx' l r =
+      (unCheck $ fmap (:) (typeCheck' ctx' l)) `apE` r
 
 -- Check a pair of 'Expr', using 'apE' to accumulate the errors.
 checkPair ::
      Ground l
-  => Expr l n (Annotated l a)
-  -> Expr l n (Annotated l a)
-  -> Check l a (Type l, Type l)
-checkPair a =
-  Check . (pairE `on` (unCheck . typeCheck')) a
+  => Ctx l
+  -> Expr l
+  -> Expr l
+  -> Check l (Type l, Type l)
+checkPair ctx a =
+  Check . (pairE `on` (unCheck . typeCheck' ctx)) a
 
 
 -- -----------------------------------------------------------------------------

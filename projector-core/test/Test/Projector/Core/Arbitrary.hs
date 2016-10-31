@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -7,15 +8,13 @@
 module Test.Projector.Core.Arbitrary where
 
 
-import qualified Bound as B
-import qualified Bound.Name as B
-import qualified Bound.Var as B
-
 import           Control.Comonad (Comonad (..))
 
 import           Data.List as L
 import           Data.Map.Strict  (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
+
 import           Disorder.Corpus
 import           Disorder.Jack
 
@@ -41,7 +40,7 @@ genType g =
 
   in oneOfRec nonrec recc
 
-genExpr :: Jack Text -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l Text Text)
+genExpr :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
 genExpr n t v =
   let shrink z = case z of
         ELit _ ->
@@ -53,11 +52,8 @@ genExpr n t v =
         EApp x y ->
           [x, y]
 
-        ELam _ x ->
-          -- need to walk under binders with fromScope
-          -- and give sensible names to all the anonymous bound variables.
-          -- luckily, we were tracking their source names using Bound.Name!
-          [uninstantiate (B.fromScope x)]
+        ELam _ _ e ->
+          [e]
 
       nonrec = [
           ELit <$> v
@@ -70,7 +66,7 @@ genExpr n t v =
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
-genLam :: Jack Text -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l Text Text)
+genLam :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
 genLam n t v = do
   nam <- n
   typ <- t
@@ -79,28 +75,23 @@ genLam n t v = do
   bdy <- genExpr n' t v
   pure (lam nam typ bdy)
 
--- Use source metadata in Bound.Name to restore names to instantiated variables.
-uninstantiate :: Expr l Text (B.Var (B.Name Text ()) Text) -> Expr l Text Text
-uninstantiate =
-  fmap (B.unvar B.name id)
-
 
 -- -----------------------------------------------------------------------------
 -- Generating well-typed expressions
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
-newtype Context l = Context { unContext :: Map Text (Type l) }
+newtype Context l = Context { unContext :: Map Name (Type l) }
   deriving (Eq, Show)
 
 centy :: Context l
 centy = Context mempty
 
-cextend :: (Ground l, Ord l) => Context l -> Type l -> Text -> Context l
+cextend :: (Ground l, Ord l) => Context l -> Type l -> Name -> Context l
 cextend c t n =
   Context (M.insert n t (unContext c))
 
-clookup :: (Ground l, Ord l) => Context l -> Type l -> Maybe [Text]
+clookup :: (Ground l, Ord l) => Context l -> Type l -> Maybe [Name]
 clookup c t =
    -- this is extraordinarily dumb but does the job
    (M.lookup t (foldl' (\m (k, v) -> M.insertWith (<>) v [k] m) mempty (M.toList (unContext c))))
@@ -110,7 +101,7 @@ genWellTypedExpr ::
   => Type l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genWellTypedExpr ty genty genval =
   sized $ \n -> do
     k <- choose (0, n)
@@ -123,7 +114,7 @@ genWellTypedExpr' ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genWellTypedExpr' n ty names genty genval =
   let gen = case ty of
         TLit l ->
@@ -150,9 +141,9 @@ genWellTypedLam ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genWellTypedLam n bnd ty names genty genval = do
-  name <- elements muppets -- FIX parameterise this
+  name <- fmap Name (elements muppets) -- FIX parameterise this
   bdy <- genWellTypedExpr' (n `div` 2) ty (cextend names bnd name) genty genval
   pure (lam name bnd bdy)
 
@@ -163,7 +154,7 @@ genWellTypedApp ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genWellTypedApp n ty names genty genval = do
   bnd <- genty
   fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
@@ -179,7 +170,7 @@ genIllTypedExpr ::
      (Ground l, Ord l)
   => Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genIllTypedExpr genty genval =
   sized $ \n -> do
     k <- choose (0, n)
@@ -191,7 +182,7 @@ genIllTypedExpr' ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l Text Text)
+  -> Jack (Expr l)
 genIllTypedExpr' n names genty genval = do
   -- it can only be an app afaict
   ty <- genty
@@ -239,6 +230,21 @@ instance Ground TestLitT where
     VInt _ -> TInt
     VString _ -> TString
 
+  ppGroundType t = case t of
+    TBool -> "Bool"
+    TInt -> "Int"
+    TString -> "String"
+
+  ppGroundValue v = case v of
+    VBool b ->
+      if b then "true" else "false"
+
+    VInt n ->
+      renderIntegral n
+
+    VString s ->
+      T.pack (show s)
+
 genTestLitT :: Jack TestLitT
 genTestLitT =
   elements [
@@ -265,14 +271,22 @@ genWellTypedTestLitValue t =
 -- -----------------------------------------------------------------------------
 -- Generators you might actually use
 
-genTestExpr :: Jack (Expr TestLitT Text Text)
+genTestExpr :: Jack (Expr TestLitT)
 genTestExpr =
-  genExpr (elements muppets) (genType genTestLitT) genTestLitValue
+  genExpr (fmap Name (elements muppets)) (genType genTestLitT) genTestLitValue
 
-genWellTypedTestExpr :: Type TestLitT -> Jack (Expr TestLitT Text Text)
+genWellTypedTestExpr :: Type TestLitT -> Jack (Expr TestLitT)
 genWellTypedTestExpr ty = do
   genWellTypedExpr ty (genType genTestLitT) genWellTypedTestLitValue
 
-genIllTypedTestExpr :: Jack (Expr TestLitT Text Text)
+genIllTypedTestExpr :: Jack (Expr TestLitT)
 genIllTypedTestExpr = do
   genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
+
+
+-- equal up to alpha
+-- TODO would be nice to bring the Eq along for free
+(=@@=) ::
+     (Eq (Value l), Show l, Show (Value l), Ground l)
+  => Expr l -> Expr l -> Property
+(=@@=) = (===) `on` alphaNf

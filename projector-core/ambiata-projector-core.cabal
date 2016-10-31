@@ -16,9 +16,9 @@ library
                      , ambiata-p
                      , ambiata-x-eithert
                      , transformers                    >= 0.4        && < 0.6
-                     , bound                           == 1.0.*
-                     , prelude-extras                  == 0.4.*
                      , dlist                           == 0.8.*
+                     , containers                      == 0.5.*
+                     , text                            == 1.2.*
 
   ghc-options:
                        -Wall
@@ -31,6 +31,7 @@ library
 
                        Projector.Core
                        Projector.Core.Check
+                       Projector.Core.Pretty
                        Projector.Core.Simplify
                        Projector.Core.Syntax
                        Projector.Core.Type
@@ -54,7 +55,23 @@ test-suite test
                      , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
-                     , bound
                      , comonad                         == 4.2.*
                      , mtl
-                     , containers                      == 0.5.*
+                     , containers
+                     , text
+
+benchmark bench
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             bench.hs
+  ghc-options:         -Wall -threaded -O2
+  build-depends:       base
+                     , ambiata-projector-core
+                     , ambiata-p
+                     , ambiata-disorder-core
+                     , ambiata-disorder-corpus
+                     , ambiata-disorder-jack
+                     , criterion                       == 1.1.*
+                     , text
+                     , comonad                         == 4.2.*
+                     , containers
