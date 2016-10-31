@@ -3,7 +3,7 @@
 module Projector.Core.Simplify (
     nf
   , whnf
-  , anf
+  , alphaNf
   , alpha
   ) where
 
@@ -27,6 +27,7 @@ whnf =
   whnf' mempty . alpha
 
 -- | Unsafe version of 'whnf'. This substitutes into abstractions and may lead to capture.
+-- This is only safe when all bound names are unique. It is also O(N).
 whnf' :: Map Name (Expr l) -> Expr l -> Expr l
 whnf' ctx expr = case expr of
   ELit _ ->
@@ -68,12 +69,13 @@ whnf'' ctx expr =
       EApp (whnf'' ctx f) (whnf'' ctx g)
 
 
--- | Reduce an expression to normal form.
+-- | Reduce an expression to beta normal form.
 nf :: Expr l -> Expr l
 nf =
   nf' mempty . alpha
 
 -- | Unsafe version of 'nf'. This substitutes into abstractions and may lead to capture.
+-- This is only safe when all bound names are unique.
 nf' :: Map Name (Expr l) -> Expr l -> Expr l
 nf' ctx expr =
  case expr of
@@ -98,9 +100,9 @@ nf' ctx expr =
 -- | Alpha normalisation.
 --
 -- This replaces all bound names with something in the format "x_1234".
--- If you care about the original names, use 'alpha\''.
-anf :: Expr l -> Expr l
-anf expr =
+-- If you care about the original names, use 'alpha'.
+alphaNf :: Expr l -> Expr l
+alphaNf expr =
   evalState (alpha' mempty (const (Name "x")) expr) mempty
 
 -- | Alpha conversion.
@@ -112,6 +114,8 @@ alpha expr =
   evalState (alpha' mempty id expr) mempty
 
 -- | Records every name ever bound in the program, freshifying every reuse.
+--
+-- TODO: Should probably add a first pass to collect/protect free variables.
 alpha' :: Map Name Name -> (Name -> Name) -> Expr l -> State (Map Name Int) (Expr l)
 alpha' rebinds rename expr =
   case expr of

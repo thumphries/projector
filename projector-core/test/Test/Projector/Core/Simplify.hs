@@ -10,7 +10,7 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Simplify (anf, alpha, nf, whnf)
+import           Projector.Core.Simplify (alphaNf, alpha, nf, whnf)
 import           Projector.Core.Syntax (Expr (..), lam_, var_)
 import           Projector.Core.Type (Type(..))
 
@@ -35,9 +35,9 @@ prop_whnf_nf_idem =
     gamble (genWellTypedTestExpr ty) $ \e ->
       whnf (nf e) === nf e
 
-prop_anf_idem =
+prop_alphaNf_idem =
   gamble genTestExpr $ \e ->
-    anf (anf e) === anf e
+    alphaNf (alphaNf e) === alphaNf e
 
 prop_alpha_idem =
   gamble genTestExpr $ \e ->

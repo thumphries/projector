@@ -289,4 +289,4 @@ genIllTypedTestExpr = do
 (=@@=) ::
      (Eq (Value l), Show l, Show (Value l), Ground l)
   => Expr l -> Expr l -> Property
-(=@@=) = (===) `on` anf
+(=@@=) = (===) `on` alphaNf
