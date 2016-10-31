@@ -11,8 +11,8 @@ import qualified Data.Text as T
 
 import           P
 
-import           Projector.Core.Syntax (Expr (..), Name (..))
-import           Projector.Core.Type (Type (..), Ground (..))
+import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
+import           Projector.Core.Type (Type (..), Ground (..), Constructor (..), TypeName (..))
 
 
 ppType :: Ground l => Type l -> Text
@@ -23,6 +23,9 @@ ppType t =
 
     TArrow a b ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
+
+    TVariant (TypeName ty) _ ->
+      ty
 
 ppExpr :: Ground l => Expr l -> Text
 ppExpr =
@@ -48,7 +51,24 @@ ppExpr' types e =
 
     ELam (Name n) t f ->
       "\\" <> n <> typeMay t <> ". " <> ppExpr' types f
+
+    ECon (Constructor c) t es ->
+      c <> typeMay t <> T.unwords (fmap (parenMay . ppExpr' types) es)
+
+    ECase f bs ->
+      "case " <> ppExpr' types f <> " of " <>
+        T.intercalate "; " (fmap (\(p, g) -> ppPattern p <> " -> " <> ppExpr' types g) bs)
+
   where typeMay t = if types then " : " <> ppType t else T.empty
+
+ppPattern :: Pattern -> Text
+ppPattern p =
+  case p of
+    PVar (Name n) ->
+      n
+
+    PCon (Constructor c) ps ->
+      c <> " " <> T.unwords (fmap (parenMay . ppPattern) ps)
 
 hasSpace :: Text -> Bool
 hasSpace =
