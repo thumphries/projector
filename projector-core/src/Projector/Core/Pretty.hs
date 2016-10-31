@@ -52,8 +52,8 @@ ppExpr' types e =
     ELam (Name n) t f ->
       "\\" <> n <> typeMay t <> ". " <> ppExpr' types f
 
-    ECon (Constructor c) t es ->
-      c <> typeMay t <> T.unwords (fmap (parenMay . ppExpr' types) es)
+    ECon (Constructor c) _ es ->
+      c <> " " <> T.unwords (fmap (parenMay . ppExpr' types) es)
 
     ECase f bs ->
       "case " <> ppExpr' types f <> " of " <>

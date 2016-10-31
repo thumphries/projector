@@ -10,12 +10,13 @@ module Projector.Core.Simplify (
 
 import           Control.Monad.Trans.State (State, evalState, get, put)
 
+import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
 import           P
 
-import           Projector.Core.Syntax (Expr (..), Name (..))
+import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 
 
 
@@ -50,6 +51,13 @@ whnf' ctx expr = case expr of
         -- Ill-typed term
         EApp f' g
 
+  ECon c ty es ->
+    ECon c ty es
+
+  ECase e ps ->
+    -- case reduction is considered the same as application
+    undefined
+
 -- propagate substitutions around :(
 whnf'' :: Map Name (Expr l) -> Expr l -> Expr l
 whnf'' ctx expr =
@@ -67,6 +75,12 @@ whnf'' ctx expr =
 
     EApp f g ->
       EApp (whnf'' ctx f) (whnf'' ctx g)
+
+    ECon c ty es ->
+      ECon c ty (fmap (whnf'' ctx) es)
+
+    ECase e ps ->
+      ECase (whnf'' ctx e) (fmap (fmap (whnf'' ctx)) ps)
 
 
 -- | Reduce an expression to beta normal form.
@@ -97,6 +111,12 @@ nf' ctx expr =
         -- Ill-typed term
         EApp f' (nf' ctx g)
 
+  ECon c ty es ->
+    ECon c ty (fmap (nf' ctx) es)
+
+  ECase e ps ->
+    undefined
+
 -- | Alpha normalisation.
 --
 -- This replaces all bound names with something in the format "x_1234".
@@ -116,6 +136,9 @@ alpha expr =
 -- | Records every name ever bound in the program, freshifying every reuse.
 --
 -- TODO: Should probably add a first pass to collect/protect free variables.
+--
+-- TODO: Seems like there's some kind of
+-- mapBinds/foldBinds/traverseBinds, mapFree/foldFree/traverseFree possible here
 alpha' :: Map Name Name -> (Name -> Name) -> Expr l -> State (Map Name Int) (Expr l)
 alpha' rebinds rename expr =
   case expr of
@@ -131,6 +154,33 @@ alpha' rebinds rename expr =
 
     EApp f g ->
       EApp <$> alpha' rebinds rename f <*> alpha' rebinds rename g
+
+    ECon c ty es ->
+      ECon c ty <$> traverse (alpha' rebinds rename) es
+
+    ECase e ps -> do
+      e' <- alpha' rebinds rename e
+      ps' <- for ps $ \(pat, body) -> do
+        (pat', rebinds') <- alphaPat' rebinds rename pat
+        body' <- alpha' rebinds' rename body
+        pure (pat', body')
+      pure (ECase e' ps')
+
+alphaPat' :: Map Name Name -> (Name -> Name) -> Pattern -> State (Map Name Int) (Pattern, Map Name Name)
+alphaPat' rebinds rename p =
+  case p of
+    PVar x -> do
+      new <- freshen (rename x)
+      pure (PVar new, M.insert x new rebinds)
+
+    PCon c pats -> do
+      (pats', rebinds') <- foldM (accum rename) ([], rebinds) pats
+      pure (PCon c (L.reverse pats'), rebinds')
+
+  where
+    accum rename' (acc, rebinds') p2 = do
+      (p2', rebinds'') <- alphaPat' rebinds' rename' p2
+      pure (p2':acc, rebinds'')
 
 -- | Given some name, modify it such that it is unique, and perform the bookkeeping.
 freshen :: Name -> State (Map Name Int) Name

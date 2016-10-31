@@ -11,6 +11,9 @@ module Projector.Core.Syntax (
   , lam
   , lam_
   , var_
+  -- * pattern constructors
+  , pvar_
+  , pcon_
   ) where
 
 
@@ -57,3 +60,11 @@ lam_ n =
 var_ :: Text -> Expr l
 var_ =
   EVar . Name
+
+pvar_ :: Text -> Pattern
+pvar_ =
+  PVar . Name
+
+pcon_ :: Text -> [Pattern] -> Pattern
+pcon_ =
+  PCon . Constructor
