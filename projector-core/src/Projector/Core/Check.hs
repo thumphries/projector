@@ -1,7 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
   -- * User interface
     typeCheck
@@ -28,15 +31,22 @@ import qualified Data.Map.Strict as M
 import           P
 
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
-import           Projector.Core.Type (Type (..), Ground (..), typeOf)
+import           Projector.Core.Type (Type (..), Constructor (..), Ground (..), typeOf)
 
 
 data TypeError l
   = Mismatch (Type l) (Type l)
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
+  | BadConstructorName Constructor (Type l)
+  | BadConstructorArity Constructor (Type l) Int
   | BadPattern (Type l) Pattern
-  deriving (Eq, Show)
+  | NonExhaustiveCase (Expr l) (Type l)
+
+deriving instance (Eq l, Eq (Value l)) => Eq (TypeError l)
+deriving instance (Show l, Show (Value l)) => Show (TypeError l)
+deriving instance (Ord l, Ord (Value l)) => Ord (TypeError l)
+
 
 typeCheck ::
      Ground l
@@ -119,7 +129,13 @@ typeCheck' ctx expr =
       ty <- typeCheck' ctx e
       tzs <- listC $ fmap (uncurry (checkPattern ctx ty)) pes
       -- whole list needs to be equal
-      undefined
+      case L.nub tzs of
+        x:[] ->
+          pure x
+        x:y:_ ->
+          typeError (Mismatch x y)
+        [] ->
+          typeError (NonExhaustiveCase expr ty)
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
@@ -134,7 +150,7 @@ checkPattern' ctx ty pat =
     (t, PVar x) ->
       pure (cextend x t ctx)
 
-    (TVariant n cs, PCon c pats) -> do
+    (TVariant _ cs, PCon c pats) -> do
       -- find the constructor in the type
       ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
       -- check the lists are the same length
@@ -148,8 +164,6 @@ checkPattern' ctx ty pat =
 typeError :: TypeError l -> Check l a
 typeError =
   Check . Left . D.singleton
-
-checkList ctx = listC . fmap (typeCheck' ctx)
 
 -- Check a pair of 'Expr', using 'apE' to accumulate the errors.
 checkPair ::
