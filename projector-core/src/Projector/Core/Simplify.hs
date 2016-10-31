@@ -5,6 +5,7 @@ module Projector.Core.Simplify (
   , whnf
   , alphaNf
   , alpha
+  , match
   ) where
 
 
@@ -26,6 +27,8 @@ import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 whnf :: Expr l -> Expr l
 whnf =
   whnf' mempty . alpha
+
+-- TODO: Might as well use Reader, so we can use whnf in our nf strategy
 
 -- | Unsafe version of 'whnf'. This substitutes into abstractions and may lead to capture.
 -- This is only safe when all bound names are unique. It is also O(N).
@@ -52,11 +55,17 @@ whnf' ctx expr = case expr of
         EApp f' g
 
   ECon c ty es ->
-    ECon c ty es
+    ECon c ty (fmap (whnf'' ctx) es)
 
   ECase e ps ->
     -- case reduction is considered the same as application
-    undefined
+    let e' = whnf' ctx e
+        mnf = asum . with ps $ \(p, b) -> do
+          ctx' <- match ctx p e'
+          pure (whnf' ctx' b)
+    -- if nothing matches, we can't reduce, leave it alone.
+    in fromMaybe (whnf'' ctx expr) mnf
+
 
 -- propagate substitutions around :(
 whnf'' :: Map Name (Expr l) -> Expr l -> Expr l
@@ -115,7 +124,29 @@ nf' ctx expr =
     ECon c ty (fmap (nf' ctx) es)
 
   ECase e ps ->
-    undefined
+    let e' = nf' ctx e
+        mnf = asum . with ps $ \(p, b) -> do
+          ctx' <- match ctx p e'
+          pure (nf' ctx' b)
+    -- if nothing matches, we can't reduce, leave it alone.
+    in fromMaybe expr mnf
+
+-- | Pattern matching. Returns 'Nothing' if no match is possible.
+match :: Map Name (Expr l) -> Pattern -> Expr l -> Maybe (Map Name (Expr l))
+match ctx pat expr =
+  case (pat, expr) of
+    (PVar n, e) ->
+      -- Variable patterns always succeed.
+      pure (M.insert n e ctx)
+
+    (PCon c1 ps, ECon c2 _ es) ->
+      -- Constructor names and arity have to match.
+      if (c1 == c2) && (length ps == length es)
+        then foldM (\ctx' (p, e) -> match ctx' p e) ctx (L.zip ps es)
+        else empty
+
+    _ ->
+      empty
 
 -- | Alpha normalisation.
 --
