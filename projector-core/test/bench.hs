@@ -27,6 +27,17 @@ buildExpr n = case n of
   0 -> var_ "billy"
   m -> EApp (lam_ "billy" (TLit TBool) (buildExpr (m - 1))) (ELit (VBool True))
 
+-- big case
+
+buildCase :: Int -> Expr TestLitT
+buildCase n = case n of
+  0 -> var_ "x"
+  m -> ECase (ECon (Constructor "Casey") tcasey [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
+
+tcasey :: Type TestLitT
+tcasey =
+  TVariant (TypeName "Casey") [(Constructor "Casey", [TLit TBool])]
+
 main :: IO ()
 main = do
   let cfg =
@@ -69,5 +80,15 @@ main = do
           bench "check-church-mul2-100" $ tc mul2 100
         , bench "check-church-mul2-200" $ tc mul2 200
         , bench "check-church-mul2-1000" $ tc mul2 1000
+        ]
+    , bgroup "normalise-casey" [
+          bench "normalise-casey-100" $ norm buildCase 100
+        , bench "normalise-casey-200" $ norm buildCase 200
+        , bench "normalise-casey-1000" $ norm buildCase 1000
+        ]
+    , bgroup "check-casey" [
+          bench "check-casey-100" $ tc buildCase 100
+        , bench "check-casey-200" $ tc buildCase 200
+        , bench "check-casey-1000" $ tc buildCase 1000
         ]
     ]

@@ -245,6 +245,8 @@ genIllTypedExpr' n names genty genval = do
   arg <- genWellTypedExpr' (n `div` 2) nbnd names genty genval
   pure (EApp fun arg)
 
+  -- can also be a case statement
+  -- or a malformed constructor
 
 -- -----------------------------------------------------------------------------
 -- XXX Useful Jack combinators
