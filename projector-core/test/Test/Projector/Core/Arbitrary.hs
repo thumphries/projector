@@ -129,20 +129,59 @@ genPattern c n =
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
-newtype Context l = Context { unContext :: Map Name (Type l) }
-  deriving (Eq, Show)
+data Context l = Context {
+    cnames :: Map Name (Type l)
+  , cpaths :: Map (Type l) [(Name, Type l)]
+  } deriving (Eq, Show)
 
-centy :: Context l
-centy = Context mempty
+centy :: Ord l => Context l
+centy =
+  Context mempty mempty
 
 cextend :: (Ground l, Ord l) => Context l -> Type l -> Name -> Context l
-cextend c t n =
-  Context (M.insert n t (unContext c))
+cextend (Context ns p) t n =
+  pinsert (Context (M.insert n t ns) p) n t
 
 clookup :: (Ground l, Ord l) => Context l -> Type l -> Maybe [Name]
 clookup c t =
    -- this is extraordinarily dumb but does the job
-   (M.lookup t (foldl' (\m (k, v) -> M.insertWith (<>) v [k] m) mempty (M.toList (unContext c))))
+   (M.lookup t (foldl' (\m (k, v) -> M.insertWith (<>) v [k] m) mempty (M.toList (cnames c))))
+
+-- Look up any values that give us a path to the given type.
+-- needs to be filtered to remove any shadowed values.
+plookup :: (Ground l, Ord l) => Context l -> Type l -> Maybe [(Name, Type l)]
+plookup ctx want =
+  with (M.lookup want (cpaths ctx)) $ \nts ->
+    catMaybes (fmap (\(n, t1) -> M.lookup n (cnames ctx) >>= \t2 -> guard (t2 == t1) *> pure (n, t1)) nts)
+
+-- record all the types we can reach via the recorded type
+pinsert :: Ord l => Context l -> Name -> Type l -> Context l
+pinsert (Context ns p) n t =
+  Context ns . mcons t (n, t) $ case t of
+    TLit _ ->
+      p
+
+    TArrow _ to ->
+      mcons to (n, t) p
+
+    TVariant _ cts ->
+      -- break it apart just one tier
+      -- TODO: try recursing, might be cool
+      foldl'
+        (\p' (_, ts) ->
+          foldl'
+            (\m u ->
+              mcons u (n, t) m)
+            p'
+            ts)
+        p
+        cts
+
+mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
+mcons k v =
+  M.alter (\x -> Just (v : fromMaybe [] x)) k
+
+-- update :: Ord k => (a -> Maybe a) -> k -> Map k a -> Map k a
 
 genWellTypedExpr ::
      (Ground l, Ord l)
@@ -178,13 +217,67 @@ genWellTypedExpr' n ty names genty genval =
           ECon con ty <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t names genty genval) tys
 
   -- try to look something appropriate up from the context
-  -- TODO: need to also look up 'paths' from things in the context, e.g. sums we can case on, functions we can apply.
-  in case clookup names ty of
+  in case plookup names ty of
        Nothing -> gen
        Just xs ->
-         if n <= 1
-           then elements (fmap EVar xs)
-           else gen
+         let (nonrec, recc) = partitionPaths xs
+             oneOfOr ys = if isJust (P.head ys) then oneOf ys else gen
+             genPath = uncurry (genWellTypedPath names (\c t -> genWellTypedExpr' (n `div` 2) t c genty genval) ty)
+         in (oneOfOr . fmap genPath) $ if n <= 1 then nonrec else recc
+
+-- Separate simple paths from complicated ones. should probably do this structurally
+partitionPaths :: [(Name, Type l)] -> ([(Name, Type l)], [(Name, Type l)])
+partitionPaths =
+  L.partition $ \(_, ty) ->
+    case ty of
+      TLit _ ->
+        True
+      _ ->
+        False
+
+-- Given a known path to some type, generate an expression of that type.
+genWellTypedPath ::
+     (Ord l, Ground l)
+  => Context l
+  -> (Context l -> Type l -> Jack (Expr l))
+  -> Type l
+  -> Name
+  -> Type l
+  -> Jack (Expr l)
+genWellTypedPath ctx more want x have =
+  case have of
+    TVariant _ cts ->
+      ECase (EVar x) <$> genAlternatives ctx more cts want
+
+    TArrow from _ -> do
+      arg <- more ctx from
+      pure (EApp (EVar x) arg)
+
+    TLit _ ->
+      -- straightforward lookup
+      pure (EVar x)
+
+genAlternatives ::
+     (Ord l, Ground l)
+  => Context l
+  -> (Context l -> Type l -> Jack (Expr l))
+  -> [(Constructor, [Type l])]
+  -> Type l
+  -> Jack [(Pattern, Expr l)]
+genAlternatives ctx more cts want =
+  for cts $ \(c, tys) -> do
+    let bnds = L.take (length tys) (freshNames "x")
+        pat = PCon c (fmap PVar bnds)
+    let ctx' = foldl' (\cc (ty, na) -> cextend cc ty na) ctx (L.zip tys bnds)
+    ex <- more ctx' want
+    pure (pat, ex)
+
+-- From a stem, an infinite list of unique names.
+freshNames :: Text -> [Name]
+freshNames stem =
+  fresh' stem (0 :: Int)
+  where
+    fresh' n k = Name (n <> "_" <> renderIntegral k) : fresh' n (k+1)
 
 genWellTypedLam ::
      (Ground l, Ord l)
