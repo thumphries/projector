@@ -11,6 +11,7 @@ module Test.Projector.Core.Arbitrary where
 import           Control.Comonad (Comonad (..))
 
 import           Data.List as L
+import qualified Data.List.NonEmpty as NE
 import           Data.Map.Strict  (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -36,9 +37,24 @@ genType g =
 
       recc = [
           TArrow <$> genType g <*> genType g
+        , TVariant <$> genTypeName <*> genVariants g
         ]
 
   in oneOfRec nonrec recc
+
+genTypeName :: Jack TypeName
+genTypeName =
+  fmap (TypeName . T.toTitle) (elements boats)
+
+genConstructor :: Jack Constructor
+genConstructor =
+  fmap (Constructor . T.toTitle) (elements waters)
+
+genVariants :: Jack l -> Jack [(Constructor, [Type l])]
+genVariants t =
+  fmap (M.toList . M.fromList . NE.toList) . listOf1 $
+    (,) <$> genConstructor
+        <*> listOf (genType t)
 
 genExpr :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
 genExpr n t v =
@@ -55,6 +71,12 @@ genExpr n t v =
         ELam _ _ e ->
           [e]
 
+        ECon _ _ es ->
+          es
+
+        ECase e pes ->
+          e : fmap snd pes
+
       nonrec = [
           ELit <$> v
         , EVar <$> n
@@ -63,6 +85,8 @@ genExpr n t v =
       recc = [
           EApp <$> genExpr n t v <*> genExpr n t v
         , genLam n t v
+        , genCon t (genExpr n t v)
+        , genCase (genExpr n t v) (genPattern genConstructor n) 
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
@@ -75,6 +99,22 @@ genLam n t v = do
   bdy <- genExpr n' t v
   pure (lam nam typ bdy)
 
+genCon :: Jack (Type l) -> Jack (Expr l) -> Jack (Expr l)
+genCon t v =
+  ECon
+    <$> genConstructor
+    <*> t
+    <*> listOf v
+
+genCase :: Jack (Expr l) -> Jack Pattern -> Jack (Expr l)
+genCase e p =
+  ECase
+    <$> e
+    <*> (fmap NE.toList (listOf1 $ (,) <$> p <*> e))
+
+genPattern :: Jack Constructor -> Jack Name -> Jack Pattern
+genPattern c n =
+  oneOfRec [fmap PVar n] [PCon <$> c <*> listOf (genPattern c n)]
 
 -- -----------------------------------------------------------------------------
 -- Generating well-typed expressions
