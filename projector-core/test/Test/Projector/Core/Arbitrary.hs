@@ -86,7 +86,7 @@ genExpr n t v =
           EApp <$> genExpr n t v <*> genExpr n t v
         , genLam n t v
         , genCon t (genExpr n t v)
-        , genCase (genExpr n t v) (genPattern genConstructor n) 
+        , genCase (genExpr n t v) (genPattern genConstructor n)
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
@@ -165,7 +165,12 @@ genWellTypedExpr' n ty names genty genval =
         TArrow t1 t2 ->
           genWellTypedLam n t1 t2 names genty genval
 
+        TVariant _ cts -> do
+          (con, tys) <- elements cts
+          ECon con ty <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t names genty genval) tys
+
   -- try to look something appropriate up from the context
+  -- TODO: need to also look up 'paths' from things in the context, e.g. sums we can case on, functions we can apply.
   in case clookup names ty of
        Nothing -> gen
        Just xs ->
