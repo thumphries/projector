@@ -30,15 +30,23 @@ import           Projector.Core.Type
 -- Generating completely arbitrary expressions (mostly ill-typed)
 
 genType :: Jack l -> Jack (Type l)
-genType g =
+genType g = do
+    m <- chooseInt (1, 20)
+    n <- chooseInt (0, 10)
+    genType' m n g
+
+genType' :: Int -> Int -> Jack l -> Jack (Type l)
+genType' m n g =
   let nonrec = [
           TLit <$> g
         ]
 
       recc = [
-          TArrow <$> genType g <*> genType g
-        , TVariant <$> genTypeName <*> genVariants g
+          TArrow <$> rtype <*> rtype
+        , TVariant <$> genTypeName <*> genVariants m n g
         ]
+
+      rtype = genType' (max 1 (m `div` 2)) (n `div` 2) g
 
   in oneOfRec nonrec recc
 
@@ -50,11 +58,11 @@ genConstructor :: Jack Constructor
 genConstructor =
   fmap (Constructor . T.toTitle) (elements waters)
 
-genVariants :: Jack l -> Jack [(Constructor, [Type l])]
-genVariants t =
-  fmap (M.toList . M.fromList . NE.toList) . listOf1 $
+genVariants :: Int -> Int -> Jack l -> Jack [(Constructor, [Type l])]
+genVariants m n t =
+  fmap (M.toList . M.fromList) . listOfN 1 m $
     (,) <$> genConstructor
-        <*> listOf (genType t)
+        <*> listOfN 0 n (genType' (max 1 (m `div` 2)) (n `div` 2) t)
 
 genExpr :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
 genExpr n t v =

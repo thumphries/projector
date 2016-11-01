@@ -59,6 +59,7 @@ test-suite test
                      , mtl
                      , containers
                      , text
+                     , semigroups
 
 benchmark bench
   type:                exitcode-stdio-1.0
@@ -75,3 +76,4 @@ benchmark bench
                      , text
                      , comonad                         == 4.2.*
                      , containers
+                     , semigroups
