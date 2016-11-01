@@ -64,7 +64,7 @@ whnf' ctx expr = case expr of
           ctx' <- match ctx p e'
           pure (whnf' ctx' b)
     -- if nothing matches, we can't reduce, leave it alone.
-    in fromMaybe (whnf'' ctx expr) mnf
+    in maybe (whnf'' ctx expr) (whnf' ctx) mnf
 
 
 -- propagate substitutions around :(
