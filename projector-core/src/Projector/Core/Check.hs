@@ -129,7 +129,11 @@ typeCheck' ctx expr =
     ECase e pes -> do
       ty <- typeCheck' ctx e
       let tzs = fmap (uncurry (checkPattern ctx ty)) pes
+      -- whole list needs to be equal
       unifyList (typeError (NonExhaustiveCase expr ty)) tzs
+
+    EList ty es -> do
+      TList <$> unifyList (pure ty) (fmap (typeCheck' ctx) es)
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)

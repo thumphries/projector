@@ -27,6 +27,9 @@ ppType t =
     TVariant (TypeName ty) _ ->
       ty
 
+    TList ty ->
+      "[" <> ppType ty <> "]"
+
 ppExpr :: Ground l => Expr l -> Text
 ppExpr =
   ppExpr' True
@@ -58,6 +61,9 @@ ppExpr' types e =
     ECase f bs ->
       "case " <> ppExpr' types f <> " of " <>
         T.intercalate "; " (fmap (\(p, g) -> ppPattern p <> " -> " <> ppExpr' types g) bs)
+
+    EList _ es ->
+      "[" <> T.intercalate ", " (fmap (ppExpr' types) es) <> "]"
 
   where typeMay t = if types then " : " <> ppType t else T.empty
 
