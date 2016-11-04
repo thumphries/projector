@@ -128,15 +128,8 @@ typeCheck' ctx expr =
 
     ECase e pes -> do
       ty <- typeCheck' ctx e
-      tzs <- listC $ fmap (uncurry (checkPattern ctx ty)) pes
-      -- whole list needs to be equal
-      case L.nub tzs of
-        x:[] ->
-          pure x
-        [] ->
-          typeError (NonExhaustiveCase expr ty)
-        xs ->
-          typeError (CouldNotUnify xs)
+      let tzs = fmap (uncurry (checkPattern ctx ty)) pes
+      unifyList (typeError (NonExhaustiveCase expr ty)) tzs
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
@@ -162,6 +155,17 @@ checkPattern' ctx ty pat =
           foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
         _ ->
           typeError (BadPattern ty pat)
+
+unifyList :: Ground l => Check l (Type l) -> [Check l (Type l)] -> Check l (Type l)
+unifyList none es = do
+  tzs <- listC es
+  case L.nub tzs of
+    x:[] ->
+      pure x
+    [] ->
+      none
+    xs ->
+      typeError (CouldNotUnify xs)
 
 typeError :: TypeError l -> Check l a
 typeError =
