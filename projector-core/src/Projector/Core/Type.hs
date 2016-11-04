@@ -21,6 +21,7 @@ data Type l
   = TLit l
   | TArrow (Type l) (Type l)
   | TVariant TypeName [(Constructor, [Type l])]
+  | TList (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
 -- | The class of user-supplied primitive types.
