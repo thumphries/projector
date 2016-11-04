@@ -1,7 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
   -- * User interface
     typeCheck
@@ -11,29 +14,39 @@ module Projector.Core.Check (
   , typeError
   , typeCheck'
   , checkPair
-  , checkList
+  , listC
+  , pairC
+  , apC
   -- * Reusable stuff
   , apE
-  , pairE
   ) where
 
 
 import           Data.DList (DList)
 import qualified Data.DList as D
+import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
 import           P
 
-import           Projector.Core.Syntax (Expr (..), Name (..))
-import           Projector.Core.Type (Type (..), Ground (..), typeOf)
+import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
+import           Projector.Core.Type (Type (..), Constructor (..), Ground (..), typeOf)
 
 
 data TypeError l
   = Mismatch (Type l) (Type l)
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
-  deriving (Eq, Show)
+  | BadConstructorName Constructor (Type l)
+  | BadConstructorArity Constructor (Type l) Int
+  | BadPattern (Type l) Pattern
+  | NonExhaustiveCase (Expr l) (Type l)
+
+deriving instance (Eq l, Eq (Value l)) => Eq (TypeError l)
+deriving instance (Show l, Show (Value l)) => Show (TypeError l)
+deriving instance (Ord l, Ord (Value l)) => Ord (TypeError l)
+
 
 typeCheck ::
      Ground l
@@ -96,26 +109,61 @@ typeCheck' ctx expr =
         (c, d) ->
           typeError (ExpectedArrow d c)
 
+    ECon c ty es ->
+      case ty of
+        TVariant _ cs -> do
+          -- Look up constructor name
+          ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
+          -- Check arity
+          unless (length ts == length es) (typeError (BadConstructorArity c ty (length es)))
+          -- Typecheck all bnds against expected
+          _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
+            t2 <- typeCheck' ctx e
+            unless (t1 == t2) (typeError (Mismatch t1 t2))
+          pure ty
+
+        _ ->
+          typeError (BadConstructorName c ty)
+
+    ECase e pes -> do
+      ty <- typeCheck' ctx e
+      tzs <- listC $ fmap (uncurry (checkPattern ctx ty)) pes
+      -- whole list needs to be equal
+      case L.nub tzs of
+        x:[] ->
+          pure x
+        x:y:_ ->
+          typeError (Mismatch x y)
+        [] ->
+          typeError (NonExhaustiveCase expr ty)
+
+-- | Check a pattern fits the type it is supposed to match,
+-- then check its associated branch (if the pattern makes sense)
+checkPattern :: Ground l => Ctx l -> Type l -> Pattern -> Expr l -> Check l (Type l)
+checkPattern ctx ty pat expr = do
+  ctx' <- checkPattern' ctx ty pat
+  typeCheck' ctx' expr
+
+checkPattern' :: Ground l => Ctx l -> Type l -> Pattern -> Check l (Ctx l)
+checkPattern' ctx ty pat =
+  case (ty, pat) of
+    (t, PVar x) ->
+      pure (cextend x t ctx)
+
+    (TVariant _ cs, PCon c pats) -> do
+      -- find the constructor in the type
+      ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+      -- check the lists are the same length
+      unless (length ts == length pats) (typeError (BadPattern ty pat))
+      -- Check all recursive pats against type list
+      foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
+
+    _ ->
+      typeError (BadPattern ty pat)
 
 typeError :: TypeError l -> Check l a
 typeError =
   Check . Left . D.singleton
-
--- Check a list of 'Expr', using 'apE' to accumulate the errors.
-checkList :: Ground l => Ctx l -> [Expr l] -> Check l [Type l]
-checkList ctx =
-  -- This could be written with foldl' and DList if laziness / space
-  -- became important.
-  Check . foldr (fun ctx) (pure [])
-  where
-    fun ::
-         Ground l
-      => Ctx l
-      -> Expr l
-      -> Either (DList (TypeError l)) [Type l]
-      -> Either (DList (TypeError l)) [Type l]
-    fun ctx' l r =
-      (unCheck $ fmap (:) (typeCheck' ctx' l)) `apE` r
 
 -- Check a pair of 'Expr', using 'apE' to accumulate the errors.
 checkPair ::
@@ -124,15 +172,27 @@ checkPair ::
   -> Expr l
   -> Expr l
   -> Check l (Type l, Type l)
-checkPair ctx a =
-  Check . (pairE `on` (unCheck . typeCheck' ctx)) a
-
+checkPair ctx =
+  pairC `on` (typeCheck' ctx)
 
 -- -----------------------------------------------------------------------------
 
-pairE :: Monoid e => Either e b -> Either e c -> Either e (b, c)
-pairE l r =
-  apE (fmap (,) l) r
+-- | Sequence errors from a list of 'Check'.
+listC :: [Check l a] -> Check l [a]
+listC =
+  fmap D.toList . foldl' (apC . fmap D.snoc) (pure mempty)
+
+-- | Sequence errors from two 'Check' functions.
+pairC :: Check l a -> Check l b -> Check l (a, b)
+pairC l r =
+  apC (fmap (,) l) r
+
+-- | 'apE' lifted to 'Check'.
+apC :: Check l (a -> b) -> Check l a -> Check l b
+apC l r =
+  Check $ apE (unCheck l) (unCheck r)
+
+-- -----------------------------------------------------------------------------
 
 -- A version of 'ap' that accumulates errors.
 -- Useful when expressions do not relate to one another at all.

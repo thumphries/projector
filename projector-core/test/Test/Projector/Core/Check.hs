@@ -23,7 +23,7 @@ prop_welltyped =
 
 prop_welltyped_shrink =
   gamble (genType genTestLitT) $ \ty ->
-    jackShrinkProp 100 (genWellTypedTestExpr ty) $ \e ->
+    jackShrinkProp 5 (genWellTypedTestExpr ty) $ \e ->
       typeCheck e === pure ty
 
 prop_illtyped =
@@ -31,7 +31,7 @@ prop_illtyped =
     property (isLeft (typeCheck e))
 
 prop_illtyped_shrink =
-  jackShrinkProp 100 genIllTypedTestExpr $ \e ->
+  jackShrinkProp 5 genIllTypedTestExpr $ \e ->
     property (isLeft (typeCheck e))
 
 prop_nf_consistent =
