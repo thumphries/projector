@@ -36,6 +36,7 @@ import           Projector.Core.Type (Type (..), Constructor (..), Ground (..), 
 
 data TypeError l
   = Mismatch (Type l) (Type l)
+  | CouldNotUnify [Type l]
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
   | BadConstructorName Constructor (Type l)
@@ -132,10 +133,10 @@ typeCheck' ctx expr =
       case L.nub tzs of
         x:[] ->
           pure x
-        x:y:_ ->
-          typeError (Mismatch x y)
         [] ->
           typeError (NonExhaustiveCase expr ty)
+        xs ->
+          typeError (CouldNotUnify xs)
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
