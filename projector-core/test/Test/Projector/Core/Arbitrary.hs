@@ -21,6 +21,7 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core.Check
 import           Projector.Core.Simplify
 import           Projector.Core.Syntax
 import           Projector.Core.Type
@@ -331,17 +332,75 @@ genIllTypedExpr' ::
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l)
-genIllTypedExpr' n names genty genval = do
-  -- it can only be an app afaict
-  ty <- genty
-  bnd <- genty
-  nbnd <- genty `suchThat` (/= bnd)
-  fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
-  arg <- genWellTypedExpr' (n `div` 2) nbnd names genty genval
-  pure (EApp fun arg)
+genIllTypedExpr' n names genty genval =
+  -- This function should encode all the concrete, inner ways you can
+  -- cause a type error.
+  --
+  -- TODO: find a way to 'grow' this expression upwards inside a
+  -- well-typed program while still shrinking correctly.
+  let badApp = do
+        ty <- genty
+        bnd <- genty
+        nbnd <- genty `suchThat` (/= bnd)
+        fun <- genWellTypedLam (n `div` 2) bnd ty names genty genval
+        arg <- genWellTypedExpr' (n `div` 2) nbnd names genty genval
+        pure (EApp fun arg)
 
-  -- can also be a case statement
-  -- or a malformed constructor
+      -- lazy, this doesn't discard a whole lot
+      isVariant ty = case ty of TVariant _ _ -> True; _ -> False
+      genVar = genty `suchThat` isVariant
+
+      badCase1 = do
+        -- generate a variant type and a name for it
+        -- plus a different type and a name for it
+        ty@(TVariant _ cts) <- genVar
+        nty <- genty `suchThat` (/= ty)
+        na <- fmap Name (elements muppets)
+        nn <- fmap Name (elements southpark)
+        bty <- genty
+
+        -- update the context
+        let names' = cextend (cextend names ty na) nty nn
+
+        -- generate patterns and alternatives
+        pes <- genAlternatives names' (\c t -> genWellTypedExpr' (n `div` 2) t c genty genval) cts bty
+
+        -- put a different thing in the e
+        pure (ELam nn bty (ECase (EVar nn) pes))
+
+      badCase2 = do
+        -- generate a variant type
+        ty@(TVariant _ cts) <- genVar
+        nn <- fmap Name (elements muppets)
+
+        -- update the context
+        let names' = cextend names ty nn
+
+        -- pick a type for the expression
+        ety <- genty
+        nety <- genty `suchThat` (/= ety)
+
+        -- generate at least 1 body of the wrong type
+        pes <- genAlternatives names' (\c t -> genWellTypedExpr' (n `div` 2) t c genty genval) cts ety
+        bat <- genWellTypedExpr' (n `div` 2) nety names' genty genval
+        let pes' = case pes of
+              -- TODO could easily include at a random branch
+              ((pat, _):ps) -> (pat, bat):ps
+              _ -> [(pvar_ "x", bat)] -- impossible
+
+        pure (ELam nn ty (ECase (EVar nn) pes'))
+
+      badCon = do
+        -- generate a variant type
+        ty@(TVariant _ cts) <- genVar
+
+        -- construct it wrong
+        (con, tys) <- elements cts
+        fmap (ECon con ty) (for tys $ \t -> do
+          nty <- genty `suchThat` (/= t)
+          genWellTypedExpr' (n `div` (length tys)) nty names genty genval)
+
+  in oneOf [badApp, badCase1, badCase2, badCon]
 
 -- -----------------------------------------------------------------------------
 -- XXX Useful Jack combinators
@@ -431,7 +490,9 @@ genWellTypedTestExpr ty = do
 
 genIllTypedTestExpr :: Jack (Expr TestLitT)
 genIllTypedTestExpr = do
-  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
+  genTestExpr `suchThat` (isLeft . typeCheck)
+
+--  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
 
 
 -- equal up to alpha
