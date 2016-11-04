@@ -36,6 +36,7 @@ import           Projector.Core.Type (Type (..), Constructor (..), Ground (..), 
 
 data TypeError l
   = Mismatch (Type l) (Type l)
+  | CouldNotUnify [Type l]
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
   | BadConstructorName Constructor (Type l)
@@ -127,15 +128,8 @@ typeCheck' ctx expr =
 
     ECase e pes -> do
       ty <- typeCheck' ctx e
-      tzs <- listC $ fmap (uncurry (checkPattern ctx ty)) pes
-      -- whole list needs to be equal
-      case L.nub tzs of
-        x:[] ->
-          pure x
-        x:y:_ ->
-          typeError (Mismatch x y)
-        [] ->
-          typeError (NonExhaustiveCase expr ty)
+      let tzs = fmap (uncurry (checkPattern ctx ty)) pes
+      unifyList (typeError (NonExhaustiveCase expr ty)) tzs
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
@@ -146,20 +140,32 @@ checkPattern ctx ty pat expr = do
 
 checkPattern' :: Ground l => Ctx l -> Type l -> Pattern -> Check l (Ctx l)
 checkPattern' ctx ty pat =
-  case (ty, pat) of
-    (t, PVar x) ->
-      pure (cextend x t ctx)
+  case pat of
+    PVar x ->
+      pure (cextend x ty ctx)
 
-    (TVariant _ cs, PCon c pats) -> do
-      -- find the constructor in the type
-      ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
-      -- check the lists are the same length
-      unless (length ts == length pats) (typeError (BadPattern ty pat))
-      -- Check all recursive pats against type list
-      foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
+    PCon c pats ->
+      case ty of
+        TVariant _ cs -> do
+          -- find the constructor in the type
+          ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+          -- check the lists are the same length
+          unless (length ts == length pats) (typeError (BadPattern ty pat))
+          -- Check all recursive pats against type list
+          foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
+        _ ->
+          typeError (BadPattern ty pat)
 
-    _ ->
-      typeError (BadPattern ty pat)
+unifyList :: Ground l => Check l (Type l) -> [Check l (Type l)] -> Check l (Type l)
+unifyList none es = do
+  tzs <- listC es
+  case L.nub tzs of
+    x:[] ->
+      pure x
+    [] ->
+      none
+    xs ->
+      typeError (CouldNotUnify xs)
 
 typeError :: TypeError l -> Check l a
 typeError =
