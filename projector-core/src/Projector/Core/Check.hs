@@ -146,20 +146,21 @@ checkPattern ctx ty pat expr = do
 
 checkPattern' :: Ground l => Ctx l -> Type l -> Pattern -> Check l (Ctx l)
 checkPattern' ctx ty pat =
-  case (ty, pat) of
-    (t, PVar x) ->
-      pure (cextend x t ctx)
+  case pat of
+    PVar x ->
+      pure (cextend x ty ctx)
 
-    (TVariant _ cs, PCon c pats) -> do
-      -- find the constructor in the type
-      ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
-      -- check the lists are the same length
-      unless (length ts == length pats) (typeError (BadPattern ty pat))
-      -- Check all recursive pats against type list
-      foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
-
-    _ ->
-      typeError (BadPattern ty pat)
+    PCon c pats ->
+      case ty of
+        TVariant _ cs -> do
+          -- find the constructor in the type
+          ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+          -- check the lists are the same length
+          unless (length ts == length pats) (typeError (BadPattern ty pat))
+          -- Check all recursive pats against type list
+          foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
+        _ ->
+          typeError (BadPattern ty pat)
 
 typeError :: TypeError l -> Check l a
 typeError =
