@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Core.Pretty (
     ppType
+  , ppTypeInfo
   , ppExpr
   , ppExprUntyped
   ) where
@@ -16,19 +17,31 @@ import           Projector.Core.Type (Type (..), Ground (..), Constructor (..), 
 
 
 ppType :: Ground l => Type l -> Text
-ppType t =
+ppType =
+  ppType' False
+
+ppTypeInfo :: Ground l => Type l -> Text
+ppTypeInfo =
+  ppType' True
+
+ppType' :: Ground l => Bool -> Type l -> Text
+ppType' verbose t =
   case t of
     TLit g ->
       ppGroundType g
 
-    TVar (TypeName n) ->
-      n
+    TVar (TypeName ty) ->
+      ty
 
     TArrow a b ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
 
-    TVariant (TypeName ty) _ ->
-      ty
+    TVariant (TypeName ty) cts ->
+      ty <> if verbose then " = " <> ppConstructors cts else T.empty
+
+ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
+ppConstructors =
+  T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))
 
     TList ty ->
       "[" <> ppType ty <> "]"
