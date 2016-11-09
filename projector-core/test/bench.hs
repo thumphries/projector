@@ -32,7 +32,7 @@ buildExpr n = case n of
 buildCase :: Int -> Expr TestLitT
 buildCase n = case n of
   0 -> var_ "x"
-  m -> ECase (ECon (Constructor "Casey") tcasey [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
+  m -> ECase (ECon (Constructor "Casey") (TypeName "Casey") [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
 
 tcasey :: Type TestLitT
 tcasey =
@@ -42,6 +42,12 @@ caseyCtx :: TypeContext TestLitT
 caseyCtx =
   textend (TypeName "Casey") tcasey tempty
 
+-- intlist
+
+buildIntList :: Int -> Expr TestLitT
+buildIntList n = case n of
+  0 -> tnil
+  _ -> tcons n (buildIntList (n - 1))
 
 tintlist :: Type TestLitT
 tintlist =
@@ -60,11 +66,11 @@ tintlistctx =
 
 tnil :: Expr TestLitT
 tnil =
-  ECon (Constructor "Nil") nintlist []
+  ECon (Constructor "Nil") (TypeName "IntList") []
 
 tcons :: Int -> Expr TestLitT -> Expr TestLitT
 tcons v l =
-  ECon (Constructor "Cons") nintlist [ELit (VInt v), l]
+  ECon (Constructor "Cons") (TypeName "IntList") [ELit (VInt v), l]
 
 main :: IO ()
 main = do
@@ -79,7 +85,17 @@ main = do
       mul2 = mul 2
 
   defaultMainWith cfg [
-      bgroup "normalise-billy" [
+      bgroup "normalise-intlist" [
+          bench "normalise-intlist-100" $ norm buildIntList 100
+        , bench "normalise-intlist-200" $ norm buildIntList 200
+        , bench "normalise-intlist-1000" $ norm buildIntList 1000
+        ]
+    , bgroup "check-intlist" [
+          bench "check-intlist-100" $ tc buildIntList tintlistctx 100
+        , bench "check-intlist-200" $ tc buildIntList tintlistctx 200
+        , bench "check-intlist-1000" $ tc buildIntList tintlistctx 1000
+        ]
+    , bgroup "normalise-billy" [
           bench "normalise-billy-100" $ norm buildExpr 100
         , bench "normalise-billy-200" $ norm buildExpr 200
         , bench "normalise-billy-1000" $ norm buildExpr 1000
