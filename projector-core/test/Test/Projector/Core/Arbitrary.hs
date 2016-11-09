@@ -50,6 +50,13 @@ genType' m n g =
 
   in oneOfRec nonrec recc
 
+genTypeContext :: Jack l -> Jack (TypeContext l)
+genTypeContext g =
+  -- Props should generate a TypeContext first.
+  -- genType should accept it.
+  -- Plumb it around everywhere so we can pull stuff out.
+  undefined
+
 genTypeName :: Jack TypeName
 genTypeName =
   fmap (TypeName . T.toTitle) (elements boats)
