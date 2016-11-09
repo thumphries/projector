@@ -38,6 +38,34 @@ tcasey :: Type TestLitT
 tcasey =
   TVariant (TypeName "Casey") [(Constructor "Casey", [TLit TBool])]
 
+caseyCtx :: TypeContext TestLitT
+caseyCtx =
+  textend (TypeName "Casey") tcasey tempty
+
+
+tintlist :: Type TestLitT
+tintlist =
+  TVariant (TypeName "IntList") [
+      (Constructor "Nil", [])
+    , (Constructor "Cons", [TLit TInt, TVar (TypeName "IntList")])
+    ]
+
+nintlist :: Type TestLitT
+nintlist =
+  TVar (TypeName "IntList")
+
+tintlistctx :: TypeContext TestLitT
+tintlistctx =
+  textend (TypeName "IntList") tintlist tempty
+
+tnil :: Expr TestLitT
+tnil =
+  ECon (Constructor "Nil") nintlist []
+
+tcons :: Int -> Expr TestLitT -> Expr TestLitT
+tcons v l =
+  ECon (Constructor "Cons") nintlist [ELit (VInt v), l]
+
 main :: IO ()
 main = do
   let cfg =
@@ -47,7 +75,7 @@ main = do
           }
 
       norm f = C.whnf nf . f
-      tc f = C.whnf typeCheck . f
+      tc f c = C.whnf (typeCheck c) . f
       mul2 = mul 2
 
   defaultMainWith cfg [
@@ -57,9 +85,9 @@ main = do
         , bench "normalise-billy-1000" $ norm buildExpr 1000
         ]
     , bgroup "check-billy" [
-          bench "check-billy-100" $ tc buildExpr 100
-        , bench "check-billy-200" $ tc buildExpr 200
-        , bench "check-billy-1000" $ tc buildExpr 1000
+          bench "check-billy-100" $ tc buildExpr tempty 100
+        , bench "check-billy-200" $ tc buildExpr tempty 200
+        , bench "check-billy-1000" $ tc buildExpr tempty 1000
         ]
     , bgroup "normalise-church" [
           bench "normalise-church-100" $ norm nth 100
@@ -67,9 +95,9 @@ main = do
         , bench "normalise-church-1000" $ norm nth 1000
         ]
     , bgroup "check-church" [
-          bench "check-church-100" $ tc nth 100
-        , bench "check-church-200" $ tc nth 200
-        , bench "check-church-1000" $ tc nth 1000
+          bench "check-church-100" $ tc nth tempty 100
+        , bench "check-church-200" $ tc nth tempty 200
+        , bench "check-church-1000" $ tc nth tempty 1000
         ]
     , bgroup "normalise-church-mul2" [
           bench "normalise-church-mul2-100" $ norm mul2 100
@@ -77,9 +105,9 @@ main = do
         , bench "normalise-church-mul2-1000" $ norm mul2 1000
         ]
     , bgroup "check-church-mul2" [
-          bench "check-church-mul2-100" $ tc mul2 100
-        , bench "check-church-mul2-200" $ tc mul2 200
-        , bench "check-church-mul2-1000" $ tc mul2 1000
+          bench "check-church-mul2-100" $ tc mul2 tempty 100
+        , bench "check-church-mul2-200" $ tc mul2 tempty 200
+        , bench "check-church-mul2-1000" $ tc mul2 tempty 1000
         ]
     , bgroup "normalise-casey" [
           bench "normalise-casey-100" $ norm buildCase 100
@@ -87,8 +115,8 @@ main = do
         , bench "normalise-casey-1000" $ norm buildCase 1000
         ]
     , bgroup "check-casey" [
-          bench "check-casey-100" $ tc buildCase 100
-        , bench "check-casey-200" $ tc buildCase 200
-        , bench "check-casey-1000" $ tc buildCase 1000
+          bench "check-casey-100" $ tc buildCase caseyCtx 100
+        , bench "check-casey-200" $ tc buildCase caseyCtx 200
+        , bench "check-casey-1000" $ tc buildCase caseyCtx 1000
         ]
     ]

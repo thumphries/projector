@@ -31,7 +31,7 @@ import qualified Data.Map.Strict as M
 import           P
 
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
-import           Projector.Core.Type (Type (..), Constructor (..), Ground (..), typeOf)
+import           Projector.Core.Type
 
 
 data TypeError l
@@ -51,10 +51,11 @@ deriving instance (Ord l, Ord (Value l)) => Ord (TypeError l)
 
 typeCheck ::
      Ground l
-  => Expr l
+  => TypeContext l
+  -> Expr l
   -> Either [TypeError l] (Type l)
-typeCheck =
-  first D.toList . unCheck . typeCheck' mempty
+typeCheck c =
+  first D.toList . unCheck . typeCheck' c mempty
 
 
 -- -----------------------------------------------------------------------------
@@ -83,10 +84,11 @@ clookup n =
 -- our type annotations around the tree and use (==) in the right spots.
 typeCheck' ::
      Ground l
-  => Ctx l
+  => TypeContext l
+  -> Ctx l
   -> Expr l
   -> Check l (Type l)
-typeCheck' ctx expr =
+typeCheck' tc ctx expr =
   case expr of
     ELit v ->
       pure (TLit (typeOf v))
@@ -99,37 +101,36 @@ typeCheck' ctx expr =
           typeError (FreeVariable n)
 
     ELam n ta e -> do
-      tb <- typeCheck' (cextend n ta ctx) e
+      tb <- typeCheck' tc (cextend n ta ctx) e
       pure (TArrow ta tb)
 
     EApp a b -> do
-      typs <- checkPair ctx a b
+      typs <- checkPair tc ctx a b
       case typs of
         (TArrow c d, e) ->
-          if c == e then pure d else typeError (Mismatch c e)
+          if typesEqual tc c e then pure d else typeError (Mismatch c e)
         (c, d) ->
           typeError (ExpectedArrow d c)
 
-    ECon c ty es ->
-      case ty of
-        TVariant _ cs -> do
+    ECon c ty' es ->
+      case tresolve tc ty' of
+        ty@(TVariant _ cs) -> do
           -- Look up constructor name
           ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
           -- Check arity
           unless (length ts == length es) (typeError (BadConstructorArity c ty (length es)))
           -- Typecheck all bnds against expected
           _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
-            t2 <- typeCheck' ctx e
-            unless (t1 == t2) (typeError (Mismatch t1 t2))
+            t2 <- typeCheck' tc ctx e
+            unless (typesEqual tc t1 t2) (typeError (Mismatch t1 t2))
           pure ty
 
-        _ ->
+        ty ->
           typeError (BadConstructorName c ty)
 
     ECase e pes -> do
-      ty <- typeCheck' ctx e
-      let tzs = fmap (uncurry (checkPattern ctx ty)) pes
-      -- whole list needs to be equal
+      ty <- typeCheck' tc ctx e
+      let tzs = fmap (uncurry (checkPattern tc ctx ty)) pes
       unifyList (typeError (NonExhaustiveCase expr ty)) tzs
 
     EList ty es -> do
@@ -140,26 +141,39 @@ typeCheck' ctx expr =
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
-checkPattern :: Ground l => Ctx l -> Type l -> Pattern -> Expr l -> Check l (Type l)
-checkPattern ctx ty pat expr = do
-  ctx' <- checkPattern' ctx ty pat
-  typeCheck' ctx' expr
+checkPattern ::
+     Ground l
+  => TypeContext l
+  -> Ctx l
+  -> Type l
+  -> Pattern
+  -> Expr l
+  -> Check l (Type l)
+checkPattern tc ctx ty pat expr = do
+  ctx' <- checkPattern' tc ctx ty pat
+  typeCheck' tc ctx' expr
 
-checkPattern' :: Ground l => Ctx l -> Type l -> Pattern -> Check l (Ctx l)
-checkPattern' ctx ty pat =
+checkPattern' ::
+     Ground l
+  => TypeContext l
+  -> Ctx l
+  -> Type l
+  -> Pattern
+  -> Check l (Ctx l)
+checkPattern' tc ctx ty pat =
   case pat of
     PVar x ->
       pure (cextend x ty ctx)
 
     PCon c pats ->
-      case ty of
+      case (tresolve tc ty) of
         TVariant _ cs -> do
           -- find the constructor in the type
           ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
           -- check the lists are the same length
           unless (length ts == length pats) (typeError (BadPattern ty pat))
           -- Check all recursive pats against type list
-          foldM (\ctx' (t', p') -> checkPattern' ctx' t' p') ctx (L.zip ts pats)
+          foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
         _ ->
           typeError (BadPattern ty pat)
 
@@ -181,12 +195,13 @@ typeError =
 -- Check a pair of 'Expr', using 'apE' to accumulate the errors.
 checkPair ::
      Ground l
-  => Ctx l
+  => TypeContext l
+  -> Ctx l
   -> Expr l
   -> Expr l
   -> Check l (Type l, Type l)
-checkPair ctx =
-  pairC `on` (typeCheck' ctx)
+checkPair tc ctx =
+  pairC `on` (typeCheck' tc ctx)
 
 -- -----------------------------------------------------------------------------
 
