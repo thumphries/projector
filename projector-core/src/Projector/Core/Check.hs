@@ -39,6 +39,7 @@ data TypeError l
   | CouldNotUnify [Type l]
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
+  | FreeTypeVariable TypeName
   | BadConstructorName Constructor (Type l)
   | BadConstructorArity Constructor (Type l) Int
   | BadPattern (Type l) Pattern
@@ -112,9 +113,9 @@ typeCheck' tc ctx expr =
         (c, d) ->
           typeError (ExpectedArrow d c)
 
-    ECon c ty' es ->
-      case tresolve tc ty' of
-        ty@(TVariant _ cs) -> do
+    ECon c tn es ->
+      case tlookup tn tc of
+        Just ty@(TVariant _ cs) -> do
           -- Look up constructor name
           ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
           -- Check arity
@@ -125,8 +126,11 @@ typeCheck' tc ctx expr =
             unless (typesEqual tc t1 t2) (typeError (Mismatch t1 t2))
           pure ty
 
-        ty ->
+        Just ty ->
           typeError (BadConstructorName c ty)
+
+        Nothing ->
+          typeError (FreeTypeVariable tn)
 
     ECase e pes -> do
       ty <- typeCheck' tc ctx e
