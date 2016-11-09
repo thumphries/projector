@@ -21,6 +21,9 @@ ppType t =
     TLit g ->
       ppGroundType g
 
+    TVar (TypeName n) ->
+      n
+
     TArrow a b ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
 

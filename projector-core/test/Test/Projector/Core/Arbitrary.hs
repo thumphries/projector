@@ -21,7 +21,6 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Check
 import           Projector.Core.Simplify
 import           Projector.Core.Syntax
 import           Projector.Core.Type
@@ -178,6 +177,9 @@ pinsert (Context ns p) n t =
         p
         cts
 
+    TVar _ ->
+      undefined
+
 mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 mcons k v =
   M.alter (\x -> Just (v : fromMaybe [] x)) k
@@ -209,6 +211,9 @@ genWellTypedExpr' n ty names genty genval =
           if n <= 1
             then ELit <$> genval l
             else genWellTypedApp n ty names genty genval
+
+        TVar _ ->
+          undefined
 
         TArrow t1 t2 ->
           genWellTypedLam n t1 t2 names genty genval
@@ -259,6 +264,9 @@ genWellTypedPath ctx more want x have =
       TLit _ ->
         -- impossible
         pure (EVar x)
+
+      TVar _ ->
+        undefined
 
 genAlternatives ::
      (Ord l, Ground l)
@@ -490,9 +498,7 @@ genWellTypedTestExpr ty = do
 
 genIllTypedTestExpr :: Jack (Expr TestLitT)
 genIllTypedTestExpr = do
-  genTestExpr `suchThat` (isLeft . typeCheck)
-
---  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
+  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
 
 
 -- equal up to alpha
