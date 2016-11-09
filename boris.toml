@@ -13,6 +13,12 @@
 [build.branches-7-10-html]
   command = [["master", "build", "branches-7-10", "-C", "projector-html"]]
 
+[build.dist-doc]
+  command = [["master", "build", "dist-doc", "-C", "projector-html"]]
+
+[build.branches-doc]
+  command = [["master", "build", "branches-doc", "-C", "projector-html"]]
+
 [build.dist-validate]
   command = [["validate-respect"]]
 
