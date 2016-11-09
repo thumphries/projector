@@ -1,0 +1,46 @@
+\documentclass{report}
+\usepackage[T1]{fontenc}
+\usepackage{syntax}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{multicol}
+\usepackage{changepage,titlesec}
+\usepackage{charter}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{} % sets both header and footer to nothing
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[LE,RO]{\thepage}
+
+\begin{document}
+
+\setlength{\grammarparsep}{4pt} % HAlignment
+\setlength{\grammarindent}{12em} % Vertical Spacing
+
+\section*{Grammar for Projector HTML}
+
+The below is gibberish from my undergrad compilers project, committed
+as a template only.
+
+\begin{grammar}
+
+<Program> ::= <MainClassDecl> <ClassDecls>
+
+<Literal> ::= ID
+\alt `this'
+\alt `Integer'
+\alt `null'
+\alt `true'
+\alt `false'
+\alt `new' ID `(' `)'
+\alt `(' <Expr> `)'
+
+<DotExpr> ::= `.' ID `(' <ExprLst> `)' <DotExpr> | $\varepsilon$
+
+<ExprLst> ::= <Expr> <ExprLst'> | $\varepsilon$
+
+<ExprLst'> ::= `,' <ExprLst> | $\varepsilon$
+
+\end{grammar}
+
+\end{document}
