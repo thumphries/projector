@@ -8,12 +8,12 @@ module Projector.Html.Core.Prim (
   , HtmlDecl
   , HtmlDecls
   , HtmlExpr
+  , HtmlLit
   , PrimT (..)
   , types
   , tBool
   , dBool
   ) where
-
 
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -27,6 +27,7 @@ type HtmlType = Type PrimT
 type HtmlDecl = Decl PrimT
 type HtmlDecls = TypeDecls PrimT
 type HtmlExpr = Expr PrimT
+type HtmlLit = Value PrimT
 
 data PrimT
   = TString
@@ -46,6 +47,7 @@ instance Ground PrimT where
   ppGroundValue v = case v of
     VString s ->
       T.pack (show s)
+
 
 types :: HtmlDecls
 types =

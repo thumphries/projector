@@ -19,6 +19,9 @@ library
                      , containers
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
+                     , containers                      == 0.5.*
+                     , text                            == 1.2.*
+                     , template-haskell                == 2.*
 
   ghc-options:
                        -Wall
@@ -32,6 +35,8 @@ library
                        Projector.Html
                        Projector.Html.Core.Library
                        Projector.Html.Core.Prim
+
+                       Projector.Html.Backend.Haskell
 
 test-suite test
   type:                exitcode-stdio-1.0
