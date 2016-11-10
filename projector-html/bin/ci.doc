@@ -1,0 +1,13 @@
+#!/bin/sh -eux
+
+cabal sdist # Need to get commish
+version=$(cat gen/version.txt)
+DOC_RESOLVED=$(eval echo "$AMBIATA_DOC")
+DOC_URL="${AMBIATA_DOC_URL}/projector-html/${version}/grammar-${version}.pdf"
+GIT_COMMIT=$(git log --pretty=format:%H -n 1)
+
+cd doc && make
+
+aws s3 cp grammar.pdf ${DOC_RESOLVED}/projector-html/${version}/grammar-${version}.pdf
+
+spoke -r "projector" --commit "$GIT_COMMIT" --state "success" --context "doc-grammar" -d "Documentation build: grammar" -t "$DOC_URL"

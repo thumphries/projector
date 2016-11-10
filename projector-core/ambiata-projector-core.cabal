@@ -7,7 +7,7 @@ copyright:             (c) 2016 Ambiata.
 synopsis:              ambiata-projector-core
 category:              System
 cabal-version:         >= 1.8
-build-type:            Simple
+build-type:            Custom
 description:           ambiata-projector-core
 
 library

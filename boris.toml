@@ -8,10 +8,16 @@
   command = [["master", "build", "branches-7-10", "-C", "projector-core"]]
 
 [build.dist-7-10-html]
-  command = [["master", "build", "dist-7-10", "-C", "projector-html"]]
+  command = [
+      ["master", "build", "dist-7-10", "-C", "projector-html"]
+    , ["master", "build", "dist-doc", "-C", "projector-html"]
+    ]
 
 [build.branches-7-10-html]
-  command = [["master", "build", "branches-7-10", "-C", "projector-html"]]
+  command = [
+      ["master", "build", "branches-7-10", "-C", "projector-html"]
+    , ["master", "build", "branches-doc", "-C", "projector-html"]
+    ]
 
 [build.dist-validate]
   command = [["validate-respect"]]
