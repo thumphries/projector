@@ -34,6 +34,7 @@ library
                        Projector.Core.Pretty
                        Projector.Core.Simplify
                        Projector.Core.Syntax
+                       Projector.Core.Termination
                        Projector.Core.Type
 
 test-suite test

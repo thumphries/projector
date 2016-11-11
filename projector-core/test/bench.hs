@@ -72,6 +72,16 @@ tcons :: Int -> Expr TestLitT -> Expr TestLitT
 tcons v l =
   ECon (Constructor "Cons") (TypeName "IntList") [ELit (VInt v), l]
 
+negCtx :: TypeContext TestLitT
+negCtx =
+  textend (TypeName "FixPoint") tfixpoint tempty
+
+tfixpoint :: Type TestLitT
+tfixpoint =
+  TVariant (TypeName "FixPoint") [
+      (Constructor "Fix",  [TArrow (TVar (TypeName "FixPoint")) (TLit TBool)])
+    ]
+
 main :: IO ()
 main = do
   let cfg =
