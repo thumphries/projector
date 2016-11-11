@@ -10,10 +10,12 @@ module Test.Projector.Core.Arbitrary where
 
 import           Control.Comonad (Comonad (..))
 
+import           Data.Char (isAsciiLower)
 import           Data.List as L
 import qualified Data.List.NonEmpty as NE
 import           Data.Map.Strict  (Map)
 import qualified Data.Map.Strict as M
+import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 
 import           Disorder.Corpus
@@ -49,17 +51,6 @@ genType' m n g =
       rtype = genType' (max 1 (m `div` 2)) (n `div` 2) g
 
   in oneOfRec nonrec recc
-
-genTypeContext :: Jack l -> Jack (TypeContext l)
-genTypeContext g =
-  -- Props should generate a TypeContext first.
-  -- genType should accept it.
-  -- Plumb it around everywhere so we can pull stuff out.
-  undefined
-
-genTypeName :: Jack TypeName
-genTypeName =
-  fmap (TypeName . T.toTitle) (elements boats)
 
 genConstructor :: Jack Constructor
 genConstructor =
@@ -100,7 +91,7 @@ genExpr n t v =
       recc = [
           EApp <$> genExpr n t v <*> genExpr n t v
         , genLam n t v
-        , genCon t (genExpr n t v)
+        , genCon (fmap (TypeName . unName) n) (genExpr n t v)
         , genCase (genExpr n t v) (genPattern genConstructor n)
         ]
  in reshrink shrink (oneOfRec nonrec recc)
@@ -114,7 +105,7 @@ genLam n t v = do
   bdy <- genExpr n' t v
   pure (lam nam typ bdy)
 
-genCon :: Jack (Type l) -> Jack (Expr l) -> Jack (Expr l)
+genCon :: Jack TypeName -> Jack (Expr l) -> Jack (Expr l)
 genCon t v =
   ECon
     <$> genConstructor
@@ -133,6 +124,67 @@ genPattern c n =
 
 -- -----------------------------------------------------------------------------
 -- Generating well-typed expressions
+
+-- Need to generate a set of declarations and restrict our types to these
+genTypeContext :: Ground l => Jack TypeName -> Jack l -> Jack (TypeContext l)
+genTypeContext gn gt = do
+  k <- chooseInt (0, 20)
+  m <- chooseInt (1, 20)
+  n <- chooseInt (0, 10)
+  genTypeContext' k m n tempty gn gt
+
+genTypeContext' ::
+     Ground l
+  => Int -- number of types to add to context
+  -> Int -- max number of constructors to add to each variant
+  -> Int -- max number of arguments for each constructor
+  -> TypeContext l
+  -> Jack TypeName
+  -> Jack l
+  -> Jack (TypeContext l)
+genTypeContext' 0 _ _ tc _ _ =
+  pure tc
+genTypeContext' k m n tc genName genTy = do
+  let genName' = genName `suchThat` (\name -> isNothing (tlookup name tc))
+  tn <- genName'
+  let genName'' = genName' `suchThat` (/= tn)
+  v <- TVariant tn <$> genVariantsFromContext' m n tn tc genName'' genTy
+  genTypeContext'
+    (k - 1)
+    m
+    n
+    (textend tn v tc)
+    genName''
+    genTy
+
+genVariantsFromContext' ::
+     Ground l
+  => Int
+  -> Int
+  -> TypeName
+  -> TypeContext l
+  -> Jack TypeName
+  -> Jack l
+  -> Jack [(Constructor, [Type l])]
+genVariantsFromContext' m n tn tc genName genTy = do
+  i <- chooseInt (1, 5)
+  -- TODO need globally unique constructor names too
+  fmap (M.toList . M.fromList) . listOfN 1 m $
+    (,) <$> genConstructor
+        <*> listOfN 0 n (genTypeFromContext i tc genTy)
+
+-- Generate simple types, or pull one from the context.
+genTypeFromContext :: Ground l => Int -> TypeContext l -> Jack l -> Jack (Type l)
+genTypeFromContext i tc@(TypeContext m) g =
+  if (i <= 1) || (m == mempty)
+    then TLit <$> g
+    else oneOfRec [
+        (TVar <$> elements (M.keys m))
+      ] [
+        TArrow
+          <$> genTypeFromContext (i `div` 2) tc g
+          <*> genTypeFromContext (i `div` 2) tc g
+      ]
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
@@ -191,8 +243,6 @@ mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 mcons k v =
   M.alter (\x -> Just (v : fromMaybe [] x)) k
 
--- update :: Ord k => (a -> Maybe a) -> k -> Map k a -> Map k a
-
 genWellTypedExpr ::
      (Ground l, Ord l)
   => Type l
@@ -225,9 +275,9 @@ genWellTypedExpr' n ty names genty genval =
         TArrow t1 t2 ->
           genWellTypedLam n t1 t2 names genty genval
 
-        TVariant _ cts -> do
+        TVariant tn cts -> do
           (con, tys) <- elements cts
-          ECon con ty <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t names genty genval) tys
+          ECon con tn <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t names genty genval) tys
 
   -- try to look something appropriate up from the context
   in case plookup names ty of
@@ -407,11 +457,12 @@ genIllTypedExpr' n names genty genval =
 
       badCon = do
         -- generate a variant type
-        ty@(TVariant _ cts) <- genVar
+        -- FIX THIS IS WRONG needs to come from ctx
+        (TVariant tn cts) <- genVar
 
         -- construct it wrong
         (con, tys) <- elements cts
-        fmap (ECon con ty) (for tys $ \t -> do
+        fmap (ECon con tn) (for tys $ \t -> do
           nty <- genty `suchThat` (/= t)
           genWellTypedExpr' (n `div` (length tys)) nty names genty genval)
 
@@ -492,6 +543,13 @@ genWellTypedTestLitValue t =
     TInt -> VInt <$> chooseInt (0, 100)
     TString -> VString <$> elements cooking
 
+genTypeName :: Jack TypeName
+genTypeName =
+  fmap (TypeName . T.toTitle) $ oneOf [
+      elements boats
+    , T.pack <$> vectorOf 8 (arbitrary `suchThat` isAsciiLower)
+    ]
+
 -- -----------------------------------------------------------------------------
 -- Generators you might actually use
 
@@ -506,6 +564,10 @@ genWellTypedTestExpr ty = do
 genIllTypedTestExpr :: Jack (Expr TestLitT)
 genIllTypedTestExpr = do
   genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
+
+genTestTypeContext :: Jack (TypeContext TestLitT)
+genTestTypeContext
+  = genTypeContext genTypeName genTestLitT
 
 
 -- equal up to alpha
