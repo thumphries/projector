@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Projector.Core.Type (
     Type (..)
+  , Decl (..)
   , Ground (..)
   , TypeName (..)
   , Constructor (..)
@@ -33,6 +34,9 @@ data Type l
   | TVariant TypeName [(Constructor, [Type l])]
   | TList (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+
+data Decl l
+  = DVariant TypeName [(Constructor, [Type l])]
 
 -- | The class of user-supplied primitive types.
 class Eq l => Ground l where
