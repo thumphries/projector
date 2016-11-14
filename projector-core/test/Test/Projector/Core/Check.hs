@@ -19,7 +19,7 @@ import           Test.Projector.Core.Arbitrary
 
 prop_welltyped =
   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    typeCheck ctx e === pure (tnormalise ctx ty)
+    fmap (tnormalise ctx) (typeCheck ctx e) === pure (tnormalise ctx ty)
 
 {-
 prop_welltyped_shrink =

@@ -74,9 +74,8 @@ tresolve tc ty =
     _ ->
       ty
 
--- this is wrong
--- types can be infinite when unfolded
 -- equality is bork, variants aren't top level types
+-- this needs to be much better thought out
 tnormalise :: Ground l => TypeContext l -> Type l -> Type l
 tnormalise tc ty  =
   case ty of
@@ -84,13 +83,21 @@ tnormalise tc ty  =
       TArrow (tnormalise tc t1) (tnormalise tc t2)
 
     TVariant tn cts ->
-      TVariant tn (fmap (fmap (fmap (tnormalise tc))) cts)
+      TVariant tn (fmap (fmap (fmap (recur tn))) cts)
 
     TLit _ ->
       ty
 
     TVar tn ->
-      fromMaybe ty (tlookup tn tc)
+      tnormalise tc (fromMaybe ty (tlookup tn tc))
+  where
+    -- conspicuously don't unfold recursive calls
+    -- this is garbage, should just not allow ambiguous type specs
+    recur tn ty
+      | ty == (TVar tn) = ty
+      | otherwise = tnormalise tc ty
+
+
 
 typesEqual :: Ground l => TypeContext l -> Type l -> Type l -> Bool
 typesEqual tc a b =
