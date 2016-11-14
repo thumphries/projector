@@ -2,7 +2,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Core.Termination (
-    positivityCheck
+    TerminationError (..)
+  , positivityCheck
   ) where
 
 
@@ -12,6 +13,10 @@ import           P
 
 import           Projector.Core.Type
 
+
+data TerminationError l
+  = PositivityCheckFailed (Type l) (Type l)
+  deriving (Eq, Ord, Show)
 
 data Polarity = Pos | Neg
 
@@ -24,7 +29,7 @@ pflip p =
 -- | Ensure datatypes are only used recursively in positive position.
 --
 -- TODO use apE / listE family to accum errors
-positivityCheck :: Ground l => TypeContext l -> Either Text ()
+positivityCheck :: Ground l => TypeContext l -> Either (TerminationError l) ()
 positivityCheck tc =
   let ctx = M.toList (unTypeContext tc)
   in traverse_ (uncurry (positivityCheck' Pos tc)) ctx
@@ -35,7 +40,7 @@ positivityCheck' ::
   -> TypeContext l
   -> TypeName
   -> Type l
-  -> Either Text ()
+  -> Either (TerminationError l) ()
 positivityCheck' pol tc tn ty =
   positivityCheck'' pol tc tn ty ty
 
@@ -46,7 +51,7 @@ positivityCheck'' ::
   -> TypeName
   -> Type l
   -> Type l
-  -> Either Text ()
+  -> Either (TerminationError l) ()
 positivityCheck'' pol tc tn ty have =
   let cont =
         case have of
@@ -65,8 +70,8 @@ positivityCheck'' pol tc tn ty have =
 
   in case pol of
        Neg ->
-         if | have == TVar tn -> Left "AHHH"
-            | have == ty -> Left "AHHH"
+         if | have == TVar tn -> Left (PositivityCheckFailed have ty)
+            | have == ty -> Left (PositivityCheckFailed have ty)
             | otherwise -> cont
        Pos ->
          cont
