@@ -33,6 +33,7 @@ data Expr l
   | EApp (Expr l) (Expr l)
   | ECon Constructor (Type l) [Expr l]
   | ECase (Expr l) [(Pattern, Expr l)]
+  | EList (Type l) [Expr l]
 
 deriving instance (Eq l, Eq (Value l)) => Eq (Expr l)
 deriving instance (Show l, Show (Value l)) => Show (Expr l)

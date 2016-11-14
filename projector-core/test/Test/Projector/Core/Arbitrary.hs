@@ -45,6 +45,7 @@ genType' m n g =
       recc = [
           TArrow <$> rtype <*> rtype
         , TVariant <$> genTypeName <*> genVariants m n g
+        , TList <$> rtype
         ]
 
       rtype = genType' (max 1 (m `div` 2)) (n `div` 2) g
@@ -86,6 +87,9 @@ genExpr n t v =
         ECase e pes ->
           e : fmap snd pes
 
+        EList _ es ->
+          es
+
       nonrec = [
           ELit <$> v
         , EVar <$> n
@@ -96,6 +100,7 @@ genExpr n t v =
         , genLam n t v
         , genCon t (genExpr n t v)
         , genCase (genExpr n t v) (genPattern genConstructor n)
+        , EList <$> t <*> listOf (genExpr n t v)
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
@@ -178,6 +183,9 @@ pinsert (Context ns p) n t =
         p
         cts
 
+    TList _ ->
+      p -- list might be empty, also we don't have any primitives
+
 mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 mcons k v =
   M.alter (\x -> Just (v : fromMaybe [] x)) k
@@ -216,6 +224,10 @@ genWellTypedExpr' n ty names genty genval =
         TVariant _ cts -> do
           (con, tys) <- elements cts
           ECon con ty <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t names genty genval) tys
+
+        TList lty -> do
+          k <- chooseInt (0, n)
+          EList lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty names genty genval)
 
   -- try to look something appropriate up from the context
   in case plookup names ty of
@@ -257,6 +269,10 @@ genWellTypedPath ctx more want x have =
         pure (EApp (EVar x) arg)
 
       TLit _ ->
+        -- impossible
+        pure (EVar x)
+
+      TList _ ->
         -- impossible
         pure (EVar x)
 

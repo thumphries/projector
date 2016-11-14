@@ -66,6 +66,9 @@ whnf' ctx expr = case expr of
     -- if nothing matches, we can't reduce, leave it alone.
     in maybe (whnf'' ctx expr) (whnf' ctx) mnf
 
+  EList ty es ->
+    EList ty (fmap (whnf'' ctx) es)
+
 
 -- propagate substitutions around :(
 whnf'' :: Map Name (Expr l) -> Expr l -> Expr l
@@ -90,6 +93,9 @@ whnf'' ctx expr =
 
     ECase e ps ->
       ECase (whnf'' ctx e) (fmap (fmap (whnf'' ctx)) ps)
+
+    EList ty es ->
+      EList ty (fmap (whnf'' ctx) es)
 
 
 -- | Reduce an expression to beta normal form.
@@ -130,6 +136,9 @@ nf' ctx expr =
           pure (nf' ctx' b)
     -- if nothing matches, we can't reduce, leave it alone.
     in fromMaybe expr mnf
+
+  EList ty es ->
+    EList ty (fmap (nf' ctx) es)
 
 -- | Pattern matching. Returns 'Nothing' if no match is possible.
 match :: Map Name (Expr l) -> Pattern -> Expr l -> Maybe (Map Name (Expr l))
@@ -196,6 +205,9 @@ alpha' rebinds rename expr =
         body' <- alpha' rebinds' rename body
         pure (pat', body')
       pure (ECase e' ps')
+
+    EList ty es ->
+      EList ty <$> traverse (alpha' rebinds rename) es
 
 alphaPat' :: Map Name Name -> (Name -> Name) -> Pattern -> State (Map Name Int) (Pattern, Map Name Name)
 alphaPat' rebinds rename p =
