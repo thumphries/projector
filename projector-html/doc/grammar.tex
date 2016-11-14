@@ -2,43 +2,99 @@
 \usepackage[T1]{fontenc}
 \usepackage{syntax}
 \usepackage[margin=0.5in]{geometry}
-\usepackage{multicol}
 \usepackage{charter}
-
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{} % sets both header and footer to nothing
-\renewcommand{\headrulewidth}{0pt}
-\fancyfoot[LE,RO]{\thepage}
+\usepackage{hyperref}
 
 \begin{document}
 
 \setlength{\grammarparsep}{4pt} % HAlignment
 \setlength{\grammarindent}{12em} % Vertical Spacing
 
-\section*{Grammar for Projector HTML}
+\section*{Grammar}
 
-The below is gibberish from my undergrad compilers project, committed
-as a template only.
+The HTML rules should be based on
+\url{http://w3c.github.io/html-reference/syntax.html}.
+
+The lexer provides Constructor, ID, Tag, String, PlainText,
+AttrName, UnquotedAttrValue, Space.
 
 \begin{grammar}
 
-<Program> ::= <MainClassDecl> <ClassDecls>
+<Template> ::= <TypeSig> <HTML>
 
-<Literal> ::= ID
-\alt `this'
-\alt `Integer'
-\alt `null'
-\alt `true'
-\alt `false'
-\alt `new' ID `(' `)'
-\alt `(' <Expr> `)'
+<TypeSig> ::= `\\' <SigPair> <SigPairs>
 
-<DotExpr> ::= `.' ID `(' <ExprLst> `)' <DotExpr> | $\varepsilon$
+<SigPair> ::= ID `:' <Type>
 
-<ExprLst> ::= <Expr> <ExprLst'> | $\varepsilon$
+<SigPairs> ::= <SigPair> <SigPairs>
+\alt `->'
 
-<ExprLst'> ::= `,' <ExprLst> | $\varepsilon$
+<Type> ::= ID
+\alt `(' <Type> <Type> `)'
+
+<HTML> ::= <Node> <HTML>
+\alt $\varepsilon$
+
+<Node> ::= <Element>
+\alt <VoidElement>
+\alt <Comment>
+\alt <Plain>
+\alt <WhiteSpace>
+\alt `{' <Expr> `}'
+
+<Element> ::= `<' Tag <Attributes> `>' <HTML> `</' Tag `>'
+
+<VoidElement> ::= `<' Tag <Attributes> `/>'
+
+<Comment> ::= `<!----' String `---->'
+
+<Plain> ::= PlainText
+
+<WhiteSpace> ::= Space
+
+<Attributes> ::= <Attribute> <Attributes>
+\alt $\varepsilon$
+
+<Attribute> ::= <AttributeName> `=' <AttributeValue>
+\alt <EmptyAttribute>
+\alt `{' <Expr> `}'
+
+<EmptyAttribute> ::= <AttributeName>
+
+<AttributeName> ::= AttrName
+\alt `{' <Expr> `}'
+
+<AttributeValue> ::= `\"' String `\"'
+\alt UnquotedAttrValue
+\alt `{' <Expr> `}'
+
+<Expr> ::= <Variable>
+\alt <Application>
+\alt <Case>
+
+<Variable> ::= ID
+
+<Application> ::= <Expr> <Expr>
+
+<Case> ::= `case' <Expr> `of' <Alts>
+
+<Alts> ::= <Alt> <Alts'>
+
+<Alts'> ::= `;' <Alt> <Alts'>
+\alt $\varepsilon$
+
+<Alt> ::= <Pattern> `->' <AltBody>
+
+<AltBody> ::= <Expr>
+\alt <HTML>
+
+<Pattern> ::= ID
+\alt Constructor <Patterns>
+
+<Patterns> ::= ID <Patterns>
+\alt `(' Constructor <Patterns> `)'
+\alt $\varepsilon$
+
 
 \end{grammar}
 
