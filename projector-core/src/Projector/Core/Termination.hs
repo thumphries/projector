@@ -12,6 +12,7 @@ import           Data.Map.Strict as M
 import           P
 
 import           Projector.Core.Type
+import           Projector.Core.Util (listE_)
 
 
 data TerminationError l
@@ -27,12 +28,10 @@ pflip p =
     Neg -> Pos
 
 -- | Ensure datatypes are only used recursively in positive position.
---
--- TODO use apE / listE family to accum errors
-positivityCheck :: Ground l => TypeContext l -> Either (TerminationError l) ()
+positivityCheck :: Ground l => TypeContext l -> Either [TerminationError l] ()
 positivityCheck tc =
   let ctx = M.toList (unTypeContext tc)
-  in traverse_ (uncurry (positivityCheck' Pos tc)) ctx
+  in listE_ (fmap (uncurry (positivityCheck' Pos tc)) ctx)
 
 positivityCheck' ::
      Ground l
@@ -40,7 +39,7 @@ positivityCheck' ::
   -> TypeContext l
   -> TypeName
   -> Type l
-  -> Either (TerminationError l) ()
+  -> Either [TerminationError l] ()
 positivityCheck' pol tc tn ty =
   positivityCheck'' pol tc tn ty ty
 
@@ -51,7 +50,7 @@ positivityCheck'' ::
   -> TypeName
   -> Type l
   -> Type l
-  -> Either (TerminationError l) ()
+  -> Either [TerminationError l] ()
 positivityCheck'' pol tc tn ty have =
   let cont =
         case have of
@@ -60,7 +59,7 @@ positivityCheck'' pol tc tn ty have =
             positivityCheck'' pol tc tn ty r
 
           TVariant _ cts ->
-            traverse_ (traverse_ (traverse_ (positivityCheck'' pol tc tn ty))) cts
+            listE_ (mconcat (fmap (snd . (fmap (fmap (positivityCheck'' pol tc tn ty)))) cts))
 
           TLit _ ->
             pure ()
@@ -70,8 +69,12 @@ positivityCheck'' pol tc tn ty have =
 
   in case pol of
        Neg ->
-         if | have == TVar tn -> Left (PositivityCheckFailed have ty)
-            | have == ty -> Left (PositivityCheckFailed have ty)
+         if | have == TVar tn -> terminationError (PositivityCheckFailed have ty)
+            | have == ty -> terminationError (PositivityCheckFailed have ty)
             | otherwise -> cont
        Pos ->
          cont
+
+terminationError :: TerminationError l -> Either [TerminationError l] a
+terminationError =
+  Left . (:[])
