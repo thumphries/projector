@@ -65,6 +65,9 @@ ppExpr' types e =
     EList _ es ->
       "[" <> T.intercalate ", " (fmap (ppExpr' types) es) <> "]"
 
+    EForeign (Name n) ty ->
+      parenMay (n <> "#" <> typeMay ty)
+
   where typeMay t = if types then " : " <> ppType t else T.empty
 
 ppPattern :: Pattern -> Text

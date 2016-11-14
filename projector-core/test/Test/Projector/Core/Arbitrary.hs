@@ -90,9 +90,13 @@ genExpr n t v =
         EList _ es ->
           es
 
+        EForeign _ _ ->
+          []
+
       nonrec = [
           ELit <$> v
         , EVar <$> n
+        , EForeign <$> n <*> t
         ]
 
       recc = [
