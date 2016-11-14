@@ -32,6 +32,7 @@ import           P
 
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 import           Projector.Core.Type
+import           Projector.Core.Util
 
 
 data TypeError l
@@ -217,19 +218,3 @@ pairC l r =
 apC :: Check l (a -> b) -> Check l a -> Check l b
 apC l r =
   Check $ apE (unCheck l) (unCheck r)
-
--- -----------------------------------------------------------------------------
-
--- A version of 'ap' that accumulates errors.
--- Useful when expressions do not relate to one another at all.
-apE :: Monoid e => Either e (a -> b) -> Either e a -> Either e b
-apE l r =
-  case (l, r) of
-    (Right f, Right a) ->
-      pure (f a)
-    (Left a, Right _) ->
-      Left a
-    (Right _, Left b) ->
-      Left b
-    (Left a, Left b) ->
-      Left (a <> b)

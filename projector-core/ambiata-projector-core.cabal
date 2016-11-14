@@ -36,6 +36,7 @@ library
                        Projector.Core.Syntax
                        Projector.Core.Termination
                        Projector.Core.Type
+                       Projector.Core.Util
 
 test-suite test
   type:                exitcode-stdio-1.0
