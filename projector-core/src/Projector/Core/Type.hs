@@ -7,7 +7,6 @@
 {-# LANGUAGE TypeFamilies #-}
 module Projector.Core.Type (
     Type (..)
-  , Decl (..)
   , Ground (..)
   , TypeName (..)
   , Constructor (..)
@@ -16,6 +15,7 @@ module Projector.Core.Type (
   , textend
   , tlookup
   , tresolve
+  , tnormalise
   , typesEqual
   ) where
 
@@ -34,9 +34,6 @@ data Type l
   | TVariant TypeName [(Constructor, [Type l])]
   | TList (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
-
-data Decl l
-  = DVariant TypeName [(Constructor, [Type l])]
 
 -- | The class of user-supplied primitive types.
 class Eq l => Ground l where
@@ -77,6 +74,24 @@ tresolve tc ty =
     _ ->
       ty
 
+-- this is wrong
+-- types can be infinite when unfolded
+-- equality is bork, variants aren't top level types
+tnormalise :: Ground l => TypeContext l -> Type l -> Type l
+tnormalise tc ty  =
+  case ty of
+    TArrow t1 t2 ->
+      TArrow (tnormalise tc t1) (tnormalise tc t2)
+
+    TVariant tn cts ->
+      TVariant tn (fmap (fmap (fmap (tnormalise tc))) cts)
+
+    TLit _ ->
+      ty
+
+    TVar tn ->
+      fromMaybe ty (tlookup tn tc)
+
 typesEqual :: Ground l => TypeContext l -> Type l -> Type l -> Bool
 typesEqual tc a b =
-  tresolve tc a == tresolve tc b
+  tnormalise tc a == tnormalise tc b

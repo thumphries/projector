@@ -297,7 +297,6 @@ genWellTypedExpr' n ty ctx names genty genval =
         TVar x ->
           -- Look it up in ctx
           -- recur with that type substituted
-          trace (show x) $
           maybe
             (fail "free type variable!")
             (\ty' -> genWellTypedExpr' n ty' ctx names genty genval)
@@ -626,7 +625,7 @@ genTestExpr =
 
 genWellTypedTestExpr :: TypeContext TestLitT -> Type TestLitT -> Jack (Expr TestLitT)
 genWellTypedTestExpr ctx ty = do
-  genWellTypedExpr ctx ty (genType genTestLitT) genWellTypedTestLitValue
+  genWellTypedExpr ctx ty (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
 
 genWellTypedTestExpr' :: Jack (Type TestLitT, TypeContext TestLitT, Expr TestLitT)
 genWellTypedTestExpr' = do
