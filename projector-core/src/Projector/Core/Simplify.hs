@@ -69,6 +69,9 @@ whnf' ctx expr = case expr of
   EList ty es ->
     EList ty (fmap (whnf'' ctx) es)
 
+  EForeign _ _ ->
+    expr
+
 
 -- propagate substitutions around :(
 whnf'' :: Map Name (Expr l) -> Expr l -> Expr l
@@ -96,6 +99,9 @@ whnf'' ctx expr =
 
     EList ty es ->
       EList ty (fmap (whnf'' ctx) es)
+
+    EForeign _ _ ->
+      expr
 
 
 -- | Reduce an expression to beta normal form.
@@ -139,6 +145,9 @@ nf' ctx expr =
 
   EList ty es ->
     EList ty (fmap (nf' ctx) es)
+
+  EForeign _ _ ->
+    expr
 
 -- | Pattern matching. Returns 'Nothing' if no match is possible.
 match :: Map Name (Expr l) -> Pattern -> Expr l -> Maybe (Map Name (Expr l))
@@ -208,6 +217,9 @@ alpha' rebinds rename expr =
 
     EList ty es ->
       EList ty <$> traverse (alpha' rebinds rename) es
+
+    EForeign _ _ ->
+      pure expr
 
 alphaPat' :: Map Name Name -> (Name -> Name) -> Pattern -> State (Map Name Int) (Pattern, Map Name Name)
 alphaPat' rebinds rename p =

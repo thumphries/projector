@@ -135,6 +135,9 @@ typeCheck' ctx expr =
     EList ty es -> do
       TList <$> unifyList (pure ty) (fmap (typeCheck' ctx) es)
 
+    EForeign _ ty -> do
+      pure ty
+
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
 checkPattern :: Ground l => Ctx l -> Type l -> Pattern -> Expr l -> Check l (Type l)
