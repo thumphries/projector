@@ -12,7 +12,6 @@ import           P
 
 import           Projector.Core.Check (typeCheck)
 import           Projector.Core.Simplify (nf, whnf)
-import           Projector.Core.Type (tresolve)
 
 import           Test.Projector.Core.Arbitrary
 

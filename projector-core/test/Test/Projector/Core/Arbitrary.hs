@@ -46,7 +46,6 @@ genType' m n g =
 
       recc = [
           TArrow <$> rtype <*> rtype
-        , TVariant <$> genTypeName <*> genVariants m n g
         , TList <$> rtype
         ]
 
@@ -142,7 +141,7 @@ genTypeDecls tn cs gt = do
   nCons <- chooseInt (0, 100)
   types <- S.toList <$> genSizedSet nTypes tn
   constructors <- S.toList <$> genSizedSet nCons cs
-  genTypeDecls' gt types constructors tempty
+  genTypeDecls' gt types constructors mempty
 
 genTypeDecls' ::
      Ground l
@@ -157,7 +156,7 @@ genTypeDecls' _ _ [] tc =
   pure tc
 genTypeDecls' g (t:ts) (c:cs) tc = do
   (vars, cs') <- genVariantsFromContext' g c cs tc
-  let ty = TVariant t vars
+  let ty = DVariant vars
   genTypeDecls' g ts cs' (declareType t ty tc)
 
 genVariantsFromContext' ::
@@ -169,7 +168,7 @@ genVariantsFromContext' ::
   -> Jack ([(Constructor, [Type l])], [Constructor])
 genVariantsFromContext' g c cs tc = do
   -- Generate a nonrecursive branch first
-  nonrec <- (c,) <$> listOfN 0 5 (genTypeFromContext tempty g)
+  nonrec <- (c,) <$> listOfN 0 5 (genTypeFromContext mempty g)
 
   -- Generate arbitrary number of additional variants
   k <- chooseInt (0, 10)
@@ -199,9 +198,10 @@ genTypeFromContext tc@(TypeDecls m) g =
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
+type Paths l = Map (Type l) [(Name, Type l)]
 data Context l = Context {
     cnames :: Map Name (Type l)
-  , cpaths :: Map (Type l) [(Name, Type l)]
+  , cpaths :: Paths l
   } deriving (Eq, Show)
 
 centy :: Ord l => Context l
@@ -232,7 +232,7 @@ plookup ctx want =
 
 -- record all the types we can reach via the recorded type
 pinsert :: (Ground l, Ord l) => TypeDecls l -> Context l -> Name -> Type l -> Context l
-pinsert ctx names@(Context ns p) n t =
+pinsert ctx (Context ns p) n t =
   Context ns . mcons t (n, t) $ case t of
     TLit _ ->
       p
@@ -240,7 +240,16 @@ pinsert ctx names@(Context ns p) n t =
     TArrow _ to ->
       mcons to (n, t) p
 
-    TVariant _ cts ->
+    TList _ ->
+      p
+
+    TVar x ->
+      maybe p (declPaths n t p) (lookupType x ctx)
+
+declPaths :: Ord l => Name -> Type l -> Paths l -> Decl l -> Paths l
+declPaths n t p ty =
+  case ty of
+    DVariant cts ->
       -- break it apart just one tier
       -- TODO: try recursing, might be cool
       foldl'
@@ -252,15 +261,6 @@ pinsert ctx names@(Context ns p) n t =
             ts)
         p
         cts
-
-    TList _ ->
-      p -- list might be empty, also we don't have any primitives
-
-    TVar x ->
-      maybe
-        p
-        (\ty -> cpaths (pinsert ctx names n ty))
-        (lookupType x ctx)
 
 mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 mcons k v =
@@ -296,22 +296,20 @@ genWellTypedExpr' n ty ctx names genty genval =
 
         TVar x ->
           -- Look it up in ctx
-          -- recur with that type substituted
-          maybe
-            (fail "free type variable!")
-            (\ty' -> genWellTypedExpr' n ty' ctx names genty genval)
-            (lookupType x ctx)
+          case lookupType x ctx of
+            Just (DVariant cts) -> do
+              (con, tys) <- elements cts
+              ECon con x <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
+
+            Nothing ->
+              fail "free type variable!"
 
         TArrow t1 t2 ->
           genWellTypedLam n t1 t2 ctx names genty genval
 
-        TVariant tn cts -> do
-          (con, tys) <- elements cts
-          ECon con tn <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
-
         TList lty -> do
           k <- chooseInt (0, n)
-          EList lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty names genty genval)
+          EList lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
 
   -- try to look something appropriate up from the context
   in case plookup names ty of
@@ -346,9 +344,6 @@ genWellTypedPath ctx names more want x have =
   if want == have
     then pure (EVar x) -- straightforward lookup
     else case have of
-      TVariant _ cts ->
-        ECase (EVar x) <$> genAlternatives ctx names more cts want
-
       TArrow from _ -> do
         arg <- more names from
         pure (EApp (EVar x) arg)
@@ -362,12 +357,12 @@ genWellTypedPath ctx names more want x have =
         pure (EVar x)
 
       TVar n ->
-        -- look up in ctx
-        -- run with that
-        maybe
-          (fail "gWTP: free type variable!")
-          (\ty -> genWellTypedPath ctx names more want x ty)
-          (lookupType n ctx)
+        -- look up in ctx, run with that
+        case lookupType n ctx of
+          Just (DVariant cts) ->
+            ECase (EVar x) <$> genAlternatives ctx names more cts want
+          Nothing ->
+            fail "free type variable!"
 
 genAlternatives ::
      (Ord l, Ground l)
@@ -532,9 +527,9 @@ genSizedSet n gen =
   go n gen S.empty
   where
     go 0 _ s = pure s
-    go n g s = do
+    go k g s = do
       e <- g `suchThat` (`S.notMember` s)
-      go (n-1) g (S.insert e s)
+      go (k-1) g (S.insert e s)
 
 -- | a dodgy way to test jack shrinking invariants
 jackShrinkProp :: Show a => Int -> Jack a -> (a -> Property) -> Property
