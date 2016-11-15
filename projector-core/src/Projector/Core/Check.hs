@@ -124,7 +124,7 @@ typeCheck' tc ctx expr =
           _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
             t2 <- typeCheck' tc ctx e
             unless (typesEqual tc t1 t2) (typeError (Mismatch t1 t2))
-          pure ty
+          pure (TVar tn)
 
         Just ty ->
           typeError (BadConstructorName c ty)

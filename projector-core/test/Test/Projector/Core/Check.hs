@@ -12,20 +12,19 @@ import           P
 
 import           Projector.Core.Check (typeCheck)
 import           Projector.Core.Simplify (nf, whnf)
-import           Projector.Core.Type (tnormalise)
+import           Projector.Core.Type (tresolve)
 
 import           Test.Projector.Core.Arbitrary
 
 
 prop_welltyped =
   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    fmap (tnormalise ctx) (typeCheck ctx e) === pure (tnormalise ctx ty)
-
-{-
-prop_welltyped_shrink =
-  jackShrinkProp 5 (gamble genWellTypedTestExpr') $ \(ty, ctx, e) ->
     typeCheck ctx e === pure ty
--}
+
+prop_welltyped_shrink =
+  jackShrinkProp 5 genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx e === pure ty
+
 {-
 -- prop_illtyped =
   gamble genIllTypedTestExpr $ \e ->
@@ -38,11 +37,11 @@ prop_welltyped_shrink =
 
 prop_nf_consistent =
   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    fmap (tnormalise ctx) (typeCheck ctx (nf e)) === pure (tnormalise ctx ty)
+    typeCheck ctx (nf e) === pure ty
 
 prop_whnf_consistent =
   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    fmap (tnormalise ctx) (typeCheck ctx (nf e)) === pure (tnormalise ctx ty)
+    typeCheck ctx (whnf e) === pure ty
 
 
 return []

@@ -15,7 +15,6 @@ module Projector.Core.Type (
   , textend
   , tlookup
   , tresolve
-  , tnormalise
   , typesEqual
   ) where
 
@@ -74,31 +73,6 @@ tresolve tc ty =
     _ ->
       ty
 
--- equality is bork, variants aren't top level types
--- this needs to be much better thought out
-tnormalise :: Ground l => TypeContext l -> Type l -> Type l
-tnormalise tc ty  =
-  case ty of
-    TArrow t1 t2 ->
-      TArrow (tnormalise tc t1) (tnormalise tc t2)
-
-    TVariant tn cts ->
-      TVariant tn (fmap (fmap (fmap (recur tn))) cts)
-
-    TLit _ ->
-      ty
-
-    TVar tn ->
-      tnormalise tc (fromMaybe ty (tlookup tn tc))
-  where
-    -- conspicuously don't unfold recursive calls
-    -- this is garbage, should just not allow ambiguous type specs
-    recur tn ty
-      | ty == (TVar tn) = ty
-      | otherwise = tnormalise tc ty
-
-
-
 typesEqual :: Ground l => TypeContext l -> Type l -> Type l -> Bool
 typesEqual tc a b =
-  tnormalise tc a == tnormalise tc b
+  tresolve tc a == tresolve tc b
