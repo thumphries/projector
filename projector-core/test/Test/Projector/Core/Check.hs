@@ -24,15 +24,13 @@ prop_welltyped_shrink =
   jackShrinkProp 5 genWellTypedTestExpr' $ \(ty, ctx, e) ->
     typeCheck ctx e === pure ty
 
-{-
--- prop_illtyped =
-  gamble genIllTypedTestExpr $ \e ->
-    property (isLeft (typeCheck e))
+prop_illtyped =
+  gamble genIllTypedTestExpr' $ \(ctx, e) ->
+    property (isLeft (typeCheck ctx e))
 
--- prop_illtyped_shrink =
-  jackShrinkProp 5 genIllTypedTestExpr $ \e ->
-    property (isLeft (typeCheck e))
--}
+prop_illtyped_shrink =
+  jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
+    property (isLeft (typeCheck ctx e))
 
 prop_nf_consistent =
   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->

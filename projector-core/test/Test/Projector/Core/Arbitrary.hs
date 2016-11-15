@@ -422,95 +422,101 @@ genWellTypedApp n ty ctx names genty genval = do
 -- -----------------------------------------------------------------------------
 -- Generating ill-typed expressions
 
-{-
+
 genIllTypedExpr ::
      (Ground l, Ord l)
-  => Jack (Type l)
+  => TypeDecls l
+  -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l)
-genIllTypedExpr genty genval =
+genIllTypedExpr ctx genty genval =
   sized $ \n -> do
     k <- choose (0, n)
-    genIllTypedExpr' k centy genty genval
+    genIllTypedExpr' k ctx centy genty genval
 
 genIllTypedExpr' ::
      (Ground l, Ord l)
   => Int
+  -> TypeDecls l
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Expr l)
-genIllTypedExpr' n names genty genval =
+genIllTypedExpr' n ctx names genty genval =
   -- This function should encode all the concrete, inner ways you can
   -- cause a type error.
   --
   -- TODO: find a way to 'grow' this expression upwards inside a
   -- well-typed program while still shrinking correctly.
+  -- Right now we cause the error at the top and let the expr grow downwards.
   let badApp = do
         ty <- genty
         bnd <- genty
         nbnd <- genty `suchThat` (/= bnd)
-        fun <- genWellTypedLam (n `div` 2) bnd ty tempty names genty genval
-        arg <- genWellTypedExpr' (n `div` 2) nbnd names tempty genty genval
+        fun <- genWellTypedLam (n `div` 2) bnd ty ctx names genty genval
+        arg <- genWellTypedExpr' (n `div` 2) nbnd ctx names genty genval
         pure (EApp fun arg)
 
-      -- lazy, this doesn't discard a whole lot
-      isVariant ty = case ty of TVariant _ _ -> True; _ -> False
-      genVar = genty `suchThat` isVariant
-
       badCase1 = do
-        -- generate a variant type and a name for it
-        -- plus a different type and a name for it
-        ty@(TVariant _ cts) <- genVar
-        nty <- genty `suchThat` (/= ty)
-        na <- fmap Name (elements muppets)
-        nn <- fmap Name (elements southpark)
-        bty <- genty
+        -- generate patterns and alternatives for a known variant,
+        -- then put some bound variable of a different type in the case statement
+        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
+        nty <- genty `suchThat` (/= TVar tn)
+        na <- fmap Name (elements muppets) -- name for the value of Variant type
+        nn <- fmap Name (elements southpark) -- name for the new bound variable
+        bty <- genty -- arbitrary type for the body of the expression
 
-        -- update the context
-        let names' = cextend (cextend names ty na) nty nn
+        -- update the context with both the actually-bound name and the was-gonna-be-bound name
+        let names' = cextend ctx (cextend ctx names (TVar tn) na) nty nn
 
         -- generate patterns and alternatives
-        pes <- genAlternatives names' (\c t -> genWellTypedExpr' (n `div` 2) t c genty genval) cts bty
+        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' (n `div` 2) t ctx c genty genval) cts bty
 
         -- put a different thing in the e
         pure (ELam nn bty (ECase (EVar nn) pes))
 
       badCase2 = do
-        -- generate a variant type
-        ty@(TVariant _ cts) <- genVar
+        -- Create a valid case statement, then swap one of the
+        -- branches for one of a different type.
+
+        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
         nn <- fmap Name (elements muppets)
+        let names' = cextend ctx names (TVar tn) nn
 
-        -- update the context
-        let names' = cextend names ty nn
-
-        -- pick a type for the expression
+        -- pick two types for the body expression
         ety <- genty
         nety <- genty `suchThat` (/= ety)
 
         -- generate at least 1 body of the wrong type
-        pes <- genAlternatives names' (\c t -> genWellTypedExpr' (n `div` 2) t c genty genval) cts ety
-        bat <- genWellTypedExpr' (n `div` 2) nety names' genty genval
-        let pes' = case pes of
-              -- TODO could easily include at a random branch
-              ((pat, _):ps) -> (pat, bat):ps
-              _ -> [(pvar_ "x", bat)] -- impossible
+        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' (n `div` 2) t ctx c genty genval) cts ety
+        bat <- genWellTypedExpr' (n `div` 2) nety ctx names' genty genval
+        let pes' = (pvar_ "x", bat) : pes
 
-        pure (ELam nn ty (ECase (EVar nn) pes'))
+        pure (ELam nn (TVar tn) (ECase (EVar nn) pes'))
 
       badCon = do
-        -- generate a variant type
-        -- FIX THIS IS WRONG needs to come from ctx
-        (TVariant tn cts) <- genVar
+        -- grab some variant
+        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
 
         -- construct it wrong
         (con, tys) <- elements cts
-        fmap (ECon con tn) (for tys $ \t -> do
-          nty <- genty `suchThat` (/= t)
-          genWellTypedExpr' (n `div` (length tys)) nty names genty genval)
+        fmap (ECon con tn) $
+          case tys of
+            [] -> do -- cosntructor with no arguments, give it extra
+              extraType <- genty
+              e <- genWellTypedExpr' (n `div` 2) extraType ctx names genty genval
+              pure [e]
 
-  in oneOf [badApp, badCase1, badCase2, badCon]
--}
+            xs -> for xs $ \t -> do -- satisfy every type incorrectly
+              nty <- genty `suchThat` (/= t)
+              genWellTypedExpr' (n `div` (max 2 (length xs))) nty ctx names genty genval
+
+  in oneOf
+       (if (unTypeDecls ctx == mempty)
+         then [badApp] -- most of these need at least one variant in scope
+         else [badApp, badCase1, badCase2, badCon])
+
+
 
 
 -- -----------------------------------------------------------------------------
@@ -628,11 +634,14 @@ genWellTypedTestExpr' = do
   ty <- genTestType ctx
   (ty, ctx,) <$> genWellTypedTestExpr ctx ty
 
-{-
-genIllTypedTestExpr :: Jack (Expr TestLitT)
-genIllTypedTestExpr = do
-  genIllTypedExpr (genType genTestLitT) genWellTypedTestLitValue
--}
+genIllTypedTestExpr :: TypeDecls TestLitT -> Jack (Expr TestLitT)
+genIllTypedTestExpr ctx = do
+  genIllTypedExpr ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
+
+genIllTypedTestExpr' :: Jack (TypeDecls TestLitT, Expr TestLitT)
+genIllTypedTestExpr' = do
+  ctx <- genTestTypeDecls
+  (ctx,) <$> genIllTypedExpr ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
 
 genTestTypeDecls :: Jack (TypeDecls TestLitT)
 genTestTypeDecls
