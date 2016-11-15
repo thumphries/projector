@@ -13,31 +13,35 @@ import qualified Data.Text as T
 import           P
 
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
-import           Projector.Core.Type (Type (..), Ground (..), Constructor (..), TypeName (..))
+import           Projector.Core.Type
 
 
 ppType :: Ground l => Type l -> Text
 ppType =
-  ppType' False
+  ppType' mempty False
 
-ppTypeInfo :: Ground l => Type l -> Text
-ppTypeInfo =
-  ppType' True
+ppTypeInfo :: Ground l => TypeContext l -> Type l -> Text
+ppTypeInfo ctx =
+  ppType' ctx True
 
-ppType' :: Ground l => Bool -> Type l -> Text
-ppType' verbose t =
+ppType' :: Ground l => TypeContext l -> Bool -> Type l -> Text
+ppType' ctx verbose t =
   case t of
     TLit g ->
       ppGroundType g
 
-    TVar (TypeName ty) ->
-      ty
+    TVar tn@(TypeName ty) ->
+      let mty = tlookup tn ctx
+      in ty <> case (verbose, mty) of
+           (True, Just (DVariant cts)) ->
+             " = " <> ppConstructors cts
+           (False, _) ->
+             T.empty
+           (_, Nothing) ->
+             T.empty
 
     TArrow a b ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
-
-    TVariant (TypeName ty) cts ->
-      ty <> if verbose then " = " <> ppConstructors cts else T.empty
 
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =

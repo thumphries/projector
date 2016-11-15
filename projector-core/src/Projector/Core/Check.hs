@@ -40,8 +40,8 @@ data TypeError l
   | ExpectedArrow (Type l) (Type l)
   | FreeVariable Name
   | FreeTypeVariable TypeName
-  | BadConstructorName Constructor (Type l)
-  | BadConstructorArity Constructor (Type l) Int
+  | BadConstructorName Constructor (Decl l)
+  | BadConstructorArity Constructor (Decl l) Int
   | BadPattern (Type l) Pattern
   | NonExhaustiveCase (Expr l) (Type l)
 
@@ -109,13 +109,13 @@ typeCheck' tc ctx expr =
       typs <- checkPair tc ctx a b
       case typs of
         (TArrow c d, e) ->
-          if typesEqual tc c e then pure d else typeError (Mismatch c e)
+          if c == e then pure d else typeError (Mismatch c e)
         (c, d) ->
           typeError (ExpectedArrow d c)
 
     ECon c tn es ->
       case tlookup tn tc of
-        Just ty@(TVariant _ cs) -> do
+        Just ty@(DVariant cs) -> do
           -- Look up constructor name
           ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
           -- Check arity
@@ -123,11 +123,8 @@ typeCheck' tc ctx expr =
           -- Typecheck all bnds against expected
           _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
             t2 <- typeCheck' tc ctx e
-            unless (typesEqual tc t1 t2) (typeError (Mismatch t1 t2))
+            unless (t1 == t2) (typeError (Mismatch t1 t2))
           pure (TVar tn)
-
-        Just ty ->
-          typeError (BadConstructorName c ty)
 
         Nothing ->
           typeError (FreeTypeVariable tn)
@@ -170,14 +167,18 @@ checkPattern' tc ctx ty pat =
       pure (cextend x ty ctx)
 
     PCon c pats ->
-      case (tresolve tc ty) of
-        TVariant _ cs -> do
-          -- find the constructor in the type
-          ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
-          -- check the lists are the same length
-          unless (length ts == length pats) (typeError (BadPattern ty pat))
-          -- Check all recursive pats against type list
-          foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
+      case ty of
+        TVar tn ->
+          case tlookup tn tc of
+            Just (DVariant cs) -> do
+              -- find the constructor in the type
+              ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+              -- check the lists are the same length
+              unless (length ts == length pats) (typeError (BadPattern ty pat))
+              -- Check all recursive pats against type list
+              foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
+            Nothing ->
+              typeError (FreeTypeVariable tn)
         _ ->
           typeError (BadPattern ty pat)
 

@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Projector.Core.Type (
     Type (..)
+  , Decl (..)
   , Ground (..)
   , TypeName (..)
   , Constructor (..)
@@ -14,8 +15,6 @@ module Projector.Core.Type (
   , tempty
   , textend
   , tlookup
-  , tresolve
-  , typesEqual
   ) where
 
 
@@ -34,8 +33,13 @@ data Type l
   | TList (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
+-- | Declared types.
+data Decl l
+  = DVariant [(Constructor, [Type l])]
+  deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
+
 -- | The class of user-supplied primitive types.
-class Eq l => Ground l where
+class (Eq l, Ord l) => Ground l where
   data Value l
   typeOf :: Value l -> l
   ppGroundType :: l -> Text
@@ -50,29 +54,21 @@ newtype Constructor  = Constructor { unConName :: Text }
   deriving (Eq, Ord, Show, Read)
 
 -- | Type contexts.
-newtype TypeContext l = TypeContext { unTypeContext :: Map TypeName (Type l) }
+newtype TypeContext l = TypeContext { unTypeContext :: Map TypeName (Decl l) }
   deriving (Eq, Ord, Show, Read)
+
+instance Ord l => Monoid (TypeContext l) where
+  mempty = TypeContext mempty
+  mappend x = TypeContext . (mappend `on` unTypeContext) x
 
 tempty :: TypeContext l
 tempty =
   TypeContext mempty
 
-textend :: Ground l => TypeName -> Type l -> TypeContext l -> TypeContext l
+textend :: Ground l => TypeName -> Decl l -> TypeContext l -> TypeContext l
 textend n t =
   TypeContext . M.insert n t . unTypeContext
 
-tlookup :: Ground l => TypeName -> TypeContext l -> Maybe (Type l)
+tlookup :: Ground l => TypeName -> TypeContext l -> Maybe (Decl l)
 tlookup n =
   M.lookup n . unTypeContext
-
-tresolve :: Ground l => TypeContext l -> Type l -> Type l
-tresolve tc ty =
-  case ty of
-    TVar tn ->
-      fromMaybe ty (tlookup tn tc)
-    _ ->
-      ty
-
-typesEqual :: Ground l => TypeContext l -> Type l -> Type l -> Bool
-typesEqual tc a b =
-  tresolve tc a == tresolve tc b
