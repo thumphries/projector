@@ -11,10 +11,9 @@ module Projector.Core.Type (
   , Ground (..)
   , TypeName (..)
   , Constructor (..)
-  , TypeContext (..)
-  , tempty
-  , textend
-  , tlookup
+  , TypeDecls (..)
+  , declareType
+  , lookupType
   ) where
 
 
@@ -54,21 +53,17 @@ newtype Constructor  = Constructor { unConName :: Text }
   deriving (Eq, Ord, Show, Read)
 
 -- | Type contexts.
-newtype TypeContext l = TypeContext { unTypeContext :: Map TypeName (Decl l) }
+newtype TypeDecls l = TypeDecls { unTypeDecls :: Map TypeName (Decl l) }
   deriving (Eq, Ord, Show, Read)
 
-instance Ord l => Monoid (TypeContext l) where
-  mempty = TypeContext mempty
-  mappend x = TypeContext . (mappend `on` unTypeContext) x
+instance Ord l => Monoid (TypeDecls l) where
+  mempty = TypeDecls mempty
+  mappend x = TypeDecls . (mappend `on` unTypeDecls) x
 
-tempty :: TypeContext l
-tempty =
-  TypeContext mempty
+declareType :: Ground l => TypeName -> Decl l -> TypeDecls l -> TypeDecls l
+declareType n t =
+  TypeDecls . M.insert n t . unTypeDecls
 
-textend :: Ground l => TypeName -> Decl l -> TypeContext l -> TypeContext l
-textend n t =
-  TypeContext . M.insert n t . unTypeContext
-
-tlookup :: Ground l => TypeName -> TypeContext l -> Maybe (Decl l)
-tlookup n =
-  M.lookup n . unTypeContext
+lookupType :: Ground l => TypeName -> TypeDecls l -> Maybe (Decl l)
+lookupType n =
+  M.lookup n . unTypeDecls

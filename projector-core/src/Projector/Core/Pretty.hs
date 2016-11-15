@@ -20,18 +20,18 @@ ppType :: Ground l => Type l -> Text
 ppType =
   ppType' mempty False
 
-ppTypeInfo :: Ground l => TypeContext l -> Type l -> Text
+ppTypeInfo :: Ground l => TypeDecls l -> Type l -> Text
 ppTypeInfo ctx =
   ppType' ctx True
 
-ppType' :: Ground l => TypeContext l -> Bool -> Type l -> Text
+ppType' :: Ground l => TypeDecls l -> Bool -> Type l -> Text
 ppType' ctx verbose t =
   case t of
     TLit g ->
       ppGroundType g
 
     TVar tn@(TypeName ty) ->
-      let mty = tlookup tn ctx
+      let mty = lookupType tn ctx
       in ty <> case (verbose, mty) of
            (True, Just (DVariant cts)) ->
              " = " <> ppConstructors cts

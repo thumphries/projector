@@ -38,9 +38,9 @@ tcasey :: Type TestLitT
 tcasey =
   TVariant (TypeName "Casey") [(Constructor "Casey", [TLit TBool])]
 
-caseyCtx :: TypeContext TestLitT
+caseyCtx :: TypeDecls TestLitT
 caseyCtx =
-  textend (TypeName "Casey") tcasey tempty
+  declareType (TypeName "Casey") tcasey tempty
 
 -- intlist
 
@@ -60,9 +60,9 @@ nintlist :: Type TestLitT
 nintlist =
   TVar (TypeName "IntList")
 
-tintlistctx :: TypeContext TestLitT
+tintlistctx :: TypeDecls TestLitT
 tintlistctx =
-  textend (TypeName "IntList") tintlist tempty
+  declareType (TypeName "IntList") tintlist tempty
 
 tnil :: Expr TestLitT
 tnil =

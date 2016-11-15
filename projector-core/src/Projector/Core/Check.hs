@@ -52,7 +52,7 @@ deriving instance (Ord l, Ord (Value l)) => Ord (TypeError l)
 
 typeCheck ::
      Ground l
-  => TypeContext l
+  => TypeDecls l
   -> Expr l
   -> Either [TypeError l] (Type l)
 typeCheck c =
@@ -85,7 +85,7 @@ clookup n =
 -- our type annotations around the tree and use (==) in the right spots.
 typeCheck' ::
      Ground l
-  => TypeContext l
+  => TypeDecls l
   -> Ctx l
   -> Expr l
   -> Check l (Type l)
@@ -114,7 +114,7 @@ typeCheck' tc ctx expr =
           typeError (ExpectedArrow d c)
 
     ECon c tn es ->
-      case tlookup tn tc of
+      case lookupType tn tc of
         Just ty@(DVariant cs) -> do
           -- Look up constructor name
           ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
@@ -144,7 +144,7 @@ typeCheck' tc ctx expr =
 -- then check its associated branch (if the pattern makes sense)
 checkPattern ::
      Ground l
-  => TypeContext l
+  => TypeDecls l
   -> Ctx l
   -> Type l
   -> Pattern
@@ -156,7 +156,7 @@ checkPattern tc ctx ty pat expr = do
 
 checkPattern' ::
      Ground l
-  => TypeContext l
+  => TypeDecls l
   -> Ctx l
   -> Type l
   -> Pattern
@@ -169,7 +169,7 @@ checkPattern' tc ctx ty pat =
     PCon c pats ->
       case ty of
         TVar tn ->
-          case tlookup tn tc of
+          case lookupType tn tc of
             Just (DVariant cs) -> do
               -- find the constructor in the type
               ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
@@ -200,7 +200,7 @@ typeError =
 -- Check a pair of 'Expr', using 'apE' to accumulate the errors.
 checkPair ::
      Ground l
-  => TypeContext l
+  => TypeDecls l
   -> Ctx l
   -> Expr l
   -> Expr l
