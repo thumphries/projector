@@ -49,10 +49,6 @@ buildIntList n = case n of
   0 -> tnil
   _ -> tcons n (buildIntList (n - 1))
 
-tintlist :: Type TestLitT
-tintlist =
-  TVar (TypeName "IntList")
-
 dintlist :: Decl TestLitT
 dintlist =
   DVariant [

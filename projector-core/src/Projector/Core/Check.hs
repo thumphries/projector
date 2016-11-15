@@ -135,7 +135,7 @@ typeCheck' tc ctx expr =
       unifyList (typeError (NonExhaustiveCase expr ty)) tzs
 
     EList ty es -> do
-      TList <$> unifyList (pure ty) (fmap (typeCheck' ctx) es)
+      TList <$> unifyList (pure ty) (fmap (typeCheck' tc ctx) es)
 
     EForeign _ ty -> do
       pure ty

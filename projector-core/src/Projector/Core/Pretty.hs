@@ -43,12 +43,12 @@ ppType' ctx verbose t =
     TArrow a b ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
 
+    TList ty ->
+      "[" <> ppType ty <> "]"
+
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =
   T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))
-
-    TList ty ->
-      "[" <> ppType ty <> "]"
 
 ppExpr :: Ground l => Expr l -> Text
 ppExpr =

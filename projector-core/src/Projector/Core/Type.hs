@@ -28,7 +28,6 @@ data Type l
   = TLit l
   | TVar TypeName
   | TArrow (Type l) (Type l)
-  | TVariant TypeName [(Constructor, [Type l])]
   | TList (Type l)
   deriving (Eq, Ord, Show, Read, Functor, Foldable, Traversable)
 
