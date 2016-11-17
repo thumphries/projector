@@ -81,7 +81,9 @@ positivityCheck'' pol tc tn have =
            then terminationError (PositivityCheckFailed have tn)
            else cont
        Pos ->
-         cont
+         if have == TVar tn
+           then pure ()
+           else cont
 
 terminationError :: TerminationError l -> Either [TerminationError l] a
 terminationError =
