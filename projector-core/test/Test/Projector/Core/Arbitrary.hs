@@ -470,10 +470,11 @@ genIllTypedExpr' n ctx names genty genval =
         let names' = cextend ctx (cextend ctx names (TVar tn) na) nty nn
 
         -- generate patterns and alternatives
-        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' (n `div` 2) t ctx c genty genval) cts bty
+        let k = n `div` (max 2 (length cts))
+        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' k t ctx c genty genval) cts bty
 
         -- put a different thing in the e
-        pure (ELam nn bty (ECase (EVar nn) pes))
+        pure (ELam nn nty (ECase (EVar nn) pes))
 
       badCase2 = do
         -- Create a valid case statement, then swap one of the
@@ -488,8 +489,9 @@ genIllTypedExpr' n ctx names genty genval =
         nety <- genty `suchThat` (/= ety)
 
         -- generate at least 1 body of the wrong type
-        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' (n `div` 2) t ctx c genty genval) cts ety
-        bat <- genWellTypedExpr' (n `div` 2) nety ctx names' genty genval
+        let k = (n `div` (max 2 (length cts)))
+        pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' k t ctx c genty genval) cts ety
+        bat <- genWellTypedExpr' k nety ctx names' genty genval
         let pes' = (pvar_ "x", bat) : pes
 
         pure (ELam nn (TVar tn) (ECase (EVar nn) pes'))
