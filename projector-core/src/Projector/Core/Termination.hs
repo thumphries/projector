@@ -16,7 +16,7 @@ import           Projector.Core.Util (listE_)
 
 
 data TerminationError l
-  = PositivityCheckFailed (Type l) (Type l)
+  = PositivityCheckFailed (Type l) TypeName
   deriving (Eq, Ord, Show)
 
 data Polarity = Pos | Neg
@@ -28,50 +28,58 @@ pflip p =
     Neg -> Pos
 
 -- | Ensure datatypes are only used recursively in positive position.
-positivityCheck :: Ground l => TypeContext l -> Either [TerminationError l] ()
+positivityCheck :: Ground l => TypeDecls l -> Either [TerminationError l] ()
 positivityCheck tc =
-  let ctx = M.toList (unTypeContext tc)
+  let ctx = M.toList (unTypeDecls tc)
   in listE_ (fmap (uncurry (positivityCheck' Pos tc)) ctx)
 
 positivityCheck' ::
      Ground l
   => Polarity
-  -> TypeContext l
+  -> TypeDecls l
   -> TypeName
-  -> Type l
+  -> Decl l
   -> Either [TerminationError l] ()
 positivityCheck' pol tc tn ty =
-  positivityCheck'' pol tc tn ty ty
+  case ty of
+    DVariant cts ->
+      listE_ (mconcat (fmap (snd . (fmap (fmap (positivityCheck'' pol tc tn)))) cts))
 
 positivityCheck'' ::
      Ground l
   => Polarity
-  -> TypeContext l
+  -> TypeDecls l
   -> TypeName
   -> Type l
-  -> Type l
   -> Either [TerminationError l] ()
-positivityCheck'' pol tc tn ty have =
+positivityCheck'' pol tc tn have =
   let cont =
         case have of
           TArrow l r -> do
-            positivityCheck'' (pflip pol) tc tn ty l
-            positivityCheck'' pol tc tn ty r
-
-          TVariant _ cts ->
-            listE_ (mconcat (fmap (snd . (fmap (fmap (positivityCheck'' pol tc tn ty)))) cts))
+            -- Polarity flips whenever we go to the left of an Arrow.
+            positivityCheck'' (pflip pol) tc tn l
+            positivityCheck'' pol tc tn r
 
           TLit _ ->
             pure ()
 
-          TVar _ ->
-            pure ()
+          TList lt ->
+            positivityCheck'' pol tc tn lt
+
+          TVar n ->
+            case lookupType n tc of
+              Just td ->
+                positivityCheck' pol tc tn td
+
+              Nothing ->
+                -- Free type variable. Won't pass typecheck, but not our problem.
+                pure ()
 
   in case pol of
        Neg ->
-         if | have == TVar tn -> terminationError (PositivityCheckFailed have ty)
-            | have == ty -> terminationError (PositivityCheckFailed have ty)
-            | otherwise -> cont
+         if have == TVar tn
+           then terminationError (PositivityCheckFailed have tn)
+           else cont
        Pos ->
          cont
 
