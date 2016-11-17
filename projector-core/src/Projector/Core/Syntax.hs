@@ -19,7 +19,7 @@ module Projector.Core.Syntax (
 
 import           P
 
-import           Projector.Core.Type (Type (..), Ground (..), Constructor (..))
+import           Projector.Core.Type (Type (..), TypeName (..), Ground (..), Constructor (..))
 
 
 -- | The type of Projector expressions.
@@ -31,7 +31,7 @@ data Expr l
   | EVar Name
   | ELam Name (Type l) (Expr l)
   | EApp (Expr l) (Expr l)
-  | ECon Constructor (Type l) [Expr l]
+  | ECon Constructor TypeName [Expr l]
   | ECase (Expr l) [(Pattern, Expr l)]
   | EList (Type l) [Expr l]
   | EForeign Name (Type l)

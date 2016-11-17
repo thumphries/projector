@@ -17,32 +17,28 @@ import           Test.Projector.Core.Arbitrary
 
 
 prop_welltyped =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      typeCheck e === pure ty
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx e === pure ty
 
 prop_welltyped_shrink =
-  gamble (genType genTestLitT) $ \ty ->
-    jackShrinkProp 5 (genWellTypedTestExpr ty) $ \e ->
-      typeCheck e === pure ty
+  jackShrinkProp 5 genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx e === pure ty
 
 prop_illtyped =
-  gamble genIllTypedTestExpr $ \e ->
-    property (isLeft (typeCheck e))
+  gamble genIllTypedTestExpr' $ \(ctx, e) ->
+    property (isLeft (typeCheck ctx e))
 
 prop_illtyped_shrink =
-  jackShrinkProp 5 genIllTypedTestExpr $ \e ->
-    property (isLeft (typeCheck e))
+  jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
+    property (isLeft (typeCheck ctx e))
 
 prop_nf_consistent =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      typeCheck (nf e) === pure ty
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (nf e) === pure ty
 
 prop_whnf_consistent =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      typeCheck (whnf e) === pure ty
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (whnf e) === pure ty
 
 
 return []

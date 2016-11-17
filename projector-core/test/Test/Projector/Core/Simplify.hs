@@ -21,26 +21,23 @@ import           Test.Projector.Core.Arbitrary
 -- terminates, and only up to alpha), but the generators sometimes
 -- spit out fixpoints.
 prop_nf_idem =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      nf (nf e) === nf e
+  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+    nf (nf e) === nf e
 
 prop_whnf_idem =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      whnf (whnf e) === whnf e
+  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+    whnf (whnf e) === whnf e
 
 prop_whnf_nf_idem =
-  gamble (genType genTestLitT) $ \ty ->
-    gamble (genWellTypedTestExpr ty) $ \e ->
-      whnf (nf e) === nf e
+  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+    whnf (nf e) === nf e
 
 prop_alphaNf_idem =
-  gamble genTestExpr $ \e ->
+  gamble genWellTypedTestExpr' $ \(_, _, e) ->
     alphaNf (alphaNf e) === alphaNf e
 
 prop_alpha_idem =
-  gamble genTestExpr $ \e ->
+  gamble genWellTypedTestExpr' $ \(_, _, e) ->
     alpha (alpha e) === alpha e
 
 

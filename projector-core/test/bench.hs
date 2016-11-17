@@ -32,11 +32,41 @@ buildExpr n = case n of
 buildCase :: Int -> Expr TestLitT
 buildCase n = case n of
   0 -> var_ "x"
-  m -> ECase (ECon (Constructor "Casey") tcasey [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
+  m -> ECase (ECon (Constructor "Casey") (TypeName "Casey") [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
 
-tcasey :: Type TestLitT
+tcasey :: Decl TestLitT
 tcasey =
-  TVariant (TypeName "Casey") [(Constructor "Casey", [TLit TBool])]
+  DVariant [(Constructor "Casey", [TLit TBool])]
+
+caseyCtx :: TypeDecls TestLitT
+caseyCtx =
+  declareType (TypeName "Casey") tcasey mempty
+
+-- intlist
+
+buildIntList :: Int -> Expr TestLitT
+buildIntList n = case n of
+  0 -> tnil
+  _ -> tcons n (buildIntList (n - 1))
+
+dintlist :: Decl TestLitT
+dintlist =
+  DVariant [
+      (Constructor "Nil", [])
+    , (Constructor "Cons", [TLit TInt, TVar (TypeName "IntList")])
+    ]
+
+tintlistctx :: TypeDecls TestLitT
+tintlistctx =
+  declareType (TypeName "IntList") dintlist mempty
+
+tnil :: Expr TestLitT
+tnil =
+  ECon (Constructor "Nil") (TypeName "IntList") []
+
+tcons :: Int -> Expr TestLitT -> Expr TestLitT
+tcons v l =
+  ECon (Constructor "Cons") (TypeName "IntList") [ELit (VInt v), l]
 
 main :: IO ()
 main = do
@@ -47,19 +77,29 @@ main = do
           }
 
       norm f = C.whnf nf . f
-      tc f = C.whnf typeCheck . f
+      tc f c = C.whnf (typeCheck c) . f
       mul2 = mul 2
 
   defaultMainWith cfg [
-      bgroup "normalise-billy" [
+      bgroup "normalise-intlist" [
+          bench "normalise-intlist-100" $ norm buildIntList 100
+        , bench "normalise-intlist-200" $ norm buildIntList 200
+        , bench "normalise-intlist-1000" $ norm buildIntList 1000
+        ]
+    , bgroup "check-intlist" [
+          bench "check-intlist-100" $ tc buildIntList tintlistctx 100
+        , bench "check-intlist-200" $ tc buildIntList tintlistctx 200
+        , bench "check-intlist-1000" $ tc buildIntList tintlistctx 1000
+        ]
+    , bgroup "normalise-billy" [
           bench "normalise-billy-100" $ norm buildExpr 100
         , bench "normalise-billy-200" $ norm buildExpr 200
         , bench "normalise-billy-1000" $ norm buildExpr 1000
         ]
     , bgroup "check-billy" [
-          bench "check-billy-100" $ tc buildExpr 100
-        , bench "check-billy-200" $ tc buildExpr 200
-        , bench "check-billy-1000" $ tc buildExpr 1000
+          bench "check-billy-100" $ tc buildExpr mempty 100
+        , bench "check-billy-200" $ tc buildExpr mempty 200
+        , bench "check-billy-1000" $ tc buildExpr mempty 1000
         ]
     , bgroup "normalise-church" [
           bench "normalise-church-100" $ norm nth 100
@@ -67,9 +107,9 @@ main = do
         , bench "normalise-church-1000" $ norm nth 1000
         ]
     , bgroup "check-church" [
-          bench "check-church-100" $ tc nth 100
-        , bench "check-church-200" $ tc nth 200
-        , bench "check-church-1000" $ tc nth 1000
+          bench "check-church-100" $ tc nth mempty 100
+        , bench "check-church-200" $ tc nth mempty 200
+        , bench "check-church-1000" $ tc nth mempty 1000
         ]
     , bgroup "normalise-church-mul2" [
           bench "normalise-church-mul2-100" $ norm mul2 100
@@ -77,9 +117,9 @@ main = do
         , bench "normalise-church-mul2-1000" $ norm mul2 1000
         ]
     , bgroup "check-church-mul2" [
-          bench "check-church-mul2-100" $ tc mul2 100
-        , bench "check-church-mul2-200" $ tc mul2 200
-        , bench "check-church-mul2-1000" $ tc mul2 1000
+          bench "check-church-mul2-100" $ tc mul2 mempty 100
+        , bench "check-church-mul2-200" $ tc mul2 mempty 200
+        , bench "check-church-mul2-1000" $ tc mul2 mempty 1000
         ]
     , bgroup "normalise-casey" [
           bench "normalise-casey-100" $ norm buildCase 100
@@ -87,8 +127,8 @@ main = do
         , bench "normalise-casey-1000" $ norm buildCase 1000
         ]
     , bgroup "check-casey" [
-          bench "check-casey-100" $ tc buildCase 100
-        , bench "check-casey-200" $ tc buildCase 200
-        , bench "check-casey-1000" $ tc buildCase 1000
+          bench "check-casey-100" $ tc buildCase caseyCtx 100
+        , bench "check-casey-200" $ tc buildCase caseyCtx 200
+        , bench "check-casey-1000" $ tc buildCase caseyCtx 1000
         ]
     ]
