@@ -26,6 +26,7 @@ import           P
 
 import           Projector.Core.Simplify
 import           Projector.Core.Syntax
+import           Projector.Core.Termination
 import           Projector.Core.Type
 
 
@@ -141,7 +142,7 @@ genTypeDecls tn cs gt = do
   nCons <- chooseInt (0, 100)
   types <- S.toList <$> genSizedSet nTypes tn
   constructors <- S.toList <$> genSizedSet nCons cs
-  genTypeDecls' gt types constructors mempty
+  genTypeDecls' gt types constructors mempty -- `suchThat` (isRight . positivityCheck)
 
 genTypeDecls' ::
      Ground l
