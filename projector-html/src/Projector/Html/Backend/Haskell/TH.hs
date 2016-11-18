@@ -17,6 +17,8 @@ module Projector.Html.Backend.Haskell.TH (
   , appT
   , arrowT
   , arrowT_
+  , listT
+  , listT_
   -- * Expressions
   , litE
   , varE
@@ -25,6 +27,7 @@ module Projector.Html.Backend.Haskell.TH (
   , appE
   , applyE
   , caseE
+  , listE
   -- * Patterns
   , varP
   , conP
@@ -99,6 +102,14 @@ arrowT_ :: Type -> Type -> Type
 arrowT_ t =
   appT (appT arrowT t)
 
+listT :: Type
+listT =
+  ListT
+
+listT_ :: Type -> Type
+listT_ =
+  appT listT
+
 -- -----------------------------------------------------------------------------
 -- Expressions
 
@@ -130,6 +141,10 @@ applyE =
 caseE :: Exp -> [Match] -> Exp
 caseE =
   CaseE
+
+listE :: [Exp] -> Exp
+listE =
+  ListE
 
 -- -----------------------------------------------------------------------------
 -- Patterns

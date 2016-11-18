@@ -10,6 +10,7 @@ module Projector.Html.Core.Prim (
   , HtmlExpr
   , HtmlLit
   , PrimT (..)
+  , Value (..)
   , types
   , tBool
   , dBool

@@ -13,7 +13,6 @@ module Projector.Html.Backend.Haskell (
 
 
 import qualified Data.Map.Strict as M
-import qualified Data.Text as T
 
 import qualified Language.Haskell.TH as TH
 
@@ -55,6 +54,9 @@ genType ty =
     TArrow t1 t2 ->
       arrowT_ (genType t1) (genType t2)
 
+    TList t ->
+      listT_ (genType t)
+
 -- | Expressions.
 genExp :: HtmlExpr -> TH.Exp
 genExp expr =
@@ -62,10 +64,10 @@ genExp expr =
     ELit v ->
       litE (genLit v)
 
-    EVar x ->
-      varE (mkName_ (unName x))
+    EVar (Name x) ->
+      varE (mkName_ x)
 
-    ELam n _ body ->
+    ELam (Name n) _ body ->
       lamE [varP (mkName_ n)] (genExp body)
 
     EApp fun arg ->
@@ -75,13 +77,18 @@ genExp expr =
       applyE (conE (mkName_ c)) (fmap genExp es)
 
     ECase e pats ->
-      caseE (genExp e) (fmap (uncurry genMatch pats))
+      caseE (genExp e) (fmap (uncurry genMatch) pats)
 
+    EList _ es ->
+      listE (fmap genExp es)
+
+    EForeign (Name x) _ ->
+      varE (mkName_ x)
 
 -- | Case alternatives.
 genMatch :: Pattern -> HtmlExpr -> TH.Match
 genMatch p e =
-  match_ (genPat p) (genExp e) []
+  match_ (genPat p) (genExp e)
 
 -- | Patterns.
 genPat :: Pattern -> TH.Pat
