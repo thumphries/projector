@@ -31,7 +31,6 @@ module Projector.Html.Backend.Haskell.TH (
   -- * Matches
   , match
   , match_
-  , WhereClause
   -- * Literals
   , stringL
   , stringL_
@@ -146,16 +145,15 @@ conP =
 -- -----------------------------------------------------------------------------
 -- Matches
 
-type WhereClause = [Dec]
+-- | Construct a pattern match with no where clause.
+match :: Pat -> TH.Body -> Match
+match p b =
+  Match p b []
 
-match :: Pat -> TH.Body -> WhereClause -> Match
-match =
-  Match
-
--- | Construct an unguarded pattern match.
-match_ :: Pat -> Exp -> WhereClause -> Match
-match_ p e w =
-  match p (TH.NormalB e) w
+-- | Construct an unguarded pattern match with no where clause.
+match_ :: Pat -> Exp -> Match
+match_ p e =
+  match p (TH.NormalB e)
 
 -- -----------------------------------------------------------------------------
 -- Literals
