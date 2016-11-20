@@ -6,7 +6,9 @@
 module Projector.Html.Backend.Haskell.TH (
   -- * Declarations
     data_
-  , Deriving
+  , val_
+  , fun_
+  , sig
   , TypeParams
   -- ** Constructors
   , normalC
@@ -58,12 +60,26 @@ import           P
 -- -----------------------------------------------------------------------------
 -- Declarations
 
-data_ :: Name -> TypeParams -> [Con] -> Deriving -> Dec
-data_ n ps cs ds =
-  DataD [] n (fmap TH.PlainTV ps) cs ds
+-- | Declare a simple datatype.
+data_ :: Name -> TypeParams -> [Con] -> Dec
+data_ n ps cs =
+  DataD [] n (fmap TH.PlainTV ps) cs []
 
--- Maybe newtype these?
-type Deriving = [Name]
+-- | Declare a simple function.
+fun_ :: Name -> [Pat] -> Exp -> Dec
+fun_ n ps e =
+  FunD n [TH.Clause ps (TH.NormalB e) []]
+
+-- | Declare a simple value.
+val_ :: Pat -> Exp -> Dec
+val_ p e =
+  ValD p (TH.NormalB e) []
+
+sig :: Name -> Type -> Dec
+sig =
+  SigD
+
+-- Hmm, anything requiring a type synonym should be lens'd probably
 type TypeParams = [Name]
 
 -- -----------------------------------------------------------------------------

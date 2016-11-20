@@ -1,9 +1,14 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 module Projector.Html.Backend.Haskell (
-    genTypeDecs
+    ModuleName (..)
+  , renderModule
+  , genModule
+  , genTypeDecs
   , genTypeDec
+  , genExpDec
   , genType
   , genExp
   , genMatch
@@ -13,6 +18,7 @@ module Projector.Html.Backend.Haskell (
 
 
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 
 import qualified Language.Haskell.TH as TH
 
@@ -20,8 +26,41 @@ import           P
 
 import           Projector.Core
 import           Projector.Html.Backend.Haskell.TH
-import           Projector.Html.Core.Prim
+import           Projector.Html.Core.Prim as Prim
 
+
+-- -----------------------------------------------------------------------------
+
+newtype ModuleName = ModuleName { unModuleName :: Text }
+  deriving (Eq, Ord, Show)
+
+renderModule :: ModuleName -> [TH.Dec] -> Text
+renderModule (ModuleName n) ds =
+  let pragmas = [
+          "{-# LANGUAGE NoImplicitPrelude #-}"
+        , "{-# LANGUAGE OverloadedStrings #-}"
+        ]
+      imports = [
+          "import Data.String (String)"
+        ]
+      prims = fmap (T.pack . TH.pprint) (genTypeDecs Prim.types)
+      decls = fmap (T.pack . TH.pprint) ds
+
+  in T.unlines $ mconcat [
+         pragmas
+       , [n]
+       , imports
+       , prims
+       , decls
+       ]
+
+genModule :: HtmlDecls -> [(Name, HtmlType, HtmlExpr)] -> [TH.Dec]
+genModule env exprs =
+     genTypeDecs env
+  <> (mconcat . with exprs $ \(n, ty, e) ->
+       [genTypeSig n ty, genExpDec n e])
+
+-- -----------------------------------------------------------------------------
 
 genTypeDecs :: HtmlDecls -> [TH.Dec]
 genTypeDecs =
@@ -34,7 +73,16 @@ genTypeDec :: TypeName -> HtmlDecl -> TH.Dec
 genTypeDec (TypeName n) ty =
   case ty of
     DVariant cts ->
-      data_ (mkName_ n) [] (fmap (uncurry genCon) cts) []
+      data_ (mkName_ n) [] (fmap (uncurry genCon) cts)
+
+-- | Expression declarations.
+genExpDec :: Name -> HtmlExpr -> TH.Dec
+genExpDec (Name n) expr =
+  val_ (varP (mkName_ n)) (genExp expr)
+
+genTypeSig :: Name -> HtmlType -> TH.Dec
+genTypeSig (Name n) ty =
+  sig (mkName_ n) (genType ty)
 
 -- | Constructor declarations.
 genCon :: Constructor -> [HtmlType] -> TH.Con
