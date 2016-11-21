@@ -15,6 +15,9 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core
+import           Projector.Html.Core.Prim
+import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Backend.Haskell
 
 import           System.Exit (ExitCode(..))
@@ -27,6 +30,14 @@ prop_empty_module =
     moduleName = ModuleName "TestModule"
     moduleText = renderModule moduleName mempty
 
+prop_library_module =
+  once (ghcProp moduleName moduleText)
+  where
+    moduleName = ModuleName "LibModule"
+    moduleText = renderModule moduleName . genModule Lib.types $ [
+        (Name "helloWorld", Lib.tHtml,
+          ECon (Constructor "Plain") Lib.nHtml [ELit (VString "Hello, world!")])
+      ]
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
 ghcProp :: ModuleName -> Text -> Property
