@@ -1,0 +1,27 @@
+name:                  ambiata-projector-html-runtime
+version:               0.0.1
+license:               AllRightsReserved
+author:                Ambiata <info@ambiata.com>
+maintainer:            Ambiata <info@ambiata.com>
+copyright:             (c) 2016 Ambiata.
+synopsis:              ambiata-projector-html-runtime
+category:              System
+cabal-version:         >= 1.8
+build-type:            Custom
+description:           ambiata-projector-html-runtime
+
+library
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-p
+
+  ghc-options:
+                       -Wall
+
+  hs-source-dirs:
+                       src
+
+  exposed-modules:
+                       Paths_ambiata_projector_html_runtime
+
+                       Projector.Html.Runtime
