@@ -29,35 +29,52 @@ import           Projector.Html.Backend.Data
 import           Projector.Html.Backend.Haskell.TH
 import           Projector.Html.Core.Prim as Prim
 
+import           System.IO (FilePath)
+
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> [TH.Dec] -> Text
-renderModule (ModuleName n) ds =
+renderModule :: ModuleName -> Module -> (FilePath, Text)
+renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
         ]
       modName = T.unwords ["module", n, "where"]
-      imports = [
+      runtime = [
+          -- FIX will need to import runtime module eventually
           "import Data.String (String)"
         ]
+      imports = fmap (uncurry genImport) (M.toList (moduleImports m))
       prims = fmap (T.pack . TH.pprint) (genTypeDecs Prim.types)
-      decls = fmap (T.pack . TH.pprint) ds
+      decls = fmap (T.pack . TH.pprint) (genModule m)
 
-  in T.unlines $ mconcat [
+  in (genFileName mn, T.unlines $ mconcat [
          pragmas
        , [modName]
+       , runtime
        , imports
        , prims
        , decls
-       ]
+       ])
 
-genModule :: HtmlDecls -> [(Name, HtmlType, HtmlExpr)] -> [TH.Dec]
-genModule env exprs =
-     genTypeDecs env
-  <> (mconcat . with exprs $ \(n, ty, e) ->
+genImport :: ModuleName -> [Name] -> Text
+genImport (ModuleName n) quals =
+  T.unwords [
+      "import"
+    , n
+    , "(" <> T.intercalate ", " (fmap unName quals) <> ")"
+    ]
+
+genModule :: Module -> [TH.Dec]
+genModule (Module ts _ es) =
+     genTypeDecs ts
+  <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->
        [genTypeSig n ty, genExpDec n e])
+
+genFileName :: ModuleName -> FilePath
+genFileName (ModuleName n) =
+  T.unpack (T.replace "." "/" n)
 
 -- -----------------------------------------------------------------------------
 

@@ -3,8 +3,11 @@
 module Projector.Html.Backend.Data (
     ModuleName (..)
   , Module (..)
+  , emptyModule
   ) where
 
+
+import           Data.Map.Strict  (Map)
 
 import           P
 
@@ -17,5 +20,13 @@ newtype ModuleName = ModuleName { unModuleName :: Text }
 
 data Module = Module {
     moduleTypes :: HtmlDecls
-  , moduleExprs :: [(Name, HtmlType, HtmlExpr)]
+  , moduleImports :: Map ModuleName [Name]
+  , moduleExprs :: Map Name (HtmlType, HtmlExpr)
   } deriving (Eq, Ord, Show)
+
+emptyModule :: Module
+emptyModule = Module {
+    moduleTypes = mempty
+  , moduleImports = mempty
+  , moduleExprs = mempty
+  }

@@ -86,3 +86,4 @@ test-suite test-io
                      , text
                      , directory
                      , filepath
+                     , containers
