@@ -40,6 +40,7 @@ renderModule (ModuleName n) ds =
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
         ]
+      modName = T.unwords ["module", n, "where"]
       imports = [
           "import Data.String (String)"
         ]
@@ -48,7 +49,7 @@ renderModule (ModuleName n) ds =
 
   in T.unlines $ mconcat [
          pragmas
-       , [n]
+       , [modName]
        , imports
        , prims
        , decls
