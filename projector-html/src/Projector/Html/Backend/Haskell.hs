@@ -42,8 +42,7 @@ renderModule mn@(ModuleName n) m =
         ]
       modName = T.unwords ["module", n, "where"]
       runtime = [
-          -- FIX will need to import runtime module eventually
-          "import Data.String (String)"
+          "import Projector.Html.Runtime"
         ]
       imports = fmap (uncurry genImport) (M.toList (moduleImports m))
       prims = fmap (T.pack . TH.pprint) (genTypeDecs Prim.types)

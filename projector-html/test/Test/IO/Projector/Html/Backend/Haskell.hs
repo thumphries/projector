@@ -36,7 +36,8 @@ prop_empty_module =
 prop_library_module =
   once . moduleProp (ModuleName "Test.Haskell.Library") $ Module {
       moduleTypes = Lib.types
-    , moduleImports = mempty
+    , moduleImports = M.fromList [
+        ]
     , moduleExprs = M.fromList [
           (Name "helloWorld", (Lib.tHtml,
             ECon (Constructor "Plain") Lib.nHtml [ELit (VString "Hello, world!")]))
