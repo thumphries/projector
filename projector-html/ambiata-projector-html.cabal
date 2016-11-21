@@ -19,6 +19,9 @@ library
                      , containers
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
+                     , containers                      == 0.5.*
+                     , text                            == 1.2.*
+                     , template-haskell                == 2.10.*
 
   ghc-options:
                        -Wall
@@ -32,6 +35,9 @@ library
                        Projector.Html
                        Projector.Html.Core.Library
                        Projector.Html.Core.Prim
+
+                       Projector.Html.Backend.Haskell
+                       Projector.Html.Backend.Haskell.TH
 
 test-suite test
   type:                exitcode-stdio-1.0
@@ -53,3 +59,29 @@ test-suite test
                      , ambiata-projector-html
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
+
+test-suite test-io
+  type:                exitcode-stdio-1.0
+
+  main-is:             test-io.hs
+
+  ghc-options:         -Wall -threaded -O2
+
+  hs-source-dirs:
+                       test
+
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-disorder-core
+                     , ambiata-disorder-corpus
+                     , ambiata-disorder-jack
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , QuickCheck                      >= 2.8.2      && < 2.9
+                     , quickcheck-instances            == 0.3.*
+                     , temporary                       == 1.2.*
+                     , process
+                     , text
+                     , directory
+                     , filepath

@@ -4,6 +4,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Library (
     types
+  , tTag
+  , tAttribute
+  , tAttributeKey
+  , tAttributeValue
+  , tHtml
+  , nHtml
   ) where
 
 
