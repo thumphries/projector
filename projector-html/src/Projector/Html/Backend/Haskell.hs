@@ -25,14 +25,12 @@ import qualified Language.Haskell.TH as TH
 import           P
 
 import           Projector.Core
+import           Projector.Html.Backend.Data
 import           Projector.Html.Backend.Haskell.TH
 import           Projector.Html.Core.Prim as Prim
 
 
 -- -----------------------------------------------------------------------------
-
-newtype ModuleName = ModuleName { unModuleName :: Text }
-  deriving (Eq, Ord, Show)
 
 renderModule :: ModuleName -> [TH.Dec] -> Text
 renderModule (ModuleName n) ds =
