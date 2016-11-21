@@ -82,3 +82,4 @@ test-suite test-io
                      , quickcheck-instances            == 0.3.*
                      , process
                      , text
+                     , directory
