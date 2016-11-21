@@ -31,12 +31,13 @@ import           System.Process (readProcessWithExitCode)
 
 
 prop_empty_module =
-  once (moduleProp (ModuleName "Test.Haskell.Module") emptyModule)
+  once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
 
 prop_library_module =
   once . moduleProp (ModuleName "Test.Haskell.Library") $ Module {
       moduleTypes = Lib.types
     , moduleImports = M.fromList [
+          (htmlRuntime, OpenImport)
         ]
     , moduleExprs = M.fromList [
           (Name "helloWorld", (Lib.tHtml,
