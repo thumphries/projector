@@ -1,10 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Runtime.Blaze (
+  -- * External interface
     renderHtml
+  , renderHtmlBuilder
   ) where
 
 
+import           Data.ByteString.Builder (Builder)
 import           Data.Foldable (foldl')
 import           Data.Function  ((.))
 import           Data.Functor  (fmap)
@@ -18,11 +21,23 @@ import           Projector.Html.Runtime.Library
 import qualified Text.Blaze as B
 import qualified Text.Blaze.Internal as BI
 import           Text.Blaze.Renderer.Text  (renderMarkup)
+import           Text.Blaze.Renderer.Utf8  (renderMarkupBuilder)
 
+
+-- -----------------------------------------------------------------------------
+-- External interface
 
 renderHtml :: Html -> Text
 renderHtml =
   T.toStrict . renderMarkup . htmlToMarkup
+
+renderHtmlBuilder :: Html -> Builder
+renderHtmlBuilder =
+  renderMarkupBuilder . htmlToMarkup
+
+-- -----------------------------------------------------------------------------
+-- Transform
+-- (This will eventually be done via rewrite rules)
 
 htmlToMarkup :: Html -> B.Markup
 htmlToMarkup h =
