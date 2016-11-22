@@ -1,11 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Runtime (
-  -- * Primitives
-    String
-  , Bool (..)
+    module Prim
+  , module Library
   ) where
 
 
-import           Data.Bool (Bool (..))
-import           Data.String  (String)
+import           Projector.Html.Runtime.Prim as Prim
+import           Projector.Html.Runtime.Library as Library

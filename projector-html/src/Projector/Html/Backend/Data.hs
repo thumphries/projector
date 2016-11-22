@@ -5,6 +5,8 @@ module Projector.Html.Backend.Data (
   , Module (..)
   , Imports (..)
   , htmlRuntime
+  , htmlRuntimePrim
+  , htmlRuntimeLibrary
   ) where
 
 
@@ -41,3 +43,11 @@ data Imports
 htmlRuntime :: ModuleName
 htmlRuntime =
   ModuleName "Projector.Html.Runtime"
+
+htmlRuntimePrim :: ModuleName
+htmlRuntimePrim =
+  ModuleName "Projector.Html.Runtime.Prim"
+
+htmlRuntimeLibrary :: ModuleName
+htmlRuntimeLibrary =
+  ModuleName "Projector.Html.Runtime.Library"

@@ -25,3 +25,5 @@ library
                        Paths_ambiata_projector_html_runtime
 
                        Projector.Html.Runtime
+                       Projector.Html.Runtime.Library
+                       Projector.Html.Runtime.Prim
