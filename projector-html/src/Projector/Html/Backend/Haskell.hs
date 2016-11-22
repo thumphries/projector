@@ -41,29 +41,26 @@ renderModule mn@(ModuleName n) m =
         , "{-# LANGUAGE OverloadedStrings #-}"
         ]
       modName = T.unwords ["module", n, "where"]
-      runtime = [
-          -- FIX will need to import runtime module eventually
-          "import Data.String (String)"
-        ]
       imports = fmap (uncurry genImport) (M.toList (moduleImports m))
-      prims = fmap (T.pack . TH.pprint) (genTypeDecs Prim.types)
       decls = fmap (T.pack . TH.pprint) (genModule m)
 
   in (genFileName mn, T.unlines $ mconcat [
          pragmas
        , [modName]
-       , runtime
        , imports
-       , prims
        , decls
        ])
 
-genImport :: ModuleName -> [Name] -> Text
-genImport (ModuleName n) quals =
+genImport :: ModuleName -> Imports -> Text
+genImport (ModuleName n) imports =
   T.unwords [
       "import"
     , n
-    , "(" <> T.intercalate ", " (fmap unName quals) <> ")"
+    , case imports of
+        OpenImport ->
+          T.empty
+        OnlyImport quals ->
+          "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
 genModule :: Module -> [TH.Dec]

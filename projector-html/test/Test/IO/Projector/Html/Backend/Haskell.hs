@@ -17,7 +17,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import           Projector.Html.Core.Prim
+import qualified Projector.Html.Core.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Backend.Data
 import           Projector.Html.Backend.Haskell
@@ -31,17 +31,32 @@ import           System.Process (readProcessWithExitCode)
 
 
 prop_empty_module =
-  once (moduleProp (ModuleName "Test.Haskell.Module") emptyModule)
+  once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
 
 prop_library_module =
   once . moduleProp (ModuleName "Test.Haskell.Library") $ Module {
       moduleTypes = Lib.types
-    , moduleImports = mempty
+    , moduleImports = M.fromList [
+          (htmlRuntimePrim, OpenImport)
+        ]
     , moduleExprs = M.fromList [
           (Name "helloWorld", (Lib.tHtml,
-            ECon (Constructor "Plain") Lib.nHtml [ELit (VString "Hello, world!")]))
+            ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
         ]
     }
+
+prop_library_runtime =
+  once . moduleProp (ModuleName "Test.Haskell.Runtime") $ Module {
+      moduleTypes = mempty
+    , moduleImports = M.fromList [
+          (htmlRuntime, OpenImport)
+        ]
+    , moduleExprs = M.fromList [
+          (Name "helloWorld", (Lib.tHtml,
+            ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
+        ]
+    }
+
 
 moduleProp :: ModuleName -> Module -> Property
 moduleProp mn =
@@ -51,7 +66,6 @@ moduleProp mn =
 ghcProp :: FilePath -> Text -> Property
 ghcProp mname modl =
   testIO . withTempDirectory "./dist/" "gen-hs-XXXXXX" $ \tmpDir -> do
-    -- TODO convert module names to valid nested paths
     let path = tmpDir </> mname <.> "hs"
         dir = takeDirectory path
     createDirectoryIfMissing True dir
