@@ -25,7 +25,7 @@ import           Projector.Html.Backend.Haskell
 import           System.Directory (createDirectoryIfMissing)
 import           System.Exit (ExitCode(..))
 import           System.FilePath.Posix ((</>), (<.>), takeDirectory)
-import           System.IO (FilePath)
+import           System.IO (FilePath, IO)
 import           System.IO.Temp (withTempDirectory)
 import           System.Process (readProcessWithExitCode)
 
@@ -40,8 +40,7 @@ prop_library_module =
           (htmlRuntimePrim, OpenImport)
         ]
     , moduleExprs = M.fromList [
-          (Name "helloWorld", (Lib.tHtml,
-            ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
+          helloWorld
         ]
     }
 
@@ -52,10 +51,31 @@ prop_library_runtime =
           (htmlRuntime, OpenImport)
         ]
     , moduleExprs = M.fromList [
-          (Name "helloWorld", (Lib.tHtml,
-            ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
+          helloWorld
         ]
     }
+
+prop_hello_world =
+  once $ runProp name (text <> "\nmain = putStr (renderHtml helloWorld)\n")
+    (=== "Hello, world!")
+  where
+    (name, text) =
+      renderModule (ModuleName "Main") $ Module {
+          moduleTypes = mempty
+        , moduleImports = M.fromList [
+              (htmlRuntime, OpenImport)
+            , (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
+            ]
+        , moduleExprs = M.fromList [
+              helloWorld
+            ]
+        }
+
+helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr))
+helloWorld =
+  ( Name "helloWorld"
+  , ( Lib.tHtml
+    , ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
 
 
 moduleProp :: ModuleName -> Module -> Property
@@ -63,24 +83,37 @@ moduleProp mn =
   uncurry ghcProp . renderModule mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
-ghcProp :: FilePath -> Text -> Property
 ghcProp mname modl =
+  fileProp mname modl
+    (\path -> readProcessWithExitCode "cabal" ["exec", "--", "ghc", path] "")
+    (processProp (const (property True)))
+
+runProp mname modl cb =
+  fileProp mname modl
+    (\path -> readProcessWithExitCode "cabal" ["exec", "--", "runhaskell", path] "")
+    (processProp cb)
+
+processProp :: ([Char] -> Property) -> (ExitCode, [Char], [Char]) -> Property
+processProp f (code, out, err) =
+  case code of
+    ExitSuccess ->
+      f out
+    ExitFailure i ->
+      let errm = L.unlines [
+              "Process exited with failing status: " <> T.unpack (renderIntegral i)
+            , err
+            ]
+      in counterexample errm (property False)
+
+
+fileProp :: FilePath -> Text -> (FilePath -> IO a) -> (a -> Property) -> Property
+fileProp mname modl f g =
   testIO . withTempDirectory "./dist/" "gen-hs-XXXXXX" $ \tmpDir -> do
     let path = tmpDir </> mname <.> "hs"
         dir = takeDirectory path
     createDirectoryIfMissing True dir
     T.writeFile path modl
-    (code, _out, err) <- readProcessWithExitCode "cabal" ["exec", "--", "ghc", path] ""
-    case code of
-      ExitSuccess ->
-        pure (property True)
-      ExitFailure i ->
-        let errm = L.unlines [
-                "GHC exited with failing status: " <> T.unpack (renderIntegral i)
-              , err
-              ]
-        in pure $ counterexample errm (property False)
-
+    fmap g (f path)
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal
