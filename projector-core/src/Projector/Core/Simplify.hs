@@ -20,7 +20,6 @@ import           P
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 
 
-
 -- | Reduce an expression to weak head normal form, i.e. to the outermost abstraction.
 --
 -- This is O(N), buyer beware.
@@ -129,7 +128,7 @@ nf' ctx expr =
         nf' (M.insert n (nf' ctx g) ctx) e
 
       f' ->
-        -- Ill-typed term
+        -- f' is not yet sufficiently reducible (or we're ill-typed)
         EApp f' (nf' ctx g)
 
   ECon c ty es ->
@@ -140,8 +139,8 @@ nf' ctx expr =
         mnf = asum . with ps $ \(p, b) -> do
           ctx' <- match ctx p e'
           pure (nf' ctx' b)
-    -- if nothing matches, we can't reduce, leave it alone.
-    in fromMaybe expr mnf
+    -- e' is not yet sufficiently reducible (or we're ill-typed)
+    in fromMaybe (ECase e' (fmap (fmap (nf' ctx)) ps)) mnf
 
   EList ty es ->
     EList ty (fmap (nf' ctx) es)
