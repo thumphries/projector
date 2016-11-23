@@ -59,49 +59,49 @@ genVariants m n t =
     (,) <$> genConstructor
         <*> listOfN 0 n (genType' (max 1 (m `div` 2)) (n `div` 2) t)
 
-genExpr :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
+genExpr :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l ())
 genExpr n t v =
   let shrink z = case z of
-        ELit _ ->
+        ELit _ _ ->
           []
 
-        EVar _ ->
+        EVar _ _ ->
           []
 
-        EApp x y ->
+        EApp _ x y ->
           [x, y]
 
-        ELam _ _ e ->
+        ELam _ _ _ e ->
           [e]
 
-        ECon _ _ es ->
+        ECon _ _ _ es ->
           es
 
-        ECase e pes ->
+        ECase _ e pes ->
           e : fmap snd pes
 
-        EList _ es ->
+        EList _ _ es ->
           es
 
-        EForeign _ _ ->
+        EForeign _ _ _ ->
           []
 
       nonrec = [
-          ELit <$> v
-        , EVar <$> n
-        , EForeign <$> n <*> t
+          lit <$> v
+        , var <$> n
+        , foreign_ <$> n <*> t
         ]
 
       recc = [
-          EApp <$> genExpr n t v <*> genExpr n t v
+          app <$> genExpr n t v <*> genExpr n t v
         , genLam n t v
         , genCon (fmap (TypeName . unName) n) (genExpr n t v)
         , genCase (genExpr n t v) (genPattern genConstructor n)
-        , EList <$> t <*> listOf (genExpr n t v)
+        , list <$> t <*> listOf (genExpr n t v)
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
-genLam :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l)
+genLam :: Jack Name -> Jack (Type l) -> Jack (Value l) -> Jack (Expr l ())
 genLam n t v = do
   nam <- n
   typ <- t
@@ -110,22 +110,22 @@ genLam n t v = do
   bdy <- genExpr n' t v
   pure (lam nam typ bdy)
 
-genCon :: Jack TypeName -> Jack (Expr l) -> Jack (Expr l)
+genCon :: Jack TypeName -> Jack (Expr l ()) -> Jack (Expr l ())
 genCon t v =
-  ECon
+  con
     <$> genConstructor
     <*> t
     <*> listOf v
 
-genCase :: Jack (Expr l) -> Jack Pattern -> Jack (Expr l)
+genCase :: Jack (Expr l ()) -> Jack (Pattern ()) -> Jack (Expr l ())
 genCase e p =
-  ECase
+  case_
     <$> e
     <*> (fmap NE.toList (listOf1 $ (,) <$> p <*> e))
 
-genPattern :: Jack Constructor -> Jack Name -> Jack Pattern
+genPattern :: Jack Constructor -> Jack Name -> Jack (Pattern ())
 genPattern c n =
-  oneOfRec [fmap PVar n] [PCon <$> c <*> listOf (genPattern c n)]
+  oneOfRec [fmap pvar n] [pcon <$> c <*> listOf (genPattern c n)]
 
 -- -----------------------------------------------------------------------------
 -- Generating well-typed expressions
@@ -272,7 +272,7 @@ genWellTypedExpr ::
   -> Type l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genWellTypedExpr ctx ty genty genval =
   sized $ \n -> do
     k <- choose (0, n)
@@ -286,20 +286,20 @@ genWellTypedExpr' ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genWellTypedExpr' n ty ctx names genty genval =
   let gen = case ty of
         TLit l ->
           if n <= 1
-            then ELit <$> genval l
+            then lit <$> genval l
             else genWellTypedApp n ty ctx names genty genval
 
         TVar x ->
           -- Look it up in ctx
           case lookupType x ctx of
             Just (DVariant cts) -> do
-              (con, tys) <- elements cts
-              ECon con x <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
+              (conn, tys) <- elements cts
+              con conn x <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
 
             Nothing ->
               fail "free type variable!"
@@ -309,7 +309,7 @@ genWellTypedExpr' n ty ctx names genty genval =
 
         TList lty -> do
           k <- chooseInt (0, n)
-          EList lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
+          list lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
 
   -- try to look something appropriate up from the context
   in case plookup names ty of
@@ -335,32 +335,32 @@ genWellTypedPath ::
      (Ord l, Ground l)
   => TypeDecls l
   -> Context l
-  -> (Context l -> Type l -> Jack (Expr l))
+  -> (Context l -> Type l -> Jack (Expr l ()))
   -> Type l
   -> Name
   -> Type l
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genWellTypedPath ctx names more want x have =
   if want == have
-    then pure (EVar x) -- straightforward lookup
+    then pure (var x) -- straightforward lookup
     else case have of
       TArrow from _ -> do
         arg <- more names from
-        pure (EApp (EVar x) arg)
+        pure (app (var x) arg)
 
       TLit _ ->
         -- impossible
-        pure (EVar x)
+        pure (var x)
 
       TList _ ->
         -- impossible
-        pure (EVar x)
+        pure (var x)
 
       TVar n ->
         -- look up in ctx, run with that
         case lookupType n ctx of
           Just (DVariant cts) ->
-            ECase (EVar x) <$> genAlternatives ctx names more cts want
+            case_ (var x) <$> genAlternatives ctx names more cts want
           Nothing ->
             fail "free type variable!"
 
@@ -368,14 +368,14 @@ genAlternatives ::
      (Ord l, Ground l)
   => TypeDecls l
   -> Context l
-  -> (Context l -> Type l -> Jack (Expr l))
+  -> (Context l -> Type l -> Jack (Expr l ()))
   -> [(Constructor, [Type l])]
   -> Type l
-  -> Jack [(Pattern, Expr l)]
+  -> Jack [(Pattern (), Expr l ())]
 genAlternatives ctx names more cts want =
   for cts $ \(c, tys) -> do
     let bnds = L.take (length tys) (freshNames "x")
-        pat = PCon c (fmap PVar bnds)
+        pat = pcon c (fmap pvar bnds)
     let ctx' = foldl' (\cc (ty, na) -> cextend ctx cc ty na) names (L.zip tys bnds)
     ex <- more ctx' want
     pure (pat, ex)
@@ -396,7 +396,7 @@ genWellTypedLam ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genWellTypedLam n bnd ty ctx names genty genval = do
   name <- fmap Name (elements muppets)
   bdy <- genWellTypedExpr' (n `div` 2) ty ctx (cextend ctx names bnd name) genty genval
@@ -410,13 +410,13 @@ genWellTypedApp ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genWellTypedApp n ty ctx names genty genval = do
   bnd <- genty
   fun <- genWellTypedLam (n `div` 2) bnd ty ctx names genty genval
   arg <- genWellTypedExpr' (n `div` 2) bnd ctx names genty genval
   reshrink (\x -> [whnf x]) $
-    pure (EApp fun arg)
+    pure (app fun arg)
 
 
 -- -----------------------------------------------------------------------------
@@ -428,7 +428,7 @@ genIllTypedExpr ::
   => TypeDecls l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genIllTypedExpr ctx genty genval =
   sized $ \n -> do
     k <- choose (0, n)
@@ -441,7 +441,7 @@ genIllTypedExpr' ::
   -> Context l
   -> Jack (Type l)
   -> (l -> Jack (Value l))
-  -> Jack (Expr l)
+  -> Jack (Expr l ())
 genIllTypedExpr' n ctx names genty genval =
   -- This function should encode all the concrete, inner ways you can
   -- cause a type error.
@@ -455,7 +455,7 @@ genIllTypedExpr' n ctx names genty genval =
         nbnd <- genty `suchThat` (/= bnd)
         fun <- genWellTypedLam (n `div` 2) bnd ty ctx names genty genval
         arg <- genWellTypedExpr' (n `div` 2) nbnd ctx names genty genval
-        pure (EApp fun arg)
+        pure (app fun arg)
 
       badCase1 = do
         -- generate patterns and alternatives for a known variant,
@@ -474,7 +474,7 @@ genIllTypedExpr' n ctx names genty genval =
         pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' k t ctx c genty genval) cts bty
 
         -- put a different thing in the e
-        pure (ELam nn nty (ECase (EVar nn) pes))
+        pure (lam nn nty (case_ (var nn) pes))
 
       badCase2 = do
         -- Create a valid case statement, then swap one of the
@@ -494,15 +494,15 @@ genIllTypedExpr' n ctx names genty genval =
         bat <- genWellTypedExpr' k nety ctx names' genty genval
         let pes' = (pvar_ "x", bat) : pes
 
-        pure (ELam nn (TVar tn) (ECase (EVar nn) pes'))
+        pure (lam nn (TVar tn) (case_ (var nn) pes'))
 
       badCon = do
         -- grab some variant
         (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
 
         -- construct it wrong
-        (con, tys) <- elements cts
-        fmap (ECon con tn) $
+        (conn, tys) <- elements cts
+        fmap (con conn tn) $
           case tys of
             [] -> do -- cosntructor with no arguments, give it extra
               extraType <- genty
@@ -622,25 +622,25 @@ genConstructor =
 -- -----------------------------------------------------------------------------
 -- Generators you might actually use
 
-genTestExpr :: Jack (Expr TestLitT)
+genTestExpr :: Jack (Expr TestLitT ())
 genTestExpr =
   genExpr (fmap Name (elements muppets)) (genType genTestLitT) genTestLitValue
 
-genWellTypedTestExpr :: TypeDecls TestLitT -> Type TestLitT -> Jack (Expr TestLitT)
+genWellTypedTestExpr :: TypeDecls TestLitT -> Type TestLitT -> Jack (Expr TestLitT ())
 genWellTypedTestExpr ctx ty = do
   genWellTypedExpr ctx ty (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
 
-genWellTypedTestExpr' :: Jack (Type TestLitT, TypeDecls TestLitT, Expr TestLitT)
+genWellTypedTestExpr' :: Jack (Type TestLitT, TypeDecls TestLitT, Expr TestLitT ())
 genWellTypedTestExpr' = do
   ctx <- genTestTypeDecls
   ty <- genTestType ctx
   (ty, ctx,) <$> genWellTypedTestExpr ctx ty
 
-genIllTypedTestExpr :: TypeDecls TestLitT -> Jack (Expr TestLitT)
+genIllTypedTestExpr :: TypeDecls TestLitT -> Jack (Expr TestLitT ())
 genIllTypedTestExpr ctx = do
   genIllTypedExpr ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
 
-genIllTypedTestExpr' :: Jack (TypeDecls TestLitT, Expr TestLitT)
+genIllTypedTestExpr' :: Jack (TypeDecls TestLitT, Expr TestLitT ())
 genIllTypedTestExpr' = do
   ctx <- genTestTypeDecls
   (ctx,) <$> genIllTypedExpr ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
@@ -657,5 +657,5 @@ genTestType tc =
 -- TODO would be nice to bring the Eq along for free
 (=@@=) ::
      (Eq (Value l), Show l, Show (Value l), Ground l)
-  => Expr l -> Expr l -> Property
+  => Expr l () -> Expr l () -> Property
 (=@@=) = (===) `on` alphaNf

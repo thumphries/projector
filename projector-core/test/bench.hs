@@ -22,17 +22,17 @@ import           Test.Projector.Core.Simplify (mul, nth)
 
 -- big lambda billy
 
-buildExpr :: Int -> Expr TestLitT
+buildExpr :: Int -> Expr TestLitT ()
 buildExpr n = case n of
   0 -> var_ "billy"
-  m -> EApp (lam_ "billy" (TLit TBool) (buildExpr (m - 1))) (ELit (VBool True))
+  m -> app (lam_ "billy" (TLit TBool) (buildExpr (m - 1))) (lit (VBool True))
 
 -- big case
 
-buildCase :: Int -> Expr TestLitT
+buildCase :: Int -> Expr TestLitT ()
 buildCase n = case n of
   0 -> var_ "x"
-  m -> ECase (ECon (Constructor "Casey") (TypeName "Casey") [ELit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
+  m -> case_ (con (Constructor "Casey") (TypeName "Casey") [lit (VBool True)]) [(pcon_ "Casey" [pvar_ "x"], buildCase (m-1))]
 
 tcasey :: Decl TestLitT
 tcasey =
@@ -44,7 +44,7 @@ caseyCtx =
 
 -- intlist
 
-buildIntList :: Int -> Expr TestLitT
+buildIntList :: Int -> Expr TestLitT ()
 buildIntList n = case n of
   0 -> tnil
   _ -> tcons n (buildIntList (n - 1))
@@ -60,13 +60,13 @@ tintlistctx :: TypeDecls TestLitT
 tintlistctx =
   declareType (TypeName "IntList") dintlist mempty
 
-tnil :: Expr TestLitT
+tnil :: Expr TestLitT ()
 tnil =
-  ECon (Constructor "Nil") (TypeName "IntList") []
+  con (Constructor "Nil") (TypeName "IntList") []
 
-tcons :: Int -> Expr TestLitT -> Expr TestLitT
+tcons :: Int -> Expr TestLitT () -> Expr TestLitT ()
 tcons v l =
-  ECon (Constructor "Cons") (TypeName "IntList") [ELit (VInt v), l]
+  con (Constructor "Cons") (TypeName "IntList") [lit (VInt v), l]
 
 main :: IO ()
 main = do

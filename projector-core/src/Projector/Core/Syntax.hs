@@ -1,18 +1,36 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Syntax (
     Expr (..)
+  , extractAnnotation
   , Name (..)
   , Pattern (..)
+  , extractPatternAnnotation
   -- * Smart/lazy constructors
+  , lit
   , lam
   , lam_
+  , var
   , var_
+  , app
+  , case_
+  , con
+  , con_
+  , list
+  , foreign_
+  , foreign_'
   -- * pattern constructors
+  , pvar
   , pvar_
+  , pcon
   , pcon_
   ) where
 
@@ -26,47 +44,123 @@ import           Projector.Core.Type (Type (..), TypeName (..), Ground (..), Con
 --
 -- The first type parameter, 'l', refers to the type of literal. This is
 -- invariant. Literals must have a 'Ground' instance.
-data Expr l
-  = ELit (Value l)
-  | EVar Name
-  | ELam Name (Type l) (Expr l)
-  | EApp (Expr l) (Expr l)
-  | ECon Constructor TypeName [Expr l]
-  | ECase (Expr l) [(Pattern, Expr l)]
-  | EList (Type l) [Expr l]
-  | EForeign Name (Type l)
+--
+-- The second type parameter, 'a', refers to the type of annotation,
+-- e.g. source location or '()'.
+data Expr l a
+  = ELit a (Value l)
+  | EVar a Name
+  | ELam a Name (Type l) (Expr l a)
+  | EApp a (Expr l a) (Expr l a)
+  | ECon a Constructor TypeName [Expr l a]
+  | ECase a (Expr l a) [(Pattern a, Expr l a)]
+  | EList a (Type l) [Expr l a]
+  | EForeign a Name (Type l)
+  deriving (Functor, Foldable, Traversable)
 
-deriving instance (Eq l, Eq (Value l)) => Eq (Expr l)
-deriving instance (Show l, Show (Value l)) => Show (Expr l)
-deriving instance (Ord l, Ord (Value l)) => Ord (Expr l)
+deriving instance (Eq l, Eq (Value l), Eq a) => Eq (Expr l a)
+deriving instance (Show l, Show (Value l), Show a) => Show (Expr l a)
+deriving instance (Ord l, Ord (Value l), Ord a) => Ord (Expr l a)
+
+extractAnnotation :: Expr l a -> a
+extractAnnotation e =
+  case e of
+    ELit a _ ->
+      a
+    EVar a _ ->
+      a
+    ELam a _ _ _ ->
+      a
+    EApp a _ _ ->
+      a
+    ECon a _ _ _ ->
+      a
+    ECase a _ _ ->
+      a
+    EList a _ _ ->
+      a
+    EForeign a _ _ ->
+      a
 
 newtype Name = Name { unName :: Text }
   deriving (Eq, Ord, Show)
 
 -- | Pattern matching. Note that these are necessarily recursive.
-data Pattern
-  = PVar Name
-  | PCon Constructor [Pattern]
-  deriving (Eq, Ord, Show)
+data Pattern a
+  = PVar a Name
+  | PCon a Constructor [Pattern a]
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+extractPatternAnnotation :: Pattern a -> a
+extractPatternAnnotation p =
+  case p of
+    PVar a _ ->
+      a
+    PCon a _ _ ->
+      a
 
-lam :: Name -> Type l -> Expr l -> Expr l
-lam n ty =
-  ELam n ty
+-- lazy exprs
+lit :: Value l -> Expr l ()
+lit =
+  ELit ()
 
--- lazy
-lam_ :: Text -> Type l -> Expr l -> Expr l
+lam :: Name -> Type l -> Expr l () -> Expr l ()
+lam =
+  ELam ()
+
+lam_ :: Text -> Type l -> Expr l () -> Expr l ()
 lam_ n =
   lam (Name n)
 
-var_ :: Text -> Expr l
-var_ =
-  EVar . Name
+var :: Name -> Expr l ()
+var =
+  EVar ()
 
-pvar_ :: Text -> Pattern
+var_ :: Text -> Expr l ()
+var_ t =
+  var (Name t)
+
+app :: Expr l () -> Expr l () -> Expr l ()
+app =
+  EApp ()
+
+case_ :: Expr l () -> [(Pattern (), Expr l ())] -> Expr l ()
+case_ =
+  ECase ()
+
+con :: Constructor -> TypeName -> [Expr l ()] -> Expr l ()
+con =
+  ECon ()
+
+con_ :: Text -> Text -> [Expr l ()] -> Expr l ()
+con_ c t =
+  con (Constructor c) (TypeName t)
+
+list :: Type l -> [Expr l ()] -> Expr l ()
+list =
+ EList ()
+
+foreign_ :: Name -> Type l -> Expr l ()
+foreign_ =
+  EForeign ()
+
+foreign_' :: Text -> Type l -> Expr l ()
+foreign_' =
+  foreign_ . Name
+
+-- lazy pats
+pvar :: Name -> Pattern ()
+pvar =
+  PVar ()
+
+pvar_ :: Text -> Pattern ()
 pvar_ =
-  PVar . Name
+  pvar . Name
 
-pcon_ :: Text -> [Pattern] -> Pattern
+pcon :: Constructor -> [Pattern ()] -> Pattern ()
+pcon =
+  PCon ()
+
+pcon_ :: Text -> [Pattern ()] -> Pattern ()
 pcon_ =
-  PCon . Constructor
+  pcon . Constructor
