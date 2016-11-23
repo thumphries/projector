@@ -22,6 +22,8 @@ library
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
                      , template-haskell                == 2.10.*
+                     , megaparsec                      == 5.1.*
+                     , semigroups                      == 0.18.*
 
   ghc-options:
                        -Wall
@@ -39,6 +41,12 @@ library
                        Projector.Html.Backend.Data
                        Projector.Html.Backend.Haskell
                        Projector.Html.Backend.Haskell.TH
+
+                       Projector.Html.Data.Position
+                       Projector.Html.Data.Token
+
+                       Projector.Html.Lexer
+
 
 test-suite test
   type:                exitcode-stdio-1.0
