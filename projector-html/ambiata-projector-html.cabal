@@ -14,16 +14,15 @@ library
   build-depends:
                        base                            >= 3          && < 5
                      , ambiata-p
-                     , ambiata-x-eithert
                      , ambiata-projector-core
-                     , containers
-                     , text                            == 1.2.*
-                     , transformers                    >= 0.4        && < 0.6
+                     , ambiata-x-eithert
                      , containers                      == 0.5.*
-                     , text                            == 1.2.*
-                     , template-haskell                == 2.10.*
                      , megaparsec                      == 5.1.*
                      , semigroups                      == 0.18.*
+                     , template-haskell                == 2.10.*
+                     , text                            == 1.2.*
+                     , transformers                    >= 0.4        && < 0.6
+                     , wl-pprint                       == 1.2.*
 
   ghc-options:
                        -Wall
@@ -43,9 +42,12 @@ library
                        Projector.Html.Backend.Haskell.TH
 
                        Projector.Html.Data.Position
+                       Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
                        Projector.Html.Lexer
+
+                       Projector.Html.Pretty
 
 
 test-suite test
