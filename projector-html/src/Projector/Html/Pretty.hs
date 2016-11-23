@@ -7,30 +7,41 @@ module Projector.Html.Pretty (
 
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as T (toStrict)
 
 import           P
 
 import           Projector.Html.Data.Template
+import           Projector.Html.Data.Token
 
-import           Text.PrettyPrint.Leijen (Doc, (<$$>))
-import qualified Text.PrettyPrint.Leijen as WL
+import           Text.PrettyPrint.Leijen.Text (Doc, (<$$>))
+import qualified Text.PrettyPrint.Leijen.Text as WL
 
 
 ppTemplate :: Template a -> Text
 ppTemplate =
-  T.pack . ($ []) . WL.displayS . WL.renderPretty 0.4 100 . ppTemplate'
+  T.toStrict . WL.displayT . WL.renderPretty 0.4 100 . ppTokens . templateTokens
 
-ppTemplate' :: Template a -> Doc
-ppTemplate' (Template _ mts html) =
-       maybe WL.empty ppTypeSig mts
-  <$$> ppHtml html
-
-ppTypeSig :: TTypeSig a -> Doc
-ppTypeSig (TTypeSig _ sigs) =
-  WL.char '\\' <> ppTypeSigs sigs <> WL.text " ->"
-
-ppTypeSigs :: 
-
-ppHtml :: THtml a -> Doc
-ppHtml =
+templateTokens :: Template a -> [Token]
+templateTokens =
   undefined
+
+ppTokens :: [Token] -> Doc
+ppTokens =
+  foldl' (WL.<>) WL.empty . fmap ppToken
+
+ppToken :: Token -> Doc
+ppToken t =
+  case t of
+    TypeSigsStart ->
+      WL.char '\\'
+    TypeSigsSep ->
+      WL.line
+    TypeSigsEnd ->
+      WL.text " ->" WL.<> WL.line
+    TypeSigSep ->
+      WL.text " : "
+    TypeIdent t ->
+      WL.text t
+    _ ->
+      undefined

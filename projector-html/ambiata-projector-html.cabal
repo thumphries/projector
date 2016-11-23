@@ -22,7 +22,7 @@ library
                      , template-haskell                == 2.10.*
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
-                     , wl-pprint                       == 1.2.*
+                     , wl-pprint-text                  == 1.1.*
 
   ghc-options:
                        -Wall
