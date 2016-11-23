@@ -11,7 +11,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Simplify (alphaNf, alpha, nf, whnf)
-import           Projector.Core.Syntax (Expr (..), lam_, var_)
+import           Projector.Core.Syntax (Expr (..), lam_, var_, app)
 import           Projector.Core.Type (Type(..))
 
 import           Test.Projector.Core.Arbitrary
@@ -59,36 +59,36 @@ church :: Type TestLitT
 church =
   TArrow (TArrow unit unit) (TArrow unit unit)
 
-zero :: Expr TestLitT
+zero :: Expr TestLitT ()
 zero =
   lam_ "f" (TArrow unit unit)
     (lam_ "x" unit (var_ "x"))
 
-succ :: Expr TestLitT
+succ :: Expr TestLitT ()
 succ =
   lam_ "n" church
     (lam_ "f" (TArrow unit unit)
       (lam_ "x" unit
-        (EApp
+        (app
           (var_ "f")
-          (EApp (EApp (var_ "n") (var_ "f")) (var_ "x")))))
+          (app (app (var_ "n") (var_ "f")) (var_ "x")))))
 
-mult :: Expr TestLitT
+mult :: Expr TestLitT ()
 mult =
   lam_ "m" church
     (lam_ "n" church
       (lam_ "f" (TArrow unit unit)
-        (EApp
+        (app
           (var_ "m")
-          (EApp (var_ "n") (var_ "f")))))
+          (app (var_ "n") (var_ "f")))))
 
-nth :: Int -> Expr TestLitT
+nth :: Int -> Expr TestLitT ()
 nth 0 = zero
-nth n = EApp succ (nth (n - 1))
+nth n = app succ (nth (n - 1))
 
-mul :: Int -> Int -> Expr TestLitT
+mul :: Int -> Int -> Expr TestLitT ()
 mul m n =
-  EApp (EApp mult (nth m)) (nth n)
+  app (app mult (nth m)) (nth n)
 
 
 return []

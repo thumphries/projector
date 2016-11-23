@@ -30,39 +30,39 @@ import qualified Data.Map.Strict as M
 
 import           P
 
-import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
+import           Projector.Core.Syntax
 import           Projector.Core.Type
 
 
-data TypeError l
-  = Mismatch (Type l) (Type l)
+data TypeError l a
+  = Mismatch (Type l) (Type l) a
   | CouldNotUnify [Type l]
-  | ExpectedArrow (Type l) (Type l)
-  | FreeVariable Name
-  | FreeTypeVariable TypeName
-  | BadConstructorName Constructor (Decl l)
-  | BadConstructorArity Constructor (Decl l) Int
-  | BadPattern (Type l) Pattern
-  | NonExhaustiveCase (Expr l) (Type l)
+  | ExpectedArrow (Type l) (Type l) a
+  | FreeVariable Name a
+  | FreeTypeVariable TypeName a
+  | BadConstructorName Constructor (Decl l) a
+  | BadConstructorArity Constructor (Decl l) Int a
+  | BadPattern (Type l) (Pattern a)
+  | NonExhaustiveCase (Expr l a) (Type l) a
 
-deriving instance (Eq l, Eq (Value l)) => Eq (TypeError l)
-deriving instance (Show l, Show (Value l)) => Show (TypeError l)
-deriving instance (Ord l, Ord (Value l)) => Ord (TypeError l)
+deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
+deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
+deriving instance (Ord l, Ord (Value l), Ord a) => Ord (TypeError l a)
 
 
 typeCheck ::
      Ground l
   => TypeDecls l
-  -> Expr l
-  -> Either [TypeError l] (Type l)
+  -> Expr l a
+  -> Either [TypeError l a] (Type l)
 typeCheck c =
   first D.toList . unCheck . typeCheck' c mempty
 
 
 -- -----------------------------------------------------------------------------
 
-newtype Check l a = Check {
-    unCheck :: Either (DList (TypeError l)) a
+newtype Check l a b = Check {
+    unCheck :: Either (DList (TypeError l a)) b
   } deriving (Functor, Applicative, Monad)
 
 -- typing context
@@ -87,57 +87,57 @@ typeCheck' ::
      Ground l
   => TypeDecls l
   -> Ctx l
-  -> Expr l
-  -> Check l (Type l)
+  -> Expr l a
+  -> Check l a (Type l)
 typeCheck' tc ctx expr =
   case expr of
-    ELit v ->
+    ELit _ v ->
       pure (TLit (typeOf v))
 
-    EVar n ->
+    EVar a n ->
       case clookup n ctx of
         Just t ->
           pure t
         Nothing ->
-          typeError (FreeVariable n)
+          typeError (FreeVariable n a)
 
-    ELam n ta e -> do
+    ELam _ n ta e -> do
       tb <- typeCheck' tc (cextend n ta ctx) e
       pure (TArrow ta tb)
 
-    EApp a b -> do
-      typs <- checkPair tc ctx a b
+    EApp _ f g -> do
+      typs <- checkPair tc ctx f g
       case typs of
         (TArrow c d, e) ->
-          if c == e then pure d else typeError (Mismatch c e)
+          if c == e then pure d else typeError (Mismatch c e (extractAnnotation g))
         (c, d) ->
-          typeError (ExpectedArrow d c)
+          typeError (ExpectedArrow d c (extractAnnotation f))
 
-    ECon c tn es ->
+    ECon a c tn es ->
       case lookupType tn tc of
         Just ty@(DVariant cs) -> do
           -- Look up constructor name
-          ts <- maybe (typeError (BadConstructorName c ty)) pure (L.lookup c cs)
+          ts <- maybe (typeError (BadConstructorName c ty a)) pure (L.lookup c cs)
           -- Check arity
-          unless (length ts == length es) (typeError (BadConstructorArity c ty (length es)))
+          unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
           -- Typecheck all bnds against expected
           _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
             t2 <- typeCheck' tc ctx e
-            unless (t1 == t2) (typeError (Mismatch t1 t2))
+            unless (t1 == t2) (typeError (Mismatch t1 t2 (extractAnnotation e)))
           pure (TVar tn)
 
         Nothing ->
-          typeError (FreeTypeVariable tn)
+          typeError (FreeTypeVariable tn a)
 
-    ECase e pes -> do
+    ECase a e pes -> do
       ty <- typeCheck' tc ctx e
       let tzs = fmap (uncurry (checkPattern tc ctx ty)) pes
-      unifyList (typeError (NonExhaustiveCase expr ty)) tzs
+      unifyList (typeError (NonExhaustiveCase expr ty a)) tzs
 
-    EList ty es -> do
+    EList _ ty es -> do
       TList <$> unifyList (pure ty) (fmap (typeCheck' tc ctx) es)
 
-    EForeign _ ty -> do
+    EForeign _ _ ty -> do
       pure ty
 
 -- | Check a pattern fits the type it is supposed to match,
@@ -147,9 +147,9 @@ checkPattern ::
   => TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern
-  -> Expr l
-  -> Check l (Type l)
+  -> Pattern a
+  -> Expr l a
+  -> Check l a (Type l)
 checkPattern tc ctx ty pat expr = do
   ctx' <- checkPattern' tc ctx ty pat
   typeCheck' tc ctx' expr
@@ -159,14 +159,14 @@ checkPattern' ::
   => TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern
-  -> Check l (Ctx l)
+  -> Pattern a
+  -> Check l a (Ctx l)
 checkPattern' tc ctx ty pat =
   case pat of
-    PVar x ->
+    PVar _ x ->
       pure (cextend x ty ctx)
 
-    PCon c pats ->
+    PCon a c pats ->
       case ty of
         TVar tn ->
           case lookupType tn tc of
@@ -178,11 +178,12 @@ checkPattern' tc ctx ty pat =
               -- Check all recursive pats against type list
               foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
             Nothing ->
-              typeError (FreeTypeVariable tn)
+              typeError (FreeTypeVariable tn a)
         _ ->
           typeError (BadPattern ty pat)
 
-unifyList :: Ground l => Check l (Type l) -> [Check l (Type l)] -> Check l (Type l)
+-- TODO figure out sensible error locations here
+unifyList :: Ground l => Check l a (Type l) -> [Check l a (Type l)] -> Check l a (Type l)
 unifyList none es = do
   tzs <- listC es
   case L.nub tzs of
@@ -193,7 +194,7 @@ unifyList none es = do
     xs ->
       typeError (CouldNotUnify xs)
 
-typeError :: TypeError l -> Check l a
+typeError :: TypeError l a -> Check l a b
 typeError =
   Check . Left . D.singleton
 
@@ -202,26 +203,26 @@ checkPair ::
      Ground l
   => TypeDecls l
   -> Ctx l
-  -> Expr l
-  -> Expr l
-  -> Check l (Type l, Type l)
+  -> Expr l a
+  -> Expr l a
+  -> Check l a (Type l, Type l)
 checkPair tc ctx =
   pairC `on` (typeCheck' tc ctx)
 
 -- -----------------------------------------------------------------------------
 
 -- | Sequence errors from a list of 'Check'.
-listC :: [Check l a] -> Check l [a]
+listC :: [Check l a b] -> Check l a [b]
 listC =
   fmap D.toList . foldl' (apC . fmap D.snoc) (pure mempty)
 
 -- | Sequence errors from two 'Check' functions.
-pairC :: Check l a -> Check l b -> Check l (a, b)
+pairC :: Check l a b -> Check l a c -> Check l a (b, c)
 pairC l r =
   apC (fmap (,) l) r
 
 -- | 'apE' lifted to 'Check'.
-apC :: Check l (a -> b) -> Check l a -> Check l b
+apC :: Check l a (b -> c) -> Check l a b -> Check l a c
 apC l r =
   Check $ apE (unCheck l) (unCheck r)
 
@@ -240,3 +241,4 @@ apE l r =
       Left b
     (Left a, Left b) ->
       Left (a <> b)
+

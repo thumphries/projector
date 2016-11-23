@@ -71,14 +71,14 @@ prop_hello_world =
             ]
         }
 
-helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr))
+helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
 helloWorld =
   ( Name "helloWorld"
   , ( Lib.tHtml
-    , ECon (Constructor "Plain") Lib.nHtml [ELit (Prim.VString "Hello, world!")]))
+    , con (Constructor "Plain") Lib.nHtml [lit (Prim.VString "Hello, world!")]))
 
 
-moduleProp :: ModuleName -> Module -> Property
+moduleProp :: ModuleName -> Module a -> Property
 moduleProp mn =
   uncurry ghcProp . renderModule mn
 

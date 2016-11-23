@@ -55,7 +55,7 @@ test-suite test
                      , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
-                     , comonad                         == 4.2.*
+                     , comonad
                      , mtl
                      , containers
                      , text
@@ -74,6 +74,6 @@ benchmark bench
                      , ambiata-disorder-jack
                      , criterion                       == 1.1.*
                      , text
-                     , comonad                         == 4.2.*
+                     , comonad
                      , containers
                      , semigroups

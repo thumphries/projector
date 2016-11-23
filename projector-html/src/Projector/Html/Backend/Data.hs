@@ -21,13 +21,13 @@ import           Projector.Html.Core.Prim (HtmlDecls, HtmlExpr, HtmlType)
 newtype ModuleName = ModuleName { unModuleName :: Text }
   deriving (Eq, Ord, Show)
 
-data Module = Module {
+data Module a = Module {
     moduleTypes :: HtmlDecls
   , moduleImports :: Map ModuleName Imports
-  , moduleExprs :: Map Name (HtmlType, HtmlExpr)
+  , moduleExprs :: Map Name (HtmlType, HtmlExpr a)
   } deriving (Eq, Ord, Show)
 
-instance Monoid Module where
+instance Monoid (Module a) where
   mempty = Module mempty mempty mempty
   mappend (Module a b c) (Module d e f) = Module {
       moduleTypes = a <> d

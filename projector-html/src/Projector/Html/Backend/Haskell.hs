@@ -34,7 +34,7 @@ import           System.IO (FilePath)
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module -> (FilePath, Text)
+renderModule :: ModuleName -> Module a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
@@ -63,7 +63,7 @@ genImport (ModuleName n) imports =
           "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
-genModule :: Module -> [TH.Dec]
+genModule :: Module a -> [TH.Dec]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->
@@ -89,7 +89,7 @@ genTypeDec (TypeName n) ty =
       data_ (mkName_ n) [] (fmap (uncurry genCon) cts)
 
 -- | Expression declarations.
-genExpDec :: Name -> HtmlExpr -> TH.Dec
+genExpDec :: Name -> HtmlExpr a -> TH.Dec
 genExpDec (Name n) expr =
   val_ (varP (mkName_ n)) (genExp expr)
 
@@ -119,45 +119,45 @@ genType ty =
       listT_ (genType t)
 
 -- | Expressions.
-genExp :: HtmlExpr -> TH.Exp
+genExp :: HtmlExpr a -> TH.Exp
 genExp expr =
   case expr of
-    ELit v ->
+    ELit _ v ->
       litE (genLit v)
 
-    EVar (Name x) ->
+    EVar _ (Name x) ->
       varE (mkName_ x)
 
-    ELam (Name n) _ body ->
+    ELam _ (Name n) _ body ->
       lamE [varP (mkName_ n)] (genExp body)
 
-    EApp fun arg ->
+    EApp _ fun arg ->
       appE (genExp fun) (genExp arg)
 
-    ECon (Constructor c) _ es ->
+    ECon _ (Constructor c) _ es ->
       applyE (conE (mkName_ c)) (fmap genExp es)
 
-    ECase e pats ->
+    ECase _ e pats ->
       caseE (genExp e) (fmap (uncurry genMatch) pats)
 
-    EList _ es ->
+    EList _ _ es ->
       listE (fmap genExp es)
 
-    EForeign (Name x) _ ->
+    EForeign _ (Name x) _ ->
       varE (mkName_ x)
 
 -- | Case alternatives.
-genMatch :: Pattern -> HtmlExpr -> TH.Match
+genMatch :: Pattern a -> HtmlExpr a -> TH.Match
 genMatch p e =
   match_ (genPat p) (genExp e)
 
 -- | Patterns.
-genPat :: Pattern -> TH.Pat
+genPat :: Pattern a -> TH.Pat
 genPat p = case p of
-  PVar (Name n) ->
+  PVar _ (Name n) ->
     varP (mkName_ n)
 
-  PCon (Constructor n) ps ->
+  PCon _ (Constructor n) ps ->
     conP (mkName_ n) (fmap genPat ps)
 
 -- | Literals.

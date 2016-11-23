@@ -50,53 +50,53 @@ ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =
   T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))
 
-ppExpr :: Ground l => Expr l -> Text
+ppExpr :: Ground l => Expr l a -> Text
 ppExpr =
   ppExpr' True
 
-ppExprUntyped :: Ground l => Expr l -> Text
+ppExprUntyped :: Ground l => Expr l a -> Text
 ppExprUntyped =
   ppExpr' False
 
-ppExpr' :: Ground l => Bool -> Expr l -> Text
+ppExpr' :: Ground l => Bool -> Expr l a -> Text
 ppExpr' types e =
   case e of
-    EVar (Name n) ->
+    EVar _ (Name n) ->
       n
 
-    ELit b ->
+    ELit _ b ->
       ppGroundValue b
 
-    EApp f g ->
+    EApp _ f g ->
       let ff = ppExpr' types f
           gg = ppExpr' types g
       in parenMay ff <> " " <> parenMay gg
 
-    ELam (Name n) t f ->
+    ELam _ (Name n) t f ->
       "\\" <> n <> typeMay t <> ". " <> ppExpr' types f
 
-    ECon (Constructor c) _ es ->
+    ECon _ (Constructor c) _ es ->
       c <> " " <> T.unwords (fmap (parenMay . ppExpr' types) es)
 
-    ECase f bs ->
+    ECase _ f bs ->
       "case " <> ppExpr' types f <> " of " <>
         T.intercalate "; " (fmap (\(p, g) -> ppPattern p <> " -> " <> ppExpr' types g) bs)
 
-    EList _ es ->
+    EList _ _ es ->
       "[" <> T.intercalate ", " (fmap (ppExpr' types) es) <> "]"
 
-    EForeign (Name n) ty ->
+    EForeign _ (Name n) ty ->
       parenMay (n <> "#" <> typeMay ty)
 
   where typeMay t = if types then " : " <> ppType t else T.empty
 
-ppPattern :: Pattern -> Text
+ppPattern :: Pattern a -> Text
 ppPattern p =
   case p of
-    PVar (Name n) ->
+    PVar _ (Name n) ->
       n
 
-    PCon (Constructor c) ps ->
+    PCon _ (Constructor c) ps ->
       c <> " " <> T.unwords (fmap (parenMay . ppPattern) ps)
 
 hasSpace :: Text -> Bool
