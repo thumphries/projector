@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Pretty (
     uglyPrintTemplate
@@ -7,6 +8,8 @@ module Projector.Html.Pretty (
   ) where
 
 
+import           Data.DList (DList)
+import qualified Data.DList as D
 import qualified Data.List as L
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -21,10 +24,13 @@ uglyPrintTemplate :: Template a -> Text
 uglyPrintTemplate =
   go . templateTokens
   where
-    go (x:xs) =
-      pre x <> renderToken x <> post x <> go xs
-    go [] =
-      mempty
+    go :: [Token] -> Text
+    go ls =
+      case ls of
+        (x:xs) ->
+          pre x <> renderToken x <> post x <> go xs
+        _ -> -- GHC 7.10 bug
+          mempty
     pre x =
       case x of
         TypeSigsEnd ->
@@ -89,33 +95,40 @@ testTemplate =
 
 templateTokens :: Template a -> [Token]
 templateTokens (Template _ mts html) =
+  D.toList $
      maybe mempty typeSigTokens mts
   <> htmlTokens html
 
-typeSigTokens :: TTypeSig a -> [Token]
+typeSigTokens :: TTypeSig a -> DList (Token)
 typeSigTokens (TTypeSig _ idts) =
   mconcat [
       [TypeSigsStart]
-    , L.intercalate [TypeSigsSep] $ NE.toList (with idts $ \((TId tid), tty) ->
-          TypeIdent tid
-        : TypeSigSep
-        : typeTokens tty)
+    , mconcat . L.intersperse [TypeSigsSep] . NE.toList . with idts $ \((TId tid), tty) ->
+        mconcat [
+            [TypeIdent tid, TypeSigSep]
+          , typeTokens tty
+          ]
     , [TypeSigsEnd]
     ]
 
-typeTokens :: TType a -> [Token]
+typeTokens :: TType a -> DList (Token)
 typeTokens ty =
   case ty of
     TTVar _ (TId t) ->
       [TypeIdent t]
     TTApp _ t1 t2 ->
-      TypeLParen : typeTokens t1 <> typeTokens t2 <> [TypeRParen]
+      mconcat [
+          [TypeLParen]
+        , typeTokens t1
+        , typeTokens t2
+        , [TypeRParen]
+        ]
 
-htmlTokens :: THtml a -> [Token]
+htmlTokens :: THtml a -> DList (Token)
 htmlTokens (THtml _ nodes) =
   foldMap nodeTokens nodes
 
-nodeTokens :: TNode a -> [Token]
+nodeTokens :: TNode a -> DList (Token)
 nodeTokens node =
   case node of
     TWhiteSpace _ ->
@@ -124,7 +137,7 @@ nodeTokens node =
     TElement _ (TTag tag) attrs html ->
       mconcat [
           [TagOpen, TagIdent tag]
-        , concatMap attrTokens attrs
+        , mconcat (fmap attrTokens attrs)
         , [TagClose]
         , htmlTokens html
         , [TagCloseOpen, TagIdent tag, TagClose]
@@ -133,7 +146,7 @@ nodeTokens node =
     TVoidElement _ (TTag tag) attrs ->
       mconcat [
           [TagOpen, TagIdent tag]
-        , concatMap attrTokens attrs
+        , mconcat (fmap attrTokens attrs)
         , [TagSelfClose]
         ]
 
@@ -150,7 +163,7 @@ nodeTokens node =
         , [ExprEnd]
         ]
 
-attrTokens :: TAttribute a -> [Token]
+attrTokens :: TAttribute a -> DList (Token)
 attrTokens attr =
   case attr of
     TAttribute _ (TAttrName an) aval ->
@@ -161,7 +174,7 @@ attrTokens attr =
     TEmptyAttribute _ (TAttrName an) ->
       [AttName an]
 
-attrValueTokens :: TAttrValue a -> [Token]
+attrValueTokens :: TAttrValue a -> DList (Token)
 attrValueTokens aval =
   case aval of
     TQuotedAttrValue _ (TPlainText t) ->
@@ -175,7 +188,7 @@ attrValueTokens aval =
         , [ExprEnd]
         ]
 
-exprTokens :: TExpr a -> [Token]
+exprTokens :: TExpr a -> DList (Token)
 exprTokens expr =
   case expr of
     TEVar _ (TId x) ->
@@ -195,11 +208,11 @@ exprTokens expr =
         , altsTokens alts
         ]
 
-altsTokens :: NonEmpty (TAlt a) -> [Token]
+altsTokens :: NonEmpty (TAlt a) -> DList (Token)
 altsTokens =
-  L.intercalate [CaseSep] . NE.toList . fmap altTokens
+  mconcat . L.intersperse (D.singleton CaseSep) . NE.toList . fmap altTokens
 
-altTokens :: TAlt a -> [Token]
+altTokens :: TAlt a -> DList (Token)
 altTokens (TAlt _ pat body) =
   mconcat [
       patTokens pat
@@ -207,7 +220,7 @@ altTokens (TAlt _ pat body) =
     , altBodyTokens body
     ]
 
-patTokens :: TPattern a -> [Token]
+patTokens :: TPattern a -> DList (Token)
 patTokens pat =
   case pat of
     TPVar _ (TId x) ->
@@ -220,7 +233,7 @@ patTokens pat =
         , [PatRParen]
         ]
 
-altBodyTokens :: TAltBody a -> [Token]
+altBodyTokens :: TAltBody a -> DList (Token)
 altBodyTokens body =
   case body of
     TAltExpr _ expr ->
