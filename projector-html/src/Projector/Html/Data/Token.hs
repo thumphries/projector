@@ -31,6 +31,8 @@ data Token
   | AttValue Text   -- true
   -- ** Misc
   | WhiteSpace      -- [ \t\r\n]+
+  | HtmlComment Text -- <!-- foo -->
+  | HtmlText Text   -- Hello!
   -- * Exprs
   | ExprStart       -- {
   | ExprEnd         -- }
@@ -44,41 +46,47 @@ data Token
   -- ** Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
+  | PatLParen       -- (
+  | PatRParen       -- )
   deriving (Eq, Ord, Show)
 
 renderToken :: Token -> Text
-renderToken t =
-  case t of
-  TypeSigsStart   -> "\\"
-  TypeSigsSep     -> ";"
-  TypeSigsEnd     -> "->"
-  TypeSigSep      -> ":"
-  TypeIdent t     -> t
-  TypeLParen      -> "("
-  TypeRParen      -> ")"
+renderToken tok =
+  case tok of
+    TypeSigsStart   -> "\\"
+    TypeSigsSep     -> ";"
+    TypeSigsEnd     -> "->"
+    TypeSigSep      -> ":"
+    TypeIdent t     -> t
+    TypeLParen      -> "("
+    TypeRParen      -> ")"
 
-  TagIdent t      -> t
-  TagOpen         -> "<"
-  TagCloseOpen    -> "</"
-  TagClose        -> ">"
-  TagSelfClose    -> "/>"
+    TagIdent t      -> t
+    TagOpen         -> "<"
+    TagCloseOpen    -> "</"
+    TagClose        -> ">"
+    TagSelfClose    -> "/>"
 
-  AttName t       -> t
-  AttSep          -> "="
-  AttValueQ t     -> "\"" <> t <> "\"" -- TODO escape \" etc
-  AttValue t      -> t
+    AttName t       -> t
+    AttSep          -> "="
+    AttValueQ t     -> "\"" <> t <> "\"" -- TODO escape \" etc
+    AttValue t      -> t
 
-  WhiteSpace      -> " "
+    WhiteSpace      -> " "
+    HtmlComment t   -> "<!--" <> t <> "-->"
+    HtmlText t      -> t
 
-  ExprStart       -> "{"
-  ExprEnd         -> "}"
-  ExprIdent t     -> t
-  ExprLParen      -> "("
-  ExprRParen      -> ")"
-  CaseStart       -> "case"
-  CaseOf          -> "of"
-  CaseSep         -> ";"
-  AltSep          -> "->"
+    ExprStart       -> "{"
+    ExprEnd         -> "}"
+    ExprIdent t     -> t
+    ExprLParen      -> "("
+    ExprRParen      -> ")"
+    CaseStart       -> "case"
+    CaseOf          -> "of"
+    CaseSep         -> ";"
+    AltSep          -> "->"
 
-  PatCon t        -> t
-  PatId t         -> t
+    PatCon t        -> t
+    PatId t         -> t
+    PatLParen       -> "("
+    PatRParen       -> ")"

@@ -51,7 +51,7 @@ data THtml a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 data TNode a
-  = TElement a TTag (THtml a)
+  = TElement a TTag [TAttribute a] (THtml a)
   | TVoidElement a TTag [TAttribute a]
   | TComment a TPlainText
   | TPlain a TPlainText
@@ -80,6 +80,8 @@ data TAlt a
   = TAlt a (TPattern a) (TAltBody a)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
+-- FIX only Element / VoidElements are valid here
+-- should make this correct by construction
 data TAltBody a
   = TAltExpr a (TExpr a)
   | TAltHtml a (THtml a)
