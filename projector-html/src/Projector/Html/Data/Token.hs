@@ -10,7 +10,7 @@ import P
 
 
 data Token
-  -- * Type sigs
+  -- Type sigs
   = TypeSigsStart   -- \
   | TypeSigsSep     -- [;\n]
   | TypeSigsEnd     -- ->
@@ -18,22 +18,22 @@ data Token
   | TypeIdent Text  -- foo | Foo
   | TypeLParen      -- (
   | TypeRParen      -- )
-  -- * Html
+  -- Html
   | TagIdent Text   -- img
   | TagOpen         -- <
   | TagCloseOpen    -- </
   | TagClose        -- >
   | TagSelfClose    -- />
-  -- ** Attributes
+  -- Attributes
   | AttName Text    -- id
   | AttSep          -- =
   | AttValueQ Text  -- "true"
   | AttValue Text   -- true
-  -- ** Misc
+  -- Misc
   | WhiteSpace      -- [ \t\r\n]+
   | HtmlComment Text -- <!-- foo -->
   | HtmlText Text   -- Hello!
-  -- * Exprs
+  -- Exprs
   | ExprStart       -- {
   | ExprEnd         -- }
   | ExprIdent Text  -- foo
@@ -43,7 +43,7 @@ data Token
   | CaseOf          -- of
   | CaseSep         -- ;
   | AltSep          -- ->
-  -- ** Patterns
+  -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
   | PatLParen       -- (
