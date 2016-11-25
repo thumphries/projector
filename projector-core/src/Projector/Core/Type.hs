@@ -14,6 +14,7 @@ module Projector.Core.Type (
   , TypeDecls (..)
   , declareType
   , lookupType
+  , subtractTypes
   ) where
 
 
@@ -66,3 +67,7 @@ declareType n t =
 lookupType :: Ground l => TypeName -> TypeDecls l -> Maybe (Decl l)
 lookupType n =
   M.lookup n . unTypeDecls
+
+subtractTypes :: Ground l => TypeDecls l -> TypeDecls l -> TypeDecls l
+subtractTypes (TypeDecls m) (TypeDecls n) =
+  TypeDecls (M.difference m n)

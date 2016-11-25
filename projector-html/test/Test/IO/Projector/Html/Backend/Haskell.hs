@@ -29,6 +29,9 @@ import           System.IO (FilePath, IO)
 import           System.IO.Temp (withTempDirectory)
 import           System.Process (readProcessWithExitCode)
 
+import           Test.Projector.Core.Arbitrary (freshNames)
+import           Test.Projector.Html.Arbitrary
+
 
 prop_empty_module =
   once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
@@ -77,6 +80,20 @@ helloWorld =
   , ( Lib.tHtml
     , con (Constructor "Plain") Lib.nHtml [lit (Prim.VString "Hello, world!")]))
 
+prop_welltyped :: Property
+prop_welltyped =
+  gamble genHtmlTypeDecls $ \decls ->
+    gamble (chooseInt (0, 100)) $ \k ->
+      gamble (vectorOf k (genWellTypedHtmlExpr decls)) $ \exprs ->
+        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") $ Module {
+            moduleTypes = subtractTypes decls (Lib.types <> Prim.types)
+          , moduleImports = M.fromList [
+                (htmlRuntime, OpenImport)
+              ]
+          , moduleExprs = M.fromList (L.zip (freshNames "expr") exprs)
+          }
+
+-- -----------------------------------------------------------------------------
 
 moduleProp :: ModuleName -> Module a -> Property
 moduleProp mn =
@@ -116,4 +133,4 @@ fileProp mname modl f g =
     fmap g (f path)
 
 return []
-tests = $disorderCheckEnvAll TestRunNormal
+tests = $disorderCheckEnvAll TestRunFewer
