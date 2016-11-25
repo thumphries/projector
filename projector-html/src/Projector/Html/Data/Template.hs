@@ -206,6 +206,8 @@ instance Comonad TAlt where
 -- should make this correct by construction
 data TAltBody a
   = TAltExpr a (TExpr a)
+--  | TAltElement a TTag [TAttribute a] (THtml a)
+--  | TAltVoidElement a TTag [TAttribute a]
   | TAltHtml a (THtml a)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
