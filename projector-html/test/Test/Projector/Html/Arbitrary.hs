@@ -155,9 +155,9 @@ genAttrValueText =
     -- TODO arbitrary JS would be nice
     ]
 
-genTag :: Jack TTag
+genTag :: Jack (TTag ())
 genTag =
-  TTag <$> elements [
+  TTag () <$> elements [
       "a"
     , "html"
     , "span"
@@ -167,10 +167,10 @@ genTag =
     , "marquee"
     ]
 
-genVoidTag :: Jack TTag
+genVoidTag :: Jack (TTag ())
 genVoidTag =
   elements [
-      TTag "img"
+      TTag () "img"
     ]
 
 genTemplateExpr :: Int -> Jack (TExpr ())

@@ -78,7 +78,11 @@ helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
 helloWorld =
   ( Name "helloWorld"
   , ( Lib.tHtml
-    , con (Constructor "Plain") Lib.nHtml [lit (Prim.VString "Hello, world!")]))
+    , con (Constructor "Html") Lib.nHtml [
+        list Lib.tHtmlNode [
+            con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello, world!")]
+          ]
+      ]))
 
 prop_welltyped :: Property
 prop_welltyped =

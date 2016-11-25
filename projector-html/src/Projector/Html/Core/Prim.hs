@@ -27,7 +27,7 @@ import           Projector.Core
 type HtmlType = Type PrimT
 type HtmlDecl = Decl PrimT
 type HtmlDecls = TypeDecls PrimT
-type HtmlExpr = Expr PrimT
+type HtmlExpr a = Expr PrimT a
 type HtmlLit = Value PrimT
 
 data PrimT

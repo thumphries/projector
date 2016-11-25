@@ -51,6 +51,7 @@ instance Comonad Template where
     Template (f t) (fmap (extend (const (f t))) g) (extend (const (f t)) h)
 
 data TTypeSig a
+  -- TODO fix location info here, should be per sig
   = TTypeSig a (NonEmpty (TId, TType a))
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
@@ -62,7 +63,8 @@ instance Comonad TTypeSig where
 
 data TType a
   = TTVar a TId
-  | TTApp a (TType a) (TType a)
+--  | TTList a (TType a)
+--  | TTApp a (TType a) (TType a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TType where
@@ -70,14 +72,18 @@ instance Comonad TType where
     case ty of
       TTVar a _ ->
         a
-      TTApp a _ _ ->
-        a
+--      TTApp a _ _ ->
+--        a
+--      TTList a _ ->
+--        a
   extend f ty =
     case ty of
       TTVar _ x ->
         TTVar (f ty) x
-      TTApp _ t1 t2 ->
-        TTApp (f ty) (extend f t1) (extend f t2)
+--      TTApp _ t1 t2 ->
+--        TTApp (f ty) (extend f t1) (extend f t2)
+--      TTList _ t ->
+--        TTList (f ty) (extend f t)
 
 data THtml a
   = THtml a [TNode a]
@@ -91,8 +97,8 @@ instance Comonad THtml where
 
 
 data TNode a
-  = TElement a TTag [TAttribute a] (THtml a)
-  | TVoidElement a TTag [TAttribute a]
+  = TElement a (TTag a) [TAttribute a] (THtml a)
+  | TVoidElement a (TTag a) [TAttribute a]
   | TComment a TPlainText
   | TPlain a TPlainText
   | TWhiteSpace a
@@ -119,11 +125,11 @@ instance Comonad TNode where
       TElement _ t a h ->
         TElement
           (f node)
-          t
+          (extend (const (f node)) t)
           (fmap (extend (const (f node))) a)
           (extend (const (f node)) h)
       TVoidElement _ t a ->
-        TVoidElement (f node) t (fmap (extend (const (f node))) a)
+        TVoidElement (f node) (extend (const (f node)) t) (fmap (extend (const (f node))) a)
       TComment _ t ->
         TComment (f node) t
       TWhiteSpace _ ->
@@ -249,6 +255,17 @@ instance Comonad TPattern where
       TPCon _ a b ->
         TPCon (f pat) a (fmap (extend f) b)
 
+data TTag a = TTag a Text
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+instance Comonad TTag where
+  extract (TTag a _) =
+    a
+  extend f tag =
+    case tag of
+      TTag _ t ->
+        TTag (f tag) t
+
 newtype TId = TId { unTId :: Text }
   deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
@@ -259,7 +276,4 @@ newtype TAttrName = TAttrName { unTAttrName :: Text }
   deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
 newtype TConstructor = TConstructor { unTConstructor :: Text }
-  deriving (Eq, Ord, Show, Data, Typeable, Generic)
-
-newtype TTag = TTag { unTTag :: Text }
   deriving (Eq, Ord, Show, Data, Typeable, Generic)

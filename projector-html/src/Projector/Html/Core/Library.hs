@@ -5,11 +5,19 @@
 module Projector.Html.Core.Library (
     types
   , tTag
+  , nTag
   , tAttribute
+  , nAttribute
   , tAttributeKey
+  , nAttributeKey
   , tAttributeValue
+  , nAttributeValue
   , tHtml
   , nHtml
+  , dHtml
+  , tHtmlNode
+  , nHtmlNode
+  , dHtmlNode
   ) where
 
 
@@ -30,6 +38,7 @@ types =
     , (nAttributeKey, dAttributeKey)
     , (nAttributeValue, dAttributeValue)
     , (nHtml, dHtml)
+    , (nHtmlNode, dHtmlNode)
     ]
 
 -- -----------------------------------------------------------------------------
@@ -90,6 +99,7 @@ tAttributeValue :: HtmlType
 tAttributeValue =
   TVar nAttributeValue
 
+-- TODO need to add unquoted constructor maybe?
 dAttributeValue :: HtmlDecl
 dAttributeValue =
   DVariant [
@@ -109,8 +119,26 @@ tHtml =
 dHtml :: HtmlDecl
 dHtml =
   DVariant [
-      (Constructor "Element", [tTag, TList tAttribute, TList tHtml])
+      (Constructor "Html", [TList tHtmlNode])
+    ]
+
+
+-- -----------------------------------------------------------------------------
+
+nHtmlNode :: TypeName
+nHtmlNode =
+  TypeName "HtmlNode"
+
+tHtmlNode :: HtmlType
+tHtmlNode =
+  TVar nHtmlNode
+
+dHtmlNode :: HtmlDecl
+dHtmlNode =
+  DVariant [
+      (Constructor "Element", [tTag, TList tAttribute, TList tHtmlNode])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
     , (Constructor "Comment", [TLit Prim.TString])
     , (Constructor "Plain", [TLit Prim.TString])
+    , (Constructor "Whitespace", [])
     ]
