@@ -34,7 +34,7 @@ lexer =
 
 token :: Parser (Positioned Token)
 token =
-  withPosition (pure Token)
+  withPosition (pure WhiteSpace)
 
 -- -----------------------------------------------------------------------------
 
