@@ -46,6 +46,7 @@ library
                        Projector.Html.Data.Token
 
                        Projector.Html.Lexer
+                       Projector.Html.Lexer.Internal
 
                        Projector.Html.Pretty
 
@@ -72,6 +73,7 @@ test-suite test
                      , ambiata-projector-html-runtime
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
+                     , string-qq                       == 0.0.*
 
 test-suite test-io
   type:                exitcode-stdio-1.0
