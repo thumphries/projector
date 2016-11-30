@@ -73,7 +73,7 @@ renderToken tok =
     AttValue t      -> t
 
     WhiteSpace      -> " "
-    HtmlComment t   -> "<!--" <> t <> "-->"
+    HtmlComment t   -> "<!--" <> t <> "-->" -- TODO this should be three tokens
     HtmlText t      -> t
 
     ExprStart       -> "{"

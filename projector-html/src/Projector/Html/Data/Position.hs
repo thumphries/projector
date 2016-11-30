@@ -6,6 +6,7 @@ module Projector.Html.Data.Position (
     Position (..)
   , Range (..)
   , Positioned (..)
+  , extractPositioned
   , (<@@)
   , (@@>)
   ) where
@@ -38,6 +39,10 @@ instance Semigroup Range where
 data Positioned a
   = !a :@ !Range
   deriving (Eq, Ord, Show, Functor)
+
+extractPositioned :: Positioned a -> a
+extractPositioned (a :@ _) =
+  a
 
 -- | Absorb the item to the right.
 (<@@) :: Positioned a -> Positioned b -> Positioned a
