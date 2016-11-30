@@ -48,6 +48,8 @@ library
                        Projector.Html.Lexer
                        Projector.Html.Lexer.Internal
 
+                       Projector.Html.Parser
+
                        Projector.Html.Pretty
 
 
