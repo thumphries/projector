@@ -26,6 +26,10 @@ data Position = Position {
   , posFile :: !FilePath
   } deriving (Eq, Ord, Show)
 
+emptyPosition :: Position
+emptyPosition =
+  Position 0 0 []
+
 -- | A range between two positions.
 data Range = Range {
     rangeStart :: !Position
@@ -34,6 +38,12 @@ data Range = Range {
 
 instance Semigroup Range where
   (Range a _) <> (Range _ d) = Range a d
+
+instance Monoid Range where
+  mempty =
+    Range emptyPosition emptyPosition
+  mappend =
+    (<>)
 
 -- | A functor for positioned tokens.
 data Positioned a
