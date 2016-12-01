@@ -75,14 +75,15 @@ failWith err =
 
 next :: Parser (Positioned Token)
 next =
-  P.token pure empty
+  P.try (P.token pure empty)
 {-# INLINE next #-}
+
 
 -- -----------------------------------------------------------------------------
 
 template :: Parser (Template Range)
 template = do
-  ts <- optional typeSigs
+  ts <- optional (P.try typeSigs)
   hs <- html
   pure (Template undefined ts hs)
 
@@ -90,7 +91,7 @@ typeSigs :: Parser (TTypeSig Range)
 typeSigs = do
   TypeSigsStart :@ a <- next
   f <- typeSig
-  fs <- many (typeSigsSep *> typeSig)
+  fs <- many (P.try (typeSigsSep *> typeSig))
   TypeSigsEnd :@ b <- next
   pure (TTypeSig (a <> b) (f :| fs))
 
@@ -125,7 +126,9 @@ htmlNode =
       whitespace
   <|> plain
   <|> exprNode
+  <|> voidelement
   <|> element
+  <|> comment
 
 whitespace :: Parser (TNode Range)
 whitespace = do
@@ -136,6 +139,19 @@ plain :: Parser (TNode Range)
 plain = do
   HtmlText t :@ a <- next
   pure (TPlain a (TPlainText t))
+
+comment :: Parser (TNode Range)
+comment = do
+  HtmlComment t :@ a <- next
+  pure (TComment a (TPlainText t))
+
+voidelement :: Parser (TNode Range)
+voidelement = do
+  TagOpen :@ a <- next
+  TagIdent x :@ _ <- next
+  as <- many attr
+  TagSelfClose :@ b <- next
+  pure (TVoidElement (a <> b) (TTag x) as)
 
 element :: Parser (TNode Range)
 element = do
@@ -153,11 +169,25 @@ element = do
 attr :: Parser (TAttribute Range)
 attr = do
   AttName x :@ a <- next
-  mval <- optional $ do
-
+  mval <- optional attrval
   pure $ maybe (TEmptyAttribute a (TAttrName x))
     (\val -> TAttribute (a <> undefined) (TAttrName x) val)
     mval
+
+attrval :: Parser (TAttrValue Range)
+attrval =
+  let
+    qval = do
+      AttSep :@ _ <- next
+      AttValueQ t :@ a <- next
+      pure (TQuotedAttrValue a (TPlainText t))
+    vale = do
+      AttSep :@ _ <- next
+      ExprStart :@ a <- next
+      e <- expr
+      ExprEnd :@ b <- next
+      pure (TAttrExpr (a <> b) e)
+  in qval <|> vale
 
 exprNode :: Parser (TNode Range)
 exprNode = do
@@ -194,9 +224,9 @@ ecase_ = do
   CaseStart :@ a <- next
   e <- expr
   CaseOf :@ _ <- next
-  a <- alt
+  a1 <- alt
   as <- many (caseSep *> alt)
-  pure (TECase (a <> undefined) e (a :| as))
+  pure (TECase (a <> undefined) e (a1 :| as))
 
 caseSep :: Parser ()
 caseSep = do
