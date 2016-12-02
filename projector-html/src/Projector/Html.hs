@@ -16,7 +16,7 @@ import           System.IO  (FilePath)
 data HtmlError
   = HtmlLexError Lexer.LexError
   | HtmlParseError Parser.ParseError
-  deriving (Show)
+  deriving (Eq, Show)
 
 parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
 parseTemplate file t =

@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -24,7 +25,7 @@ import qualified Text.Megaparsec as P
 
 newtype ParseError = ParseError {
     unParseError :: (P.ParseError (Positioned Token) ParseErrorComponent)
-  } deriving (Show)
+  } deriving (Eq, Show)
 
 parse :: FilePath -> [Positioned Token] -> Either ParseError (Template Range)
 parse file =
@@ -56,16 +57,21 @@ positionPos (Position x y f) =
   P.SourcePos f (P.unsafePos (fromIntegral x)) (P.unsafePos (fromIntegral y))
 {-# INLINE positionPos #-}
 
+instance Show a => P.ShowToken (Positioned a) where
+  showTokens = show
+
+instance P.ShowErrorComponent ParseErrorComponent where
+  showErrorComponent = show
 
 data ParseErrorComponent
-  = ParseRuleError Text
+  = ParseFail Text
   | ParseIndentError Ordering P.Pos P.Pos
   | TagMismatch (Positioned Text) (Positioned Text)
   deriving (Eq, Ord, Show)
 
 instance P.ErrorComponent ParseErrorComponent where
   representFail =
-    ParseRuleError . T.pack
+    ParseFail . T.pack
   representIndentation =
     ParseIndentError
 
@@ -73,10 +79,44 @@ failWith :: ParseErrorComponent -> Parser a
 failWith err =
   P.failure S.empty S.empty (S.singleton err)
 
-next :: Parser (Positioned Token)
-next =
-  P.try (P.token pure empty)
-{-# INLINE next #-}
+satisfy_ :: Maybe Token -> (Token -> Bool) -> Parser (Positioned Token)
+satisfy_ mrep p =
+  P.token
+    (\pt ->
+       if p (extractPositioned pt)
+         then pure pt
+         else Left
+                ( S.singleton (P.Tokens (pt :| []))
+                , maybe
+                    mempty
+                    (S.singleton . P.Tokens . (:| []) . (:@ mempty))
+                    mrep
+                , mempty))
+    empty
+{-# INLINE satisfy_ #-}
+
+satisfy :: (Token -> Bool) -> Parser (Positioned Token)
+satisfy =
+  satisfy_ empty
+{-# INLINE satisfy #-}
+
+expect :: Token -> Parser (Positioned Token)
+expect t =
+  P.token
+    (\pt ->
+       if t == extractPositioned pt
+         then pure pt
+         else Left
+                ( S.singleton (P.Tokens (pt :| []))
+                , S.singleton (P.Tokens (t :@ mempty :| []))
+                , mempty))
+    empty
+{-# INLINE expect #-}
+
+token :: Token -> Parser Range
+token =
+  fmap range . expect
+{-# INLINE token #-}
 
 
 -- -----------------------------------------------------------------------------
@@ -89,23 +129,28 @@ template = do
 
 typeSigs :: Parser (TTypeSig Range)
 typeSigs = do
-  TypeSigsStart :@ a <- next
+  a <- token TypeSigsStart
   f <- typeSig
-  fs <- many (P.try (typeSigsSep *> typeSig))
-  TypeSigsEnd :@ b <- next
+  fs <- many (P.try (token TypeSigsSep *> typeSig))
+  b <- token TypeSigsEnd
   pure (TTypeSig (a <> b) (f :| fs))
 
-typeSigsSep :: Parser ()
-typeSigsSep = do
-  TypeSigsSep :@ _ <- next
-  pure ()
-
 typeSig :: Parser (TId, TType Range)
-typeSig = do
-  TypeIdent x :@ _a <- next -- TODO this annotation gets dropped :(
-  TypeSigSep :@ _ <- next
+typeSig = P.dbg "typeSig" $ do
+  (x, _a) <- typeIdent -- TODO this annotation gets dropped :(
+  _ <- token TypeSigSep
   ty <- type_
-  pure (TId x, ty)
+  pure (x, ty)
+
+typeIdent :: Parser (TId, Range)
+typeIdent = do
+  TypeIdent x :@ a <- satisfy
+    (\case
+       TypeIdent _ ->
+         True
+       _ ->
+         False)
+  pure (TId x, a)
 
 type_ :: Parser (TType Range)
 type_ =
@@ -113,62 +158,68 @@ type_ =
 
 tvar :: Parser (TType Range)
 tvar = do
-  TypeIdent x :@ a <- next
-  pure (TTVar a (TId x))
+  (x, a) <- typeIdent
+  pure (TTVar a x)
 
 html :: Parser (THtml Range)
-html = do
+html = P.dbg "html" $ do
   ns <- many htmlNode
   pure (THtml undefined ns)
 
 htmlNode :: Parser (TNode Range)
 htmlNode =
-      whitespace
-  <|> plain
-  <|> exprNode
-  <|> voidelement
-  <|> element
-  <|> comment
+  P.dbg "htmlNode" . asum . fmap P.try $ [
+    whitespace
+  , plain
+  , exprNode
+  , voidelement
+  , element
+  , comment
+  ]
 
 whitespace :: Parser (TNode Range)
 whitespace = do
-  WhiteSpace :@ a <- next
+  a <- token WhiteSpace
   pure (TWhiteSpace a)
 
 plain :: Parser (TNode Range)
 plain = do
-  HtmlText t :@ a <- next
+  HtmlText t :@ a <- satisfy (\case HtmlText _ -> True; _ -> False)
   pure (TPlain a (TPlainText t))
 
 comment :: Parser (TNode Range)
 comment = do
-  HtmlComment t :@ a <- next
+  HtmlComment t :@ a <- satisfy (\case HtmlComment _ -> True; _ -> False)
   pure (TComment a (TPlainText t))
 
 voidelement :: Parser (TNode Range)
 voidelement = do
-  TagOpen :@ a <- next
-  TagIdent x :@ _ <- next
+  a <- token TagOpen
+  TagIdent x :@ _ <- tagIdent
   as <- many attr
-  TagSelfClose :@ b <- next
+  b <- token TagSelfClose
   pure (TVoidElement (a <> b) (TTag x) as)
 
 element :: Parser (TNode Range)
 element = do
-  TagOpen :@ a <- next
-  TagIdent x :@ xl <- next
+  a <- token TagOpen
+  TagIdent x :@ xl <- tagIdent
   as <- many attr
-  TagClose :@ _ <- next
+  _ <- token TagClose
   h <- html
-  TagCloseOpen :@ _ <- next
-  TagIdent y :@ yl <- next
-  TagClose :@ b <- next
+  _ <- token TagCloseOpen
+  TagIdent y :@ yl <- tagIdent
+  b <- token TagClose
   when (x /= y) (failWith (TagMismatch (x :@ xl) (y :@ yl)))
   pure (TElement (a <> b) (TTag x) as h)
 
+tagIdent :: Parser (Positioned Token)
+tagIdent =
+  satisfy (\case TagIdent _ -> True; _ -> False)
+
 attr :: Parser (TAttribute Range)
 attr = do
-  AttName x :@ a <- next
+  AttName x :@ a <- satisfy (\case AttName _ -> True; _ -> False)
   mval <- optional attrval
   pure $ maybe (TEmptyAttribute a (TAttrName x))
     (\val -> TAttribute (a <> undefined) (TAttrName x) val)
@@ -178,65 +229,69 @@ attrval :: Parser (TAttrValue Range)
 attrval =
   let
     qval = do
-      AttSep :@ _ <- next
-      AttValueQ t :@ a <- next
+      _ <- token AttSep
+      AttValueQ t :@ a <- satisfy (\case AttValueQ _ -> True; _ -> False)
       pure (TQuotedAttrValue a (TPlainText t))
     vale = do
-      AttSep :@ _ <- next
-      ExprStart :@ a <- next
+      _ <- token AttSep
+      a <- token ExprStart
       e <- expr
-      ExprEnd :@ b <- next
+      b <- token ExprEnd
       pure (TAttrExpr (a <> b) e)
   in qval <|> vale
 
 exprNode :: Parser (TNode Range)
-exprNode = do
-  ExprStart :@ a <- next
+exprNode = P.dbg "exprNode" $ do
+  a <- token ExprStart
   e <- expr
-  ExprEnd :@ b <- next
+  b <- token ExprEnd
   pure (TExprNode (a <> b) e)
 
 expr :: Parser (TExpr Range)
 expr =
-  eappParen <|> eapp <|> ecase_ <|> evar
+  P.dbg "expr" $
+  asum $ fmap P.try [
+      ecase_
+    , evar
+    ]
 
 eapp :: Parser (TExpr Range)
-eapp = do
+eapp = P.dbg "eapp" $ do
   f <- expr
   g <- expr
   pure (TEApp undefined f g)
 
 eappParen :: Parser (TExpr Range)
-eappParen = do
-  ExprLParen :@ a <- next
+eappParen = P.dbg "eappParen" $ do
+  a <- token ExprLParen
   f <- expr
   g <- expr
-  ExprLParen :@ b <- next
+  b <- token ExprRParen
   pure (TEApp (a <> b) f g)
 
 evar :: Parser (TExpr Range)
-evar = do
-  ExprIdent x :@ a <- next
+evar = P.dbg "evar" $ do
+  ExprIdent x :@ a <- satisfy (\case ExprIdent _ -> True; _ -> False)
   pure (TEVar a (TId x))
 
 ecase_ :: Parser (TExpr Range)
-ecase_ = do
-  CaseStart :@ a <- next
+ecase_ = P.dbg "ecase" $ do
+  a <- token CaseStart
   e <- expr
-  CaseOf :@ _ <- next
+  _ <- token CaseOf
   a1 <- alt
   as <- many (caseSep *> alt)
   pure (TECase (a <> undefined) e (a1 :| as))
 
 caseSep :: Parser ()
 caseSep = do
-  CaseSep :@ _ <- next
+  _ <- token CaseSep
   pure ()
 
 alt :: Parser (TAlt Range)
 alt = do
   p <- pattern
-  AltSep :@ _ <- next
+  _ <- token AltSep
   altExpr p <|> altHtml p
 
 altExpr :: TPattern Range -> Parser (TAlt Range)
@@ -253,18 +308,18 @@ pattern :: Parser (TPattern Range)
 pattern =
   let
     var = do
-      PatId x :@ a <- next
+      PatId x :@ a <- satisfy (\case PatId _ -> True; _ -> False)
       pure (TPVar a (TId x))
     -- standalone constructor
     con = do
-      PatCon x :@ a <- next
+      PatCon x :@ a <- satisfy (\case PatCon _ -> True; _ -> False)
       pure (TPCon a (TConstructor x) [])
     -- higher arity constructor
     conparen = do
-      PatLParen :@ a <- next
-      PatCon x :@ _ <- next
+      a <- token PatLParen
+      PatCon x :@ _ <- satisfy (\case PatCon _ -> True; _ -> False)
       ps <- many pattern
-      PatRParen :@ b <- next
+      b <- token PatRParen
       pure (TPCon (a <> b) (TConstructor x) ps)
     -- TODO should probably allow top level cons without parens
   in var <|> con <|> conparen
