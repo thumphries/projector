@@ -8,6 +8,8 @@ module Projector.Html.Parser (
   ) where
 
 
+import           Control.Comonad
+
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -125,7 +127,8 @@ template :: Parser (Template Range)
 template = do
   ts <- optional (P.try typeSigs)
   hs <- html
-  pure (Template undefined ts hs)
+  let rang = maybe (extract hs) ((<> extract hs) . extract) ts
+  pure (Template rang ts hs)
 
 typeSigs :: Parser (TTypeSig Range)
 typeSigs = do
@@ -164,7 +167,7 @@ tvar = do
 html :: Parser (THtml Range)
 html = P.dbg "html" $ do
   ns <- many htmlNode
-  pure (THtml undefined ns)
+  pure (THtml undefined ns) -- ugh
 
 htmlNode :: Parser (TNode Range)
 htmlNode =
