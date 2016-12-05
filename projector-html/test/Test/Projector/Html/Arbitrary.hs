@@ -15,6 +15,7 @@ import qualified Projector.Html.Core.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
 import           Test.Projector.Core.Arbitrary
+import           Test.QuickCheck.Jack
 
 
 genHtmlTypeDecls :: Jack HtmlDecls
@@ -41,6 +42,4 @@ genWellTypedHtmlLit t =
 
 genHtmlLitT :: Jack Prim.PrimT
 genHtmlLitT =
-  elements [
-      Prim.TString
-    ]
+  arbitraryBoundedEnum
