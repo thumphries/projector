@@ -59,6 +59,12 @@ positionPos (Position x y f) =
   P.SourcePos f (P.unsafePos (fromIntegral x)) (P.unsafePos (fromIntegral y))
 {-# INLINE positionPos #-}
 
+posPosition :: P.SourcePos -> Position
+posPosition (P.SourcePos file line col) =
+  Position (fromIntegral (P.unPos line)) (fromIntegral (P.unPos col)) file
+{-# INLINEABLE posPosition #-}
+
+-- FIX remove these once dbg calls are gone
 instance Show a => P.ShowToken (Positioned a) where
   showTokens = show
 
@@ -120,6 +126,21 @@ token =
   fmap range . expect
 {-# INLINE token #-}
 
+listRange :: Comonad w => [w a] -> Maybe (a, a)
+listRange ls =
+  case ls of
+    (x:xs) ->
+      pure (go x xs)
+    [] ->
+      empty
+  where
+    go x [] =
+      (extract x, extract x)
+    go x [y] =
+      (extract x, extract y)
+    go x (_:ys) =
+      go x ys
+{-# INLINEABLE listRange #-}
 
 -- -----------------------------------------------------------------------------
 
@@ -166,8 +187,10 @@ tvar = do
 
 html :: Parser (THtml Range)
 html = P.dbg "html" $ do
+  pos <- P.getPosition
   ns <- many htmlNode
-  pure (THtml undefined ns) -- ugh
+  let r = maybe (Range (posPosition pos) (posPosition pos)) (uncurry (<>)) (listRange ns)
+  pure (THtml r ns)
 
 htmlNode :: Parser (TNode Range)
 htmlNode =
@@ -225,7 +248,7 @@ attr = do
   AttName x :@ a <- satisfy (\case AttName _ -> True; _ -> False)
   mval <- optional attrval
   pure $ maybe (TEmptyAttribute a (TAttrName x))
-    (\val -> TAttribute (a <> undefined) (TAttrName x) val)
+    (\val -> TAttribute (a <> extract val) (TAttrName x) val)
     mval
 
 attrval :: Parser (TAttrValue Range)
@@ -262,7 +285,7 @@ eapp :: Parser (TExpr Range)
 eapp = P.dbg "eapp" $ do
   f <- expr
   g <- expr
-  pure (TEApp undefined f g)
+  pure (TEApp (extract f <> extract g) f g)
 
 eappParen :: Parser (TExpr Range)
 eappParen = P.dbg "eappParen" $ do
@@ -284,7 +307,8 @@ ecase_ = P.dbg "ecase" $ do
   _ <- token CaseOf
   a1 <- alt
   as <- many (caseSep *> alt)
-  pure (TECase (a <> undefined) e (a1 :| as))
+  let r = (a <>) (maybe (extract a1) snd (listRange as))
+  pure (TECase r e (a1 :| as))
 
 caseSep :: Parser ()
 caseSep = do
@@ -300,12 +324,12 @@ alt = do
 altExpr :: TPattern Range -> Parser (TAlt Range)
 altExpr p = do
   e <- expr
-  pure (TAlt undefined p (TAltExpr undefined e))
+  pure (TAlt (extract p <> extract e) p (TAltExpr (extract e) e))
 
 altHtml :: TPattern Range -> Parser (TAlt Range)
 altHtml p = do
   h <- html
-  pure (TAlt undefined p (TAltHtml undefined h))
+  pure (TAlt (extract p <> extract h) p (TAltHtml (extract h) h))
 
 pattern :: Parser (TPattern Range)
 pattern =
