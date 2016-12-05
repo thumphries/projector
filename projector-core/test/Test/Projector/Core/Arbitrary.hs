@@ -135,13 +135,17 @@ genPattern c n =
 
 genTypeDecls ::
      Ground l
-  => Jack TypeName -> Jack Constructor -> Jack l -> Jack (TypeDecls l)
-genTypeDecls tn cs gt = do
+  => TypeDecls l
+  -> Jack TypeName
+  -> Jack Constructor
+  -> Jack l
+  -> Jack (TypeDecls l)
+genTypeDecls tc tn cs gt = do
   nTypes <- chooseInt (0, 20)
   nCons <- chooseInt (0, 100)
   types <- S.toList <$> genSizedSet nTypes tn
   constructors <- S.toList <$> genSizedSet nCons cs
-  genTypeDecls' gt types constructors mempty
+  genTypeDecls' gt types constructors tc
 
 genTypeDecls' ::
      Ground l
@@ -647,7 +651,7 @@ genIllTypedTestExpr' = do
 
 genTestTypeDecls :: Jack (TypeDecls TestLitT)
 genTestTypeDecls
-  = genTypeDecls genTypeName genConstructor genTestLitT
+  = genTypeDecls mempty genTypeName genConstructor genTestLitT
 
 genTestType :: TypeDecls TestLitT -> Jack (Type TestLitT)
 genTestType tc =

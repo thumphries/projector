@@ -32,7 +32,7 @@ type HtmlLit = Value PrimT
 
 data PrimT
   = TString
-  deriving (Eq, Ord, Read, Show)
+  deriving (Eq, Ord, Enum, Bounded, Read, Show)
 
 instance Ground PrimT where
   data Value PrimT
