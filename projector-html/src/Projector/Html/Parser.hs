@@ -46,14 +46,14 @@ parse' p file =
 type Parser= P.Parsec ParseErrorComponent Text
 
 data ParseErrorComponent
-  = ParseFail Text
+  = ParseFail [Char]
   | ParseIndentError Ordering P.Pos P.Pos
   | TagMismatch (Positioned TTag) (Positioned TTag)
   deriving (Eq, Ord, Show)
 
 instance P.ErrorComponent ParseErrorComponent where
   representFail =
-    ParseFail . T.pack
+    ParseFail
   representIndentation =
     ParseIndentError
 
@@ -76,17 +76,17 @@ template =
 
 typeSigs :: Parser (TTypeSig Range)
 typeSigs = do
-  _ :@ a <- token TypeSigsStart
-  f <- typeSig
-  fs <- many (P.try (typeSigsSep *> typeSig))
+  _ :@ a <- lexeme (token TypeSigsStart)
+  f <- lexeme typeSig
+  fs <- many (P.try (typeSigsSep *> lexeme typeSig))
   _ :@ b <- token TypeSigsEnd
   pure (TTypeSig (a <> b) (f :| fs))
 
 typeSig :: Parser (TId, TType Range)
 typeSig =
   label "type signature" $ do
-    t :@ _a <- typeIdent -- TODO this annotation gets dropped :(
-    _ <- token TypeSigSep
+    t :@ _a <- lexeme typeIdent -- TODO this annotation gets dropped :(
+    _ <- lexeme (token TypeSigSep)
     ty <- type_
     pure (TId t, ty)
 
@@ -121,12 +121,12 @@ html =
 htmlNode :: Parser (TNode Range)
 htmlNode =
   label "html node" $
-        P.try semanticWS
+        P.try exprNode
+    <|> P.try htmlComment
     <|> P.try plainText
-    <|> P.try element
+    <|> P.try semanticWS
     <|> P.try voidElement
-    <|> P.try exprNode
-    <|> htmlComment
+    <|> element
 
 semanticWS :: Parser (TNode Range)
 semanticWS =
@@ -168,7 +168,7 @@ esc echar = do
 element :: Parser (TNode Range)
 element =
   label "element" $ do
-    t1 :@ a <- tagOpen
+    t1 :@ a <- P.try (lexeme (tagOpen <* P.notFollowedBy (P.char '/')))
     as <- many (P.try (lexemeRN attr))
     _ <- tagClose
     hs <- html
@@ -179,7 +179,7 @@ element =
 voidElement :: Parser (TNode Range)
 voidElement =
   label "void element" $ do
-    t :@ a <- tagOpen
+    t :@ a <- P.try (lexeme (tagOpen <* P.notFollowedBy (P.char '/')))
     as <- many (P.try (lexemeRN attr))
     b <- tagSelfClose
     pure (TVoidElement (a <> b) t as)
@@ -188,7 +188,7 @@ exprNode :: Parser (TNode Range)
 exprNode =
   label "expression" $ do
     _ :@ a <- lexemeRN (token ExprStart)
-    e <- expr
+    e <- lexemeRN expr
     _ :@ b <- token ExprEnd
     pure (TExprNode (a <> b) e)
 
@@ -255,7 +255,7 @@ attrValueExpr :: Parser (TAttrValue Range)
 attrValueExpr =
   label "attribute value" $ do
     _ :@ a <- lexemeRN (token ExprStart)
-    e <- expr
+    e <- lexemeRN expr
     _ :@ b <- token ExprEnd
     pure (TAttrExpr (a <> b) e)
 
@@ -287,7 +287,7 @@ ecase_ =
     e <- lexemeRN expr
     _ <- lexemeRN (token CaseOf)
     a1 <- alt
-    as <- many (caseSep *> alt)
+    as <- many (lexemeRN caseSep *> alt)
     let r = (a <>) (maybe (extract a1) snd (listRange as))
     pure (TECase r e (a1 :| as))
 
@@ -300,16 +300,16 @@ caseSep =
 eapp :: Parser (TExpr Range)
 eapp =
   label "function application" $ do
-    f <- expr'
-    g :| gs <- some' expr'
+    f <- lexemeRN expr'
+    g :| gs <- some' (P.try (lexemeRN expr'))
     let r = maybe (extract f) (uncurry (<>)) (listRange (g:gs))
     pure (eappAssoc r f (g :| gs))
 
 eappParen :: Parser (TExpr Range)
 eappParen = do
   _ :@ a <- lexeme (token ExprLParen)
-  f <- expr'
-  g :| gs <- some' (P.try expr')
+  f <- lexemeRN expr'
+  g :| gs <- some' (P.try (lexemeRN expr'))
   _ :@ b <- lexeme (token ExprRParen)
   pure (eappAssoc (a <> b) f (g :| gs))
 
@@ -324,8 +324,8 @@ alt =
   label "case alternative" $ do
     _pos <- L.indentLevel -- TODO use
     p <- lexemeRN pattern
-    _ <- token AltSep
-    altExpr p <|> altHtml p
+    _ <- lexemeRN (token AltSep)
+    lexemeRN (P.try (altExpr p) <|> altHtml p)
 
 altExpr :: TPattern Range -> Parser (TAlt Range)
 altExpr p = do
@@ -334,11 +334,24 @@ altExpr p = do
 
 altHtml :: TPattern Range -> Parser (TAlt Range)
 altHtml p = do
-  h <- html
-  pure (TAlt (extract p <> extract h) p (TAltHtml (extract h) h))
+  h :| hs <- some' (P.try element <|> P.try voidElement <|> P.try htmlComment)
+  let hr = maybe (extract h) (uncurry (<>)) (listRange (h:hs))
+      ht = THtml hr (h:hs)
+  pure (TAlt (extract p <> extract ht) p (TAltHtml (extract ht) ht))
+
 
 pattern :: Parser (TPattern Range)
 pattern =
+  let
+    contop = do
+      t :@ a <- lexeme patCon
+      ps <- many (lexeme pattern')
+      let r = maybe a ((a <>) . snd) (listRange ps)
+      pure (TPCon r (TConstructor t) ps)
+  in label "pattern" $ P.try contop <|> pattern'
+
+pattern' :: Parser (TPattern Range)
+pattern' =
   let
     var = do
       t :@ a <- patId
@@ -351,7 +364,7 @@ pattern =
     conparen = do
       _ :@ a <- lexeme (token PatLParen)
       t :@ _ <- lexeme patCon
-      ps <- many (lexeme pattern)
+      ps <- many (lexeme pattern')
       _ :@ b <- token PatRParen
       pure (TPCon (a <> b) (TConstructor t) ps)
   in label "pattern" (P.try var <|> P.try con <|> conparen)
