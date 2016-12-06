@@ -7,6 +7,8 @@ module Projector.Html.Parser (
   ) where
 
 
+import           Control.Comonad  (Comonad(..))
+
 import           Data.List.NonEmpty  (NonEmpty(..))
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -66,7 +68,8 @@ template =
   label "template" $ do
     sig <- optional typeSigs
     hs <- html
-    pure (Template undefined sig hs)
+    let rang = maybe (extract hs) ((<> extract hs) . extract) sig
+    pure (Template rang sig hs)
 
 -- -----------------------------------------------------------------------------
 -- type signature
@@ -110,9 +113,10 @@ typeIdent =
 html :: Parser (THtml Range)
 html =
   label "html" $ do
-    _pos <- P.getPosition
+    pos <- P.getPosition
     ns <- many htmlNode
-    pure (THtml undefined ns)
+    let r = maybe (Range (posPosition pos) (posPosition pos)) (uncurry (<>)) (listRange ns)
+    pure (THtml r ns)
 
 htmlNode :: Parser (TNode Range)
 htmlNode =
@@ -234,7 +238,7 @@ attrValue (n :@ a) =
   label "attribute value" $ asum [
       do _ <- lexeme (token AttSep)
          val <- P.try attrValueString <|> P.try attrValueExpr
-         pure (TAttribute (a <> undefined) n val)
+         pure (TAttribute (a <> extract val) n val)
     , pure (TEmptyAttribute a n)
     ]
 
@@ -284,7 +288,8 @@ ecase_ =
     _ <- lexemeRN (token CaseOf)
     a1 <- alt
     as <- many (caseSep *> alt)
-    pure (TECase undefined e (a1 :| as))
+    let r = (a <>) (maybe (extract a1) snd (listRange as))
+    pure (TECase r e (a1 :| as))
 
 caseSep :: Parser (Positioned Token)
 caseSep =
@@ -297,7 +302,8 @@ eapp =
   label "function application" $ do
     f <- expr'
     g :| gs <- some' expr'
-    pure (eappAssoc undefined f (g :| gs))
+    let r = maybe (extract f) (uncurry (<>)) (listRange (g:gs))
+    pure (eappAssoc r f (g :| gs))
 
 eappParen :: Parser (TExpr Range)
 eappParen = do
@@ -324,12 +330,12 @@ alt =
 altExpr :: TPattern Range -> Parser (TAlt Range)
 altExpr p = do
   e <- expr
-  pure (TAlt undefined p (TAltExpr undefined e))
+  pure (TAlt (extract p <> extract e) p (TAltExpr (extract e) e))
 
 altHtml :: TPattern Range -> Parser (TAlt Range)
 altHtml p = do
   h <- html
-  pure (TAlt undefined p (TAltHtml undefined h))
+  pure (TAlt (extract p <> extract h) p (TAltHtml (extract h) h))
 
 pattern :: Parser (TPattern Range)
 pattern =
@@ -370,6 +376,22 @@ reserved = S.fromList [
 
 -- -----------------------------------------------------------------------------
 
+listRange :: Comonad w => [w a] -> Maybe (a, a)
+listRange ls =
+  case ls of
+    (x:xs) ->
+      pure (go x xs)
+    [] ->
+      empty
+  where
+    go x [] =
+      (extract x, extract x)
+    go x [y] =
+      (extract x, extract y)
+    go x (_:ys) =
+      go x ys
+{-# INLINEABLE listRange #-}
+
 some' :: Parser a -> Parser (NonEmpty a)
 some' p = do
   a <- p
@@ -399,20 +421,10 @@ suchThat g f= do
   pure a
 {-# INLINE suchThat #-}
 
-singleton :: Applicative f => Parser a -> Parser (f a)
-singleton =
-  fmap pure
-{-# INLINE singleton #-}
-
 lexeme :: Parser a -> Parser a
 lexeme f =
   f <* many space
 {-# INLINE lexeme #-}
-
-lexeme1 :: Parser a -> Parser a
-lexeme1 f =
-  f <* some space
-{-# INLINE lexeme1 #-}
 
 lexemeRN :: Parser a -> Parser a
 lexemeRN f =
