@@ -6,6 +6,7 @@ module Test.Projector.Html.Arbitrary where
 
 
 import           Data.List.NonEmpty  (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import           Data.Text.Arbitrary ()
 
@@ -20,7 +21,7 @@ import qualified Projector.Html.Core.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
 import           Test.Projector.Core.Arbitrary
-import           Test.QuickCheck.Jack
+import           Test.QuickCheck.Jack hiding (listOf1)
 
 
 -- -----------------------------------------------------------------------------
@@ -102,14 +103,18 @@ genPlain =
 
 genPlainText :: Jack TPlainText
 genPlainText =
-  fmap (TPlainText . escape) arbitrary
+  fmap (TPlainText . escape) (arbitrary `suchThat` (/= T.empty))
 
 escape :: Text -> Text
 escape =
     T.replace "{" "\\{"
+  . T.replace "}" "\\}"
   . T.replace "<" "\\<"
   . T.replace "-->" "\\-\\->"
   . T.replace ">" "\\>"
+  . T.replace " " "a"
+  . T.replace "\n" "b"
+  . T.replace "\t" "c"
 
 genHtmlExpr :: Jack (TNode ())
 genHtmlExpr =
@@ -138,7 +143,7 @@ genAttributeValue :: Jack (TAttrValue ())
 genAttributeValue =
   oneOf [
       TQuotedAttrValue () <$> genAttrValueText
-    , TUnquotedAttrValue () <$> genAttrValueText
+--    , TUnquotedAttrValue () <$> genAttrValueText -- TODO REMOVE FROM AST
     , TAttrExpr () <$> genTemplateExpr
     ]
 
@@ -194,7 +199,7 @@ genTemplateAltBody :: Jack (TAltBody ())
 genTemplateAltBody =
   oneOf [
       TAltExpr () <$> genTemplateExpr
-    , TAltHtml () <$> (THtml () <$> listOf (oneOf [genElement, genVoidElement])) -- need to fix AST
+    , TAltHtml () <$> (THtml () . NE.toList <$> listOf1 (oneOf [genElement, genVoidElement])) -- need to fix AST
     ]
 
 genTemplatePattern :: Jack (TPattern ())

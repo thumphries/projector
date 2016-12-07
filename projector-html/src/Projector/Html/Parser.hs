@@ -4,6 +4,7 @@ module Projector.Html.Parser (
     parse
   , parse'
   , ParseError (..)
+  , voidElement
   ) where
 
 
@@ -67,7 +68,7 @@ template :: Parser (Template Range)
 template =
   label "template" $ do
     sig <- optional typeSigs
-    hs <- html
+    hs <- optional newline *> html
     let rang = maybe (extract hs) ((<> extract hs) . extract) sig
     pure (Template rang sig hs)
 
@@ -121,17 +122,17 @@ html =
 htmlNode :: Parser (TNode Range)
 htmlNode =
   label "html node" $
-        P.try exprNode
-    <|> P.try htmlComment
-    <|> P.try plainText
-    <|> P.try semanticWS
-    <|> P.try voidElement
-    <|> element
+        exprNode
+    <|> htmlComment
+    <|> plainText
+    <|> semanticWS
+    <|> P.try element
+    <|> voidElement
 
 semanticWS :: Parser (TNode Range)
 semanticWS =
   label "whitespace" $ do
-    _ :@ r <- withPosition (some whitespace)
+    _ :@ r <- withPosition (some (P.try whitespace))
     pure (TWhiteSpace r)
 
 plainText :: Parser (TNode Range)
@@ -149,7 +150,7 @@ htmlComment :: Parser (TNode Range)
 htmlComment =
   label "html comment" $ do
     t :@ a <- withPosition $ do
-      string "<!--"
+      P.try (string "<!--")
       t <- P.manyTill P.anyChar (string "-->")
       pure (T.pack t)
     pure (TComment a (TPlainText t))
@@ -168,7 +169,7 @@ esc echar = do
 element :: Parser (TNode Range)
 element =
   label "element" $ do
-    t1 :@ a <- P.try (lexeme (tagOpen <* P.notFollowedBy (P.char '/')))
+    t1 :@ a <- P.try (lexeme tagOpen)
     as <- many (P.try (lexemeRN attr))
     _ <- tagClose
     hs <- html
@@ -179,15 +180,15 @@ element =
 voidElement :: Parser (TNode Range)
 voidElement =
   label "void element" $ do
-    t :@ a <- P.try (lexeme (tagOpen <* P.notFollowedBy (P.char '/')))
+    t :@ a <- P.try (lexeme tagOpen)
     as <- many (P.try (lexemeRN attr))
-    b <- tagSelfClose
+    b <- P.try tagSelfClose
     pure (TVoidElement (a <> b) t as)
 
 exprNode :: Parser (TNode Range)
 exprNode =
   label "expression" $ do
-    _ :@ a <- lexemeRN (token ExprStart)
+    _ :@ a <- P.try (lexemeRN (token ExprStart))
     e <- lexemeRN expr
     _ :@ b <- token ExprEnd
     pure (TExprNode (a <> b) e)
@@ -195,26 +196,26 @@ exprNode =
 tagOpen :: Parser (Positioned TTag)
 tagOpen =
   label "tag open" $ do
-    _ :@ a <- lexemeRN (token TagOpen)
+    _ :@ a <- P.try (lexemeRN (token TagOpen <* P.notFollowedBy (P.char '/')))
     n :@ b <- lexemeRN tagIdent
     pure (TTag n :@ (a <> b))
 
 tagClose :: Parser Range
 tagClose =
   label "tag close" $ do
-    _ :@ a <- token TagClose
+    _ :@ a <- P.try (token TagClose)
     pure a
 
 tagSelfClose :: Parser Range
 tagSelfClose =
   label "tag self-close" $ do
-    _ :@ a <- token TagSelfClose
+    _ :@ a <- P.try (token TagSelfClose)
     pure a
 
 closeTag :: Parser (Positioned TTag)
 closeTag =
   label "close tag" $ do
-    _ :@ a <- lexeme (token TagCloseOpen)
+    _ :@ a <- P.try (lexeme (token TagCloseOpen))
     i :@ _ <- tagIdent
     b <- tagClose
     pure (TTag i :@ (a <> b))
@@ -226,7 +227,7 @@ tagIdent =
 attr :: Parser (TAttribute Range)
 attr =
   label "attribute" $ do
-    n <- attrName
+    n <- P.try attrName
     attrValue n
 
 attrName :: Parser (Positioned TAttrName)
@@ -236,7 +237,7 @@ attrName =
 attrValue :: Positioned TAttrName -> Parser (TAttribute Range)
 attrValue (n :@ a) =
   label "attribute value" $ asum [
-      do _ <- lexeme (token AttSep)
+      do _ <- P.try (lexeme (token AttSep))
          val <- P.try attrValueString <|> P.try attrValueExpr
          pure (TAttribute (a <> extract val) n val)
     , pure (TEmptyAttribute a n)
