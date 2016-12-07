@@ -5,6 +5,8 @@
 module Test.Projector.Html.Arbitrary where
 
 
+import           Data.Generics.Aliases
+import           Data.Generics.Schemes
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
@@ -61,7 +63,7 @@ genTemplate :: Jack (Template ())
 genTemplate =
   Template ()
     <$> genTemplateTypeSig
-    <*> genHtml
+    <*> fmap (everywhere (mkT mergePlain)) genHtml
 
 genTemplateTypeSig :: Jack (Maybe (TTypeSig ()))
 genTemplateTypeSig = do
@@ -212,3 +214,11 @@ genTemplatePattern =
                    <*> listOf genTemplatePattern
         ]
   in oneOfRec nonrec recc
+
+mergePlain :: THtml () -> THtml ()
+mergePlain (THtml a nodes) =
+  THtml a (go nodes)
+  where
+    go ((TPlain _ (TPlainText b)) : (TPlain _ (TPlainText c)) : xs) = go (TPlain () (TPlainText (b <> c)) : xs)
+    go (x:xs) = x : go xs
+    go [] = []

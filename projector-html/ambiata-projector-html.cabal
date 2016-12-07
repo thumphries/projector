@@ -76,6 +76,7 @@ test-suite test
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , string-qq                       == 0.0.*
+                     , syb
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -105,3 +106,4 @@ test-suite test-io
                      , directory
                      , filepath
                      , containers
+                     , syb
