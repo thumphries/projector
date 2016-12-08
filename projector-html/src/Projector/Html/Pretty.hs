@@ -202,10 +202,11 @@ exprTokens expr =
         ]
     TECase _ e alts ->
       mconcat [
-          [CaseStart]
+          [ExprLParen, CaseStart]
         , exprTokens e
         , [CaseOf]
         , altsTokens alts
+        , [ExprRParen]
         ]
 
 altsTokens :: NonEmpty (TAlt a) -> DList (Token)

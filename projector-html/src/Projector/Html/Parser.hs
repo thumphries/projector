@@ -143,7 +143,7 @@ plainText =
 
 breakers :: Set Char
 breakers = S.fromList [
-    '{','}', '<', '\\', ' ', '\r', '\n', '\t'
+    '{','}', '<', '>', '\\', ' ', '\r', '\n', '\t'
   ]
 
 htmlComment :: Parser (TNode Range)
@@ -270,20 +270,20 @@ expr =
 
 expr' :: Parser (TExpr Range)
 expr' =
-  label "expression" $
+  label "expression" $ do
         P.try ecase_
     <|> P.try eappParen
     <|> P.try evar
 
 evar :: Parser (TExpr Range)
 evar =
-  label "variable" $ do
+  label "variable" . eOptionalParens $ do
     x :@ a <- exprId
     pure (TEVar a (TId x))
 
 ecase_ :: Parser (TExpr Range)
 ecase_ =
-  label "case statement" $ do
+  label "case statement" . eOptionalParens $ do
     _ :@ a <- lexemeRN (token CaseStart)
     e <- lexemeRN expr
     _ <- lexemeRN (token CaseOf)
@@ -300,25 +300,33 @@ caseSep =
 
 eapp :: Parser (TExpr Range)
 eapp =
-  label "function application" $ do
+  label "function application" . eOptionalParens $ do
     f <- lexemeRN expr'
     g :| gs <- some' (P.try (lexemeRN expr'))
     let r = maybe (extract f) (uncurry (<>)) (listRange (g:gs))
     pure (eappAssoc r f (g :| gs))
 
 eappParen :: Parser (TExpr Range)
-eappParen = do
-  _ :@ a <- lexeme (token ExprLParen)
-  f <- lexemeRN expr'
-  g :| gs <- some' (P.try (lexemeRN expr'))
-  _ :@ b <- lexeme (token ExprRParen)
-  pure (eappAssoc (a <> b) f (g :| gs))
+eappParen =
+  eParens $ do
+    f <- lexemeRN expr'
+    g :| gs <- some' (P.try (lexemeRN expr'))
+    let r = maybe (extract f) (uncurry (<>)) (listRange (g : gs))
+    pure (eappAssoc r f (g :| gs))
 
 eappAssoc :: Range -> (TExpr Range) -> NonEmpty (TExpr Range) -> TExpr Range
 eappAssoc r f (g :| gs) =
   case gs of
     [] -> TEApp r f g
     (h:hs) -> eappAssoc r (TEApp r f g) (h :| hs)
+
+eParens :: Parser a -> Parser a
+eParens p =
+  P.between (P.try (lexeme (token ExprLParen))) (token ExprRParen) p
+
+eOptionalParens :: Parser a -> Parser a
+eOptionalParens p =
+  eParens p <|> p
 
 alt :: Parser (TAlt Range)
 alt =

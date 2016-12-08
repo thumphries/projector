@@ -61,9 +61,10 @@ genHtmlLitT =
 
 genTemplate :: Jack (Template ())
 genTemplate =
-  Template ()
-    <$> genTemplateTypeSig
-    <*> fmap (everywhere (mkT mergePlain)) genHtml
+  sized $ \k -> do
+    j <- chooseInt (0, k)
+    Template () <$> genTemplateTypeSig <*>
+      fmap (everywhere (mkT mergePlain)) (genHtml j)
 
 genTemplateTypeSig :: Jack (Maybe (TTypeSig ()))
 genTemplateTypeSig = do
@@ -72,28 +73,30 @@ genTemplateTypeSig = do
     0 ->
       pure Nothing
     _ ->
-      fmap (pure . TTypeSig ()) $ do
-        listOf1
+      fmap (pure . TTypeSig () . NE.fromList) $ do
+        listOfN 1 k
           ((,) <$> (TId <$> elements muppets) <*>
            ((TTVar () . TId . T.toTitle) <$> elements waters))
 
-genHtml :: Jack (THtml ())
-genHtml =
+genHtml :: Int -> Jack (THtml ())
+genHtml k =
+  let j = k `div` 2 in
   THtml () <$>
-  listOf (oneOf [genElement, genVoidElement, genComment, genPlain, genHtmlExpr])
+  listOfN 0 k (oneOf [genElement j, genVoidElement j, genComment, genPlain, genHtmlExpr j])
 
-genElement :: Jack (TNode ())
-genElement =
+genElement :: Int -> Jack (TNode ())
+genElement k =
+  let j = k `div` 2 in
   TElement ()
     <$> genTag
-    <*> listOf genAttribute
-    <*> genHtml
+    <*> listOfN 0 j (genAttribute (j `div` 2))
+    <*> genHtml j
 
-genVoidElement :: Jack (TNode ())
-genVoidElement =
+genVoidElement :: Int -> Jack (TNode ())
+genVoidElement k =
   TVoidElement ()
     <$> genTag
-    <*> listOf genAttribute
+    <*> listOfN 0 k (genAttribute (k `div` 2))
 
 genComment :: Jack (TNode ())
 genComment =
@@ -105,28 +108,24 @@ genPlain =
 
 genPlainText :: Jack TPlainText
 genPlainText =
-  fmap (TPlainText . escape) (arbitrary `suchThat` (/= T.empty))
+  fmap (TPlainText . mangle) (arbitrary `suchThat` (/= T.empty))
 
-escape :: Text -> Text
-escape =
-    T.replace "{" "\\{"
-  . T.replace "}" "\\}"
-  . T.replace "<" "\\<"
-  . T.replace "-->" "\\-\\->"
-  . T.replace ">" "\\>"
-  . T.replace " " "a"
+mangle :: Text -> Text
+mangle =
+    T.replace " " "a"
   . T.replace "\n" "b"
   . T.replace "\t" "c"
+  . T.replace "\\" "\\\\"
 
-genHtmlExpr :: Jack (TNode ())
-genHtmlExpr =
-  TExprNode () <$> genTemplateExpr
+genHtmlExpr :: Int -> Jack (TNode ())
+genHtmlExpr k =
+  TExprNode () <$> genTemplateExpr k
 
-genAttribute :: Jack (TAttribute ())
-genAttribute =
+genAttribute :: Int -> Jack (TAttribute ())
+genAttribute k =
   oneOf [
       TEmptyAttribute () <$> genAttributeName
-    , TAttribute () <$> genAttributeName <*> genAttributeValue
+    , TAttribute () <$> genAttributeName <*> genAttributeValue k
     ]
 
 genAttributeName :: Jack TAttrName
@@ -140,14 +139,11 @@ genAttributeName =
     , elements boats
     ]
 
--- TODO size here would help
-genAttributeValue :: Jack (TAttrValue ())
-genAttributeValue =
-  oneOf [
-      TQuotedAttrValue () <$> genAttrValueText
---    , TUnquotedAttrValue () <$> genAttrValueText -- TODO REMOVE FROM AST
-    , TAttrExpr () <$> genTemplateExpr
-    ]
+genAttributeValue :: Int -> Jack (TAttrValue ())
+genAttributeValue k =
+  if k <= 2
+    then TQuotedAttrValue () <$> genAttrValueText
+    else TAttrExpr () <$> genTemplateExpr k
 
 genAttrValueText :: Jack TPlainText
 genAttrValueText =
@@ -177,43 +173,46 @@ genVoidTag =
       TTag "img"
     ]
 
-genTemplateExpr :: Jack (TExpr ())
-genTemplateExpr =
-  let nonrec = [
+genTemplateExpr :: Int -> Jack (TExpr ())
+genTemplateExpr k =
+  let j = k `div` 2
+      nonrec = [
           TEVar () <$> (TId <$> elements muppets)
         ]
       recc = [
-          TEApp () <$> oneOf nonrec <*> oneOf nonrec
-        , TECase () <$> oneOf nonrec <*> genTemplateAlts
+          TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
+        , TECase () <$> genTemplateExpr j <*> genTemplateAlts j
         ]
-  in oneOfRec nonrec recc
+  in if k <= 2 then oneOf nonrec else oneOf recc
 
-genTemplateAlts :: Jack (NonEmpty (TAlt ()))
-genTemplateAlts = do
+genTemplateAlts :: Int -> Jack (NonEmpty (TAlt ()))
+genTemplateAlts j = do
   k <- chooseInt (1, 10)
-  (:|) <$> genTemplateAlt <*> vectorOf k genTemplateAlt
+  (:|) <$> genTemplateAlt j <*> vectorOf k (genTemplateAlt (j `div` k))
 
-genTemplateAlt :: Jack (TAlt ())
-genTemplateAlt =
-  TAlt () <$> genTemplatePattern <*> genTemplateAltBody
+genTemplateAlt :: Int -> Jack (TAlt ())
+genTemplateAlt k =
+  let j = k `div` 2 in
+  TAlt () <$> genTemplatePattern j <*> genTemplateAltBody j
 
-genTemplateAltBody :: Jack (TAltBody ())
-genTemplateAltBody =
+genTemplateAltBody :: Int -> Jack (TAltBody ())
+genTemplateAltBody k =
   oneOf [
-      TAltExpr () <$> genTemplateExpr
-    , TAltHtml () <$> (THtml () . NE.toList <$> listOf1 (oneOf [genElement, genVoidElement])) -- need to fix AST
+      TAltExpr () <$> genTemplateExpr k
+    , TAltHtml () <$> (THtml () <$> listOfN 1 (max 1 k) (oneOf [genElement k, genVoidElement k])) -- need to fix AST
     ]
 
-genTemplatePattern :: Jack (TPattern ())
-genTemplatePattern =
-  let nonrec = [
+genTemplatePattern :: Int -> Jack (TPattern ())
+genTemplatePattern k =
+  let j = k `div` 2
+      nonrec = [
           TPVar () <$> (TId <$> elements waters)
         ]
       recc = [
           TPCon () <$> ((TConstructor . T.toTitle) <$> elements muppets)
-                   <*> listOf genTemplatePattern
+                   <*> listOfN 0 k (genTemplatePattern j)
         ]
-  in oneOfRec nonrec recc
+  in if k <= 2 then oneOf nonrec else oneOf recc
 
 mergePlain :: THtml () -> THtml ()
 mergePlain (THtml a nodes) =
