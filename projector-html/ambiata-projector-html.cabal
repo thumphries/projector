@@ -35,6 +35,9 @@ library
                        Paths_ambiata_projector_html
 
                        Projector.Html
+
+                       Projector.Html.Core
+                       Projector.Html.Core.Elaborator
                        Projector.Html.Core.Library
                        Projector.Html.Core.Prim
 
@@ -45,8 +48,6 @@ library
                        Projector.Html.Data.Position
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
-
-                       Projector.Html.Elaborator
 
                        Projector.Html.Parser
 

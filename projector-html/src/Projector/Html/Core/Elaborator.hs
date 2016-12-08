@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Projector.Html.Elaborator (
+module Projector.Html.Core.Elaborator (
     elaborate
   ) where
 
