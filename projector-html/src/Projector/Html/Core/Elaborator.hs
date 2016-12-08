@@ -42,18 +42,18 @@ eNode :: TNode a -> HtmlExpr a
 eNode node =
   case node of
     TWhiteSpace a ->
-      ECon a (Constructor "WhiteSpace") Lib.nHtml []
+      ECon a (Constructor "Whitespace") Lib.nHtmlNode []
     TPlain a (TPlainText t) ->
-      ECon a (Constructor "Plain") Lib.nHtml [stringLit a t]
+      ECon a (Constructor "Plain") Lib.nHtmlNode [stringLit a t]
     TComment a (TPlainText t) ->
-      ECon a (Constructor "Comment") Lib.nHtml [stringLit a t]
+      ECon a (Constructor "Comment") Lib.nHtmlNode [stringLit a t]
     TVoidElement a tag attrs ->
-      ECon a (Constructor "VoidElement") Lib.nHtml [
+      ECon a (Constructor "VoidElement") Lib.nHtmlNode [
           eTag tag
         , eAttrs a attrs
         ]
     TElement a tag attrs html ->
-      ECon a (Constructor "Element") Lib.nHtml [
+      ECon a (Constructor "Element") Lib.nHtmlNode [
           eTag tag
         , eAttrs a attrs
         , eHtml html
@@ -97,8 +97,8 @@ eAttrVal aval =
        TUnquotedAttrValue a (TPlainText t) ->
          mkVal a (stringLit a t)
          -- TODO don't have a constructor in Lib, are these equivalent in HTML?
-       TAttrExpr a expr ->
-         mkVal a (eExpr expr)
+       TAttrExpr _ expr ->
+         eExpr expr
 
 eExpr :: TExpr a -> HtmlExpr a
 eExpr expr =

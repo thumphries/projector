@@ -136,7 +136,7 @@ tHtmlNode =
 dHtmlNode :: HtmlDecl
 dHtmlNode =
   DVariant [
-      (Constructor "Element", [tTag, TList tAttribute, TList tHtmlNode])
+      (Constructor "Element", [tTag, TList tAttribute, tHtml])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
     , (Constructor "Comment", [TLit Prim.TString])
     , (Constructor "Plain", [TLit Prim.TString])
