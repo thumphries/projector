@@ -99,7 +99,6 @@ tAttributeValue :: HtmlType
 tAttributeValue =
   TVar nAttributeValue
 
--- TODO need to add unquoted constructor maybe?
 dAttributeValue :: HtmlDecl
 dAttributeValue =
   DVariant [

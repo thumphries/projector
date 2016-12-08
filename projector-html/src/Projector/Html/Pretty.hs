@@ -185,8 +185,6 @@ attrValueTokens aval =
   case aval of
     TQuotedAttrValue _ (TPlainText t) ->
       [AttValueQ t]
-    TUnquotedAttrValue _ (TPlainText t) ->
-      [AttValue t]
     TAttrExpr _ expr ->
       mconcat [
           [ExprStart]

@@ -94,9 +94,6 @@ eAttrVal aval =
   in case aval of
        TQuotedAttrValue a (TPlainText t) ->
          mkVal a (stringLit a t)
-       TUnquotedAttrValue a (TPlainText t) ->
-         mkVal a (stringLit a t)
-         -- TODO don't have a constructor in Lib, are these equivalent in HTML?
        TAttrExpr _ expr ->
          eExpr expr
 

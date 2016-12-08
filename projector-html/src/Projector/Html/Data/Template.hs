@@ -161,7 +161,6 @@ instance Comonad TAttribute where
 
 data TAttrValue a
   = TQuotedAttrValue a TPlainText
-  | TUnquotedAttrValue a TPlainText
   | TAttrExpr a (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
@@ -170,13 +169,10 @@ instance Comonad TAttrValue where
     case val of
       TQuotedAttrValue a _ ->
         a
-      TUnquotedAttrValue a _ ->
-        a
       TAttrExpr a _ ->
         a
   extend f expr = case expr of
     TQuotedAttrValue _ t -> TQuotedAttrValue (f expr) t
-    TUnquotedAttrValue _ t -> TUnquotedAttrValue (f expr) t
     TAttrExpr _ e -> TAttrExpr (f expr) (extend (const (f expr)) e)
 
 data TExpr a
