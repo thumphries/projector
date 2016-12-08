@@ -46,9 +46,6 @@ library
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
-                       Projector.Html.Lexer
-                       Projector.Html.Lexer.Internal
-
                        Projector.Html.Parser
 
                        Projector.Html.Pretty
@@ -80,6 +77,7 @@ test-suite test
                      , syb
                      , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*
+                     , text
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -112,3 +110,4 @@ test-suite test-io
                      , syb
                      , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*
+                     , text
