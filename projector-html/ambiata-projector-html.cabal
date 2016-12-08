@@ -68,6 +68,7 @@ test-suite test
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
+                     , ambiata-disorder-eithert
                      , ambiata-disorder-jack
                      , ambiata-p
                      , ambiata-projector-core
@@ -96,6 +97,7 @@ test-suite test-io
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
+                     , ambiata-disorder-eithert
                      , ambiata-disorder-jack
                      , ambiata-p
                      , ambiata-projector-core
