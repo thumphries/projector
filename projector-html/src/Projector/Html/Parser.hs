@@ -421,21 +421,6 @@ some' p = do
   pure (a :| as)
 {-# INLINEABLE some' #-}
 
-sepBy1' :: Parser a -> Parser a -> Parser [a]
-sepBy1' p sep = do
-  a <- p
-  bs <- many . P.try $ do
-    s <- sep
-    b <- p
-    pure [s,b]
-  pure (a : mconcat bs)
-{-# INLINEABLE sepBy1' #-}
-
-indented :: P.Pos -> Parser ()
-indented indent =
-  void (L.indentGuard P.space GT indent)
-{-# INLINE indented #-}
-
 suchThat :: Parser a -> (a -> Bool) -> Parser a
 suchThat g f= do
   a <- g

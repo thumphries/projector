@@ -23,6 +23,7 @@ library
                      , template-haskell                == 2.10.*
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
+                     , comonad                         == 5.*
 
   ghc-options:
                        -Wall
@@ -77,6 +78,8 @@ test-suite test
                      , quickcheck-instances            == 0.3.*
                      , string-qq                       == 0.0.*
                      , syb
+                     , quickcheck-text                 == 0.1.*
+                     , semigroups                      == 0.18.*
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -107,3 +110,5 @@ test-suite test-io
                      , filepath
                      , containers
                      , syb
+                     , quickcheck-text                 == 0.1.*
+                     , semigroups                      == 0.18.*
