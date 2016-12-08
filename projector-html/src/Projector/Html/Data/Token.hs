@@ -6,6 +6,8 @@ module Projector.Html.Data.Token (
   ) where
 
 
+import qualified Data.Text as T
+
 import P
 
 
@@ -69,12 +71,12 @@ renderToken tok =
 
     AttName t       -> t
     AttSep          -> "="
-    AttValueQ t     -> "\"" <> t <> "\"" -- TODO escape \" etc
+    AttValueQ t     -> "\"" <> escape t <> "\""
     AttValue t      -> t
 
     WhiteSpace      -> " "
     HtmlComment t   -> "<!--" <> t <> "-->" -- TODO this should be three tokens
-    HtmlText t      -> t
+    HtmlText t      -> escape t
 
     ExprStart       -> "{"
     ExprEnd         -> "}"
@@ -90,3 +92,14 @@ renderToken tok =
     PatId t         -> t
     PatLParen       -> "("
     PatRParen       -> ")"
+
+escape :: Text -> Text
+escape =
+    T.replace "{" "\\{"
+  . T.replace "}" "\\}"
+  . T.replace "<" "\\<"
+  . T.replace "-->" "\\-\\->"
+  . T.replace ">" "\\>"
+  . T.replace "\r" "\\\r"
+  . T.replace "\n" "\\\n"
+  . T.replace "\\" "\\\\"

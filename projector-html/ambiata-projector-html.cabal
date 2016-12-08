@@ -23,6 +23,7 @@ library
                      , template-haskell                == 2.10.*
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
+                     , comonad                         == 5.*
 
   ghc-options:
                        -Wall
@@ -45,8 +46,7 @@ library
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
-                       Projector.Html.Lexer
-                       Projector.Html.Lexer.Internal
+                       Projector.Html.Parser
 
                        Projector.Html.Pretty
 
@@ -74,6 +74,10 @@ test-suite test
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , string-qq                       == 0.0.*
+                     , syb
+                     , quickcheck-text                 == 0.1.*
+                     , semigroups                      == 0.18.*
+                     , text
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -103,3 +107,7 @@ test-suite test-io
                      , directory
                      , filepath
                      , containers
+                     , syb
+                     , quickcheck-text                 == 0.1.*
+                     , semigroups                      == 0.18.*
+                     , text
