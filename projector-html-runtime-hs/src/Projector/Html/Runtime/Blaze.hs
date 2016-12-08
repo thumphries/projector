@@ -11,7 +11,6 @@ import           Data.ByteString.Builder (Builder)
 import           Data.Foldable (foldl')
 import           Data.Function  ((.))
 import           Data.Functor  (fmap)
-import           Data.Monoid  (mconcat)
 import           Data.Text (Text)
 import qualified Data.Text.Lazy as T (toStrict)
 
