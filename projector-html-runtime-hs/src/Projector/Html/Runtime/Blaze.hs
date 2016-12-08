@@ -48,7 +48,7 @@ htmlNodeToMarkup h =
   case h of
     Element tag attrs branches ->
       applyAttrs
-        (BI.customParent (renderTag tag) (mconcat (fmap htmlNodeToMarkup branches)))
+        (BI.customParent (renderTag tag) (htmlToMarkup branches))
         attrs
 
     VoidElement tag attrs ->

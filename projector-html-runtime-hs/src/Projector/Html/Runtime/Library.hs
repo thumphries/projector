@@ -19,7 +19,7 @@ data AttributeKey = AttributeKey !String
 data AttributeValue = AttributeValue !String
 data Html = Html !([HtmlNode])
 data HtmlNode
-    = Element !Tag !([Attribute]) !([HtmlNode])
+    = Element !Tag !([Attribute]) !Html
     | VoidElement !Tag !([Attribute])
     | Comment !String
     | Plain !String
