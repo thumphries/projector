@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module Test.Projector.Html.Elaborator where
+module Test.Projector.Html.Core.Elaborator where
 
 
 import qualified Data.Text as T
