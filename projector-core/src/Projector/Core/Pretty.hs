@@ -38,14 +38,12 @@ ppTypeError' err =
     Mismatch t1 t2 a ->
       WL.annotate a $
       text
-        (T.unwords
-           ["Type mismatch! Expected", ppType t1, ", but found", ppType t2])
-    CouldNotUnify ts
-    --WL.annotate a $
-     ->
-      text
-        (T.unwords
-           ("Type mismatch! Expected these to be equal:" : fmap ppType ts))
+        (mconcat
+           ["Type mismatch! Expected ", ppType t1, ", but found ", ppType t2])
+    CouldNotUnify ts ->
+      text -- need a better annotation here. this is a bad error message
+        ("Type mismatch! Expected these to be equal: " <>
+         T.intercalate ", " (fmap ppType ts))
     ExpectedArrow t1 t2 a ->
       WL.annotate a $
       text
@@ -57,22 +55,22 @@ ppTypeError' err =
            ])
     FreeVariable (Name n) a ->
       WL.annotate a $
-      text (T.unwords ["Unknown variable! '", n, "' is not in scope"])
+      text (mconcat ["Unknown variable! '", n, "' is not in scope"])
     FreeTypeVariable (TypeName tn) a ->
       WL.annotate a $
-      text (T.unwords ["Unknown type! '", tn, "' has not been declared"])
+      text (mconcat ["Unknown type! '", tn, "' has not been declared"])
     BadConstructorName (Constructor c) (TypeName tn) d a ->
       case d of
         DVariant cts ->
           WL.annotate a $
           text
-            (T.unwords
+            (mconcat
                [ "Invalid constructor! '"
                , c
                , "' is not a constructor for"
                , tn
                , ". Perhaps you meant one of:"
-               , T.unwords (fmap (unConName . fst) cts)
+               , T.intercalate ", " (fmap (unConName . fst) cts)
                ])
     BadConstructorArity (Constructor c) (DVariant cts) i a ->
       WL.annotate a $
@@ -92,7 +90,7 @@ ppTypeError' err =
       WL.annotate a $
       text
         (T.unwords
-           [ "Pattern matches are non-exhaustive for expression of type"
+           [ "Pattern matches are non-exhaustive for an expression of type"
            , ppType ty
            ])
 
