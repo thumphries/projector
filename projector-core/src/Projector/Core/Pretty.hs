@@ -21,7 +21,7 @@ import           Projector.Core.Check  (TypeError(..))
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 import           Projector.Core.Type
 
-import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>))
+import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>), (<$$>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
 -- -----------------------------------------------------------------------------
@@ -168,7 +168,7 @@ ppExpr' types e =
       WL.annotate a $
         WL.hang 2
               ((text ("\\" <> n <> typeMay t <> "."))
-          </> (ppExpr' types f))
+          <$$> (ppExpr' types f))
 
     ECon a (Constructor c) _ es ->
       WL.annotate a $
