@@ -1,20 +1,102 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Core.Pretty (
-    ppType
+    ppTypeError
+  , ppTypeErrorDecorated
+  , ppType
   , ppTypeInfo
   , ppExpr
   , ppExprUntyped
   ) where
 
 
+import           Data.Functor.Identity (Identity, runIdentity)
 import qualified Data.Text as T
 
 import           P
 
+import           Projector.Core.Check  (TypeError(..))
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 import           Projector.Core.Type
 
+import           Text.PrettyPrint.Annotated.Leijen  (Doc)
+import qualified Text.PrettyPrint.Annotated.Leijen as WL
+
+-- -----------------------------------------------------------------------------
+
+ppTypeError :: Ground l => TypeError l a -> Text
+ppTypeError =
+  prettyUndecorated . ppTypeError'
+
+ppTypeErrorDecorated :: Ground l => (a -> Text) -> (a -> Text) -> TypeError l a -> Text
+ppTypeErrorDecorated start end =
+  prettyDecorated start end . ppTypeError'
+
+ppTypeError' :: Ground l => TypeError l a -> Doc a
+ppTypeError' err =
+  case err of
+    Mismatch t1 t2 a ->
+      WL.annotate a $
+      text
+        (T.unwords
+           ["Type mismatch! Expected", ppType t1, ", but found", ppType t2])
+    CouldNotUnify ts
+    --WL.annotate a $
+     ->
+      text
+        (T.unwords
+           ("Type mismatch! Expected these to be equal:" : fmap ppType ts))
+    ExpectedArrow t1 t2 a ->
+      WL.annotate a $
+      text
+        (T.unwords
+           [ "Type mismatch! Expected a function from"
+           , ppType t1
+           , ", but found"
+           , ppType t2
+           ])
+    FreeVariable (Name n) a ->
+      WL.annotate a $
+      text (T.unwords ["Unknown variable! '", n, "' is not in scope"])
+    FreeTypeVariable (TypeName tn) a ->
+      WL.annotate a $
+      text (T.unwords ["Unknown type! '", tn, "' has not been declared"])
+    BadConstructorName (Constructor c) (TypeName tn) d a ->
+      case d of
+        DVariant cts ->
+          WL.annotate a $
+          text
+            (T.unwords
+               [ "Invalid constructor! '"
+               , c
+               , "' is not a constructor for"
+               , tn
+               , ". Perhaps you meant one of:"
+               , T.unwords (fmap (unConName . fst) cts)
+               ])
+    BadConstructorArity (Constructor c) (DVariant cts) i a ->
+      WL.annotate a $
+      text
+        (T.unwords
+           [ "Constructor"
+           , c
+           , "expects"
+           , renderIntegral (length cts)
+           , "arguments, but received"
+           , renderIntegral i
+           ])
+    BadPattern t p ->
+      text
+        (T.unwords ["Invalid pattern '", ppPattern p, "' for type", ppType t])
+    NonExhaustiveCase _e ty a ->
+      WL.annotate a $
+      text
+        (T.unwords
+           [ "Pattern matches are non-exhaustive for expression of type"
+           , ppType ty
+           ])
+
+-- -----------------------------------------------------------------------------
 
 ppType :: Ground l => Type l -> Text
 ppType =
@@ -49,6 +131,8 @@ ppType' ctx verbose t =
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =
   T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))
+
+-- -----------------------------------------------------------------------------
 
 ppExpr :: Ground l => Expr l a -> Text
 ppExpr =
@@ -106,3 +190,24 @@ hasSpace =
 parenMay :: Text -> Text
 parenMay t =
   if hasSpace t then "(" <> t <> ")" else t
+
+-- -----------------------------------------------------------------------------
+
+text :: Text -> Doc a
+text =
+  WL.string . T.unpack
+
+pretty :: Doc a -> WL.SimpleDoc a
+pretty =
+  WL.renderPretty 0.4 100
+
+prettyDecorated :: (a -> Text) -> (a -> Text) -> Doc a -> Text
+prettyDecorated start end =
+  runIdentity . WL.displayDecoratedA str (pure . start) (pure . end) . pretty
+  where
+    str :: [Char] -> Identity Text
+    str = pure . T.pack
+
+prettyUndecorated :: Doc a -> Text
+prettyUndecorated =
+  prettyDecorated (const mempty) (const mempty)

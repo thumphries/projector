@@ -40,7 +40,7 @@ data TypeError l a
   | ExpectedArrow (Type l) (Type l) a
   | FreeVariable Name a
   | FreeTypeVariable TypeName a
-  | BadConstructorName Constructor (Decl l) a
+  | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
   | BadPattern (Type l) (Pattern a)
   | NonExhaustiveCase (Expr l a) (Type l) a
@@ -117,7 +117,7 @@ typeCheck' tc ctx expr =
       case lookupType tn tc of
         Just ty@(DVariant cs) -> do
           -- Look up constructor name
-          ts <- maybe (typeError (BadConstructorName c ty a)) pure (L.lookup c cs)
+          ts <- maybe (typeError (BadConstructorName c tn ty a)) pure (L.lookup c cs)
           -- Check arity
           unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
           -- Typecheck all bnds against expected
