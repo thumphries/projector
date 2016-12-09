@@ -7,13 +7,11 @@ module Projector.Html (
   ) where
 
 
-import qualified Data.Text as T
-
 import           P
 
 import           Projector.Html.Core  (CoreError(..), renderCoreErrorRange, templateToCore, HtmlType, HtmlExpr)
 import           Projector.Html.Data.Position  (Range)
-import           Projector.Html.Parser (ParseError (..), parse)
+import           Projector.Html.Parser (ParseError (..), renderParseError, parse)
 
 import           System.IO  (FilePath)
 
@@ -27,8 +25,7 @@ renderHtmlError :: HtmlError -> Text
 renderHtmlError he =
   case he of
     HtmlParseError e ->
-      -- FIX
-      T.pack (show e)
+      renderParseError e
     HtmlCoreError e ->
       renderCoreErrorRange e
 

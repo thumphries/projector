@@ -74,15 +74,13 @@ extractPositioned (a :@ _) =
 renderRange :: Range -> Text
 renderRange (Range (Position l1 c1 file) (Position l2 c2 _)) =
   mconcat
-    [ "In "
-    , T.pack file
-    , " between ("
+    [ T.pack file
+    , ":"
     , renderIntegral l1
-    , ","
+    , ":"
     , renderIntegral c1
-    , ") and ("
+    , "-"
     , renderIntegral l2
-    , ","
+    , ":"
     , renderIntegral c2
-    , ")"
     ]
