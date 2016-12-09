@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Position (
@@ -12,7 +14,10 @@ module Projector.Html.Data.Position (
   ) where
 
 
+import           Data.Data (Data, Typeable)
 import           Data.Semigroup (Semigroup (..))
+
+import           GHC.Generics  (Generic)
 
 import           P hiding ((<>))
 
@@ -24,7 +29,7 @@ data Position = Position {
     posLine :: !Int
   , posColumn :: !Int
   , posFile :: !FilePath
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
 emptyPosition :: Position
 emptyPosition =
@@ -34,7 +39,7 @@ emptyPosition =
 data Range = Range {
     rangeStart :: !Position
   , rangeEnd :: !Position
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Data, Typeable, Generic)
 
 instance Semigroup Range where
   (Range a _) <> (Range _ d) = Range a d
@@ -48,7 +53,7 @@ instance Monoid Range where
 -- | A functor for positioned tokens.
 data Positioned a
   = !a :@ !Range
-  deriving (Eq, Ord, Show, Functor)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor)
 
 extractPositioned :: Positioned a -> a
 extractPositioned (a :@ _) =
