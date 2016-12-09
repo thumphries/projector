@@ -15,7 +15,7 @@ library
                        base                            >= 3          && < 5
                      , ambiata-p
                      , ambiata-projector-core
-                     , ambiata-x-eithert
+                     , ambiata-x-templatehaskell
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , megaparsec                      == 5.1.*
@@ -35,6 +35,9 @@ library
                        Paths_ambiata_projector_html
 
                        Projector.Html
+
+                       Projector.Html.Core
+                       Projector.Html.Core.Elaborator
                        Projector.Html.Core.Library
                        Projector.Html.Core.Prim
 
@@ -47,6 +50,7 @@ library
                        Projector.Html.Data.Token
 
                        Projector.Html.Parser
+                       Projector.Html.Parser.QQ
 
                        Projector.Html.Pretty
 
@@ -65,6 +69,7 @@ test-suite test
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
+                     , ambiata-disorder-eithert
                      , ambiata-disorder-jack
                      , ambiata-p
                      , ambiata-projector-core
@@ -93,6 +98,7 @@ test-suite test-io
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
+                     , ambiata-disorder-eithert
                      , ambiata-disorder-jack
                      , ambiata-p
                      , ambiata-projector-core

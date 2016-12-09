@@ -76,7 +76,7 @@ testTemplate =
     (Just (TTypeSig () ((TId "foo", (TTVar () (TId "Bar"))) :|
                         [(TId "bar", (TTVar () (TId "Baz")))])))
     (THtml () [
-        TElement () (TTag "h1") [
+        TElement () (TTag () "h1") [
             TAttribute ()
               (TAttrName "display")
               (TQuotedAttrValue () (TPlainText "inline-block"))
@@ -116,13 +116,19 @@ typeTokens ty =
   case ty of
     TTVar _ (TId t) ->
       [TypeIdent t]
-    TTApp _ t1 t2 ->
-      mconcat [
-          [TypeLParen]
-        , typeTokens t1
-        , typeTokens t2
-        , [TypeRParen]
-        ]
+--    TTList _ t ->
+--      mconcat [
+--          [TypeLSquare]
+--        , typeTokens t
+--        , [TypeRSquare]
+--        ]
+--    TTApp _ t1 t2 ->
+--      mconcat [
+--          [TypeLParen]
+--        , typeTokens t1
+--        , typeTokens t2
+--        , [TypeRParen]
+--        ]
 
 htmlTokens :: THtml a -> DList (Token)
 htmlTokens (THtml _ nodes) =
@@ -134,7 +140,7 @@ nodeTokens node =
     TWhiteSpace _ ->
       [WhiteSpace]
 
-    TElement _ (TTag tag) attrs html ->
+    TElement _ (TTag _ tag) attrs html ->
       mconcat [
           [TagOpen, TagIdent tag]
         , mconcat (fmap attrTokens attrs)
@@ -143,7 +149,7 @@ nodeTokens node =
         , [TagCloseOpen, TagIdent tag, TagClose]
         ]
 
-    TVoidElement _ (TTag tag) attrs ->
+    TVoidElement _ (TTag _ tag) attrs ->
       mconcat [
           [TagOpen, TagIdent tag]
         , mconcat (fmap attrTokens attrs)
@@ -179,8 +185,6 @@ attrValueTokens aval =
   case aval of
     TQuotedAttrValue _ (TPlainText t) ->
       [AttValueQ t]
-    TUnquotedAttrValue _ (TPlainText t) ->
-      [AttValue t]
     TAttrExpr _ expr ->
       mconcat [
           [ExprStart]

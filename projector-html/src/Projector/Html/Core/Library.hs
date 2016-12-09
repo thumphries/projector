@@ -5,11 +5,19 @@
 module Projector.Html.Core.Library (
     types
   , tTag
+  , nTag
   , tAttribute
+  , nAttribute
   , tAttributeKey
+  , nAttributeKey
   , tAttributeValue
+  , nAttributeValue
   , tHtml
   , nHtml
+  , dHtml
+  , tHtmlNode
+  , nHtmlNode
+  , dHtmlNode
   ) where
 
 
@@ -30,6 +38,7 @@ types =
     , (nAttributeKey, dAttributeKey)
     , (nAttributeValue, dAttributeValue)
     , (nHtml, dHtml)
+    , (nHtmlNode, dHtmlNode)
     ]
 
 -- -----------------------------------------------------------------------------
@@ -109,8 +118,26 @@ tHtml =
 dHtml :: HtmlDecl
 dHtml =
   DVariant [
-      (Constructor "Element", [tTag, TList tAttribute, TList tHtml])
+      (Constructor "Html", [TList tHtmlNode])
+    ]
+
+
+-- -----------------------------------------------------------------------------
+
+nHtmlNode :: TypeName
+nHtmlNode =
+  TypeName "HtmlNode"
+
+tHtmlNode :: HtmlType
+tHtmlNode =
+  TVar nHtmlNode
+
+dHtmlNode :: HtmlDecl
+dHtmlNode =
+  DVariant [
+      (Constructor "Element", [tTag, TList tAttribute, tHtml])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
     , (Constructor "Comment", [TLit Prim.TString])
     , (Constructor "Plain", [TLit Prim.TString])
+    , (Constructor "Whitespace", [])
     ]

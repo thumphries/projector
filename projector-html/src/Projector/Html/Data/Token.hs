@@ -20,6 +20,8 @@ data Token
   | TypeIdent Text  -- foo | Foo
   | TypeLParen      -- (
   | TypeRParen      -- )
+  | TypeLSquare     -- [
+  | TypeRSquare     -- ]
   -- Html
   | TagIdent Text   -- img
   | TagOpen         -- <
@@ -62,6 +64,8 @@ renderToken tok =
     TypeIdent t     -> t
     TypeLParen      -> "("
     TypeRParen      -> ")"
+    TypeLSquare     -> "["
+    TypeRSquare     -> "]"
 
     TagIdent t      -> t
     TagOpen         -> "<"

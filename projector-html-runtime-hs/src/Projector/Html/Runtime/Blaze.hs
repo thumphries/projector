@@ -11,7 +11,6 @@ import           Data.ByteString.Builder (Builder)
 import           Data.Foldable (foldl')
 import           Data.Function  ((.))
 import           Data.Functor  (fmap)
-import           Data.Monoid  (mconcat)
 import           Data.Text (Text)
 import qualified Data.Text.Lazy as T (toStrict)
 
@@ -40,11 +39,15 @@ renderHtmlBuilder =
 -- (This will eventually be done via rewrite rules)
 
 htmlToMarkup :: Html -> B.Markup
-htmlToMarkup h =
+htmlToMarkup (Html nodes) =
+  B.toMarkup (fmap htmlNodeToMarkup nodes)
+
+htmlNodeToMarkup :: HtmlNode -> B.Markup
+htmlNodeToMarkup h =
   case h of
     Element tag attrs branches ->
       applyAttrs
-        (BI.customParent (renderTag tag) (mconcat (fmap htmlToMarkup branches)))
+        (BI.customParent (renderTag tag) (htmlToMarkup branches))
         attrs
 
     VoidElement tag attrs ->
@@ -55,6 +58,9 @@ htmlToMarkup h =
 
     Plain str ->
       B.string str
+
+    Whitespace ->
+      B.string " " -- TODO Check this
 
 renderTag :: Tag -> B.Tag
 renderTag (Tag ts) =

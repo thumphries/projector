@@ -49,7 +49,7 @@ type Parser= P.Parsec ParseErrorComponent Text
 data ParseErrorComponent
   = ParseFail [Char]
   | ParseIndentError Ordering P.Pos P.Pos
-  | TagMismatch (Positioned TTag) (Positioned TTag)
+  | TagMismatch (TTag Range) (TTag Range)
   deriving (Eq, Ord, Show)
 
 instance P.ErrorComponent ParseErrorComponent where
@@ -169,21 +169,21 @@ esc echar = do
 element :: Parser (TNode Range)
 element =
   label "element" $ do
-    t1 :@ a <- P.try (lexeme tagOpen)
+    ta@(TTag a t1) <- P.try (lexeme tagOpen)
     as <- many (P.try (lexemeRN attr))
     _ <- tagClose
     hs <- html
-    t2 :@ b <- closeTag
-    when (t1 /= t2) (failWith (TagMismatch (t1 :@ a) (t2 :@ b)))
-    pure (TElement (a <> b) t1 as hs)
+    tb@(TTag b t2) <- closeTag
+    when (t1 /= t2) (failWith (TagMismatch ta tb))
+    pure (TElement (a <> b) ta as hs)
 
 voidElement :: Parser (TNode Range)
 voidElement =
   label "void element" $ do
-    t :@ a <- P.try (lexeme tagOpen)
+    t <- P.try (lexeme tagOpen)
     as <- many (P.try (lexemeRN attr))
     b <- P.try tagSelfClose
-    pure (TVoidElement (a <> b) t as)
+    pure (TVoidElement (extract t <> b) t as)
 
 exprNode :: Parser (TNode Range)
 exprNode =
@@ -193,12 +193,12 @@ exprNode =
     _ :@ b <- token ExprEnd
     pure (TExprNode (a <> b) e)
 
-tagOpen :: Parser (Positioned TTag)
+tagOpen :: Parser (TTag Range)
 tagOpen =
   label "tag open" $ do
     _ :@ a <- P.try (lexemeRN (token TagOpen <* P.notFollowedBy (P.char '/')))
     n :@ b <- lexemeRN tagIdent
-    pure (TTag n :@ (a <> b))
+    pure (TTag (a <> b) n)
 
 tagClose :: Parser Range
 tagClose =
@@ -212,13 +212,13 @@ tagSelfClose =
     _ :@ a <- P.try (token TagSelfClose)
     pure a
 
-closeTag :: Parser (Positioned TTag)
+closeTag :: Parser (TTag Range)
 closeTag =
   label "close tag" $ do
     _ :@ a <- P.try (lexeme (token TagCloseOpen))
     i :@ _ <- tagIdent
     b <- tagClose
-    pure (TTag i :@ (a <> b))
+    pure (TTag (a <> b) i)
 
 tagIdent :: Parser (Positioned Text)
 tagIdent =
