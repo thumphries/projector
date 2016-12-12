@@ -42,7 +42,8 @@ data TypeError l a
   | FreeTypeVariable TypeName a
   | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
-  | BadPattern (Type l) (Pattern a)
+  | BadPatternArity Constructor (Type l) Int Int a
+  | BadPatternConstructor Constructor (Type l) a
   | NonExhaustiveCase (Expr l a) (Type l) a
 
 deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
@@ -172,15 +173,15 @@ checkPattern' tc ctx ty pat =
           case lookupType tn tc of
             Just (DVariant cs) -> do
               -- find the constructor in the type
-              ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+              ts <- maybe (typeError (BadPatternConstructor c ty a)) pure (L.lookup c cs)
               -- check the lists are the same length
-              unless (length ts == length pats) (typeError (BadPattern ty pat))
+              unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
               -- Check all recursive pats against type list
               foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
             Nothing ->
               typeError (FreeTypeVariable tn a)
         _ ->
-          typeError (BadPattern ty pat)
+          typeError (BadPatternConstructor c ty a)
 
 -- TODO figure out sensible error locations here
 unifyList :: Ground l => Check l a (Type l) -> [Check l a (Type l)] -> Check l a (Type l)

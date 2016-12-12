@@ -85,9 +85,28 @@ ppTypeError' err =
            , "arguments, but received"
            , renderIntegral i
            ])
-    BadPattern t p ->
-      text
-        (T.unwords ["Invalid pattern '", ppPattern p, "' for type", ppType t])
+    BadPatternArity (Constructor c) ty nexp ngot a ->
+      WL.annotate a $
+      WL.hang
+        2
+        (((text "Invalid pattern for type") <+> text (ppType ty) <+> (text ":")) <$$>
+         (text "Constructor" <+>
+          (WL.squotes (text c)) <+>
+          text
+            (T.unwords
+               [ "expects"
+               , renderIntegral nexp
+               , "arguments, but got"
+               , renderIntegral ngot
+               ])))
+    BadPatternConstructor (Constructor c) ty a ->
+      WL.annotate a $
+      WL.hang
+        2
+        ((text "Invalid pattern for type" <+> text (ppType ty) <+> text ":") <$$>
+         (text "Constructor" <+>
+          (WL.squotes (text c)) <+>
+          text "is not a constructor for type" <+> text (ppType ty)))
     NonExhaustiveCase _e ty a ->
       WL.annotate a $
       text
