@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
   -- * User interface
@@ -36,13 +37,14 @@ import           Projector.Core.Type
 
 data TypeError l a
   = Mismatch (Type l) (Type l) a
-  | CouldNotUnify [Type l]
+  | CouldNotUnify [(Type l, a)] a
   | ExpectedArrow (Type l) (Type l) a
   | FreeVariable Name a
   | FreeTypeVariable TypeName a
-  | BadConstructorName Constructor (Decl l) a
+  | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
-  | BadPattern (Type l) (Pattern a)
+  | BadPatternArity Constructor (Type l) Int Int a
+  | BadPatternConstructor Constructor (Type l) a
   | NonExhaustiveCase (Expr l a) (Type l) a
 
 deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
@@ -117,7 +119,7 @@ typeCheck' tc ctx expr =
       case lookupType tn tc of
         Just ty@(DVariant cs) -> do
           -- Look up constructor name
-          ts <- maybe (typeError (BadConstructorName c ty a)) pure (L.lookup c cs)
+          ts <- maybe (typeError (BadConstructorName c tn ty a)) pure (L.lookup c cs)
           -- Check arity
           unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
           -- Typecheck all bnds against expected
@@ -131,11 +133,15 @@ typeCheck' tc ctx expr =
 
     ECase a e pes -> do
       ty <- typeCheck' tc ctx e
-      let tzs = fmap (uncurry (checkPattern tc ctx ty)) pes
-      unifyList (typeError (NonExhaustiveCase expr ty a)) tzs
+      let tzs = fmap fun pes
+          fun (pat, ex) = fmap (,a) (checkPattern tc ctx ty pat ex)
+      unifyList a (typeError (NonExhaustiveCase expr ty a)) tzs
 
-    EList _ ty es -> do
-      TList <$> unifyList (pure ty) (fmap (typeCheck' tc ctx) es)
+    EList _a ty es -> do
+      _ <- listC . with es $ \e -> do
+        t <- typeCheck' tc ctx e
+        when (t /= ty) (typeError (Mismatch ty t (extractAnnotation e)))
+      pure (TList ty)
 
     EForeign _ _ ty -> do
       pure ty
@@ -172,27 +178,26 @@ checkPattern' tc ctx ty pat =
           case lookupType tn tc of
             Just (DVariant cs) -> do
               -- find the constructor in the type
-              ts <- maybe (typeError (BadPattern ty pat)) pure (L.lookup c cs)
+              ts <- maybe (typeError (BadPatternConstructor c ty a)) pure (L.lookup c cs)
               -- check the lists are the same length
-              unless (length ts == length pats) (typeError (BadPattern ty pat))
+              unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
               -- Check all recursive pats against type list
               foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
             Nothing ->
               typeError (FreeTypeVariable tn a)
         _ ->
-          typeError (BadPattern ty pat)
+          typeError (BadPatternConstructor c ty a)
 
--- TODO figure out sensible error locations here
-unifyList :: Ground l => Check l a (Type l) -> [Check l a (Type l)] -> Check l a (Type l)
-unifyList none es = do
+unifyList :: Ground l => a -> Check l a (Type l) -> [Check l a (Type l, a)] -> Check l a (Type l)
+unifyList a none es = do
   tzs <- listC es
-  case L.nub tzs of
-    x:[] ->
+  case L.nubBy ((==) `on` fst) tzs of
+    (x,_):[] ->
       pure x
     [] ->
       none
     xs ->
-      typeError (CouldNotUnify xs)
+      typeError (CouldNotUnify xs a)
 
 typeError :: TypeError l a -> Check l a b
 typeError =

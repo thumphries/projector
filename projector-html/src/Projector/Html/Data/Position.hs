@@ -7,6 +7,7 @@
 module Projector.Html.Data.Position (
     Position (..)
   , Range (..)
+  , renderRange
   , Positioned (..)
   , extractPositioned
   , (<@@)
@@ -16,6 +17,7 @@ module Projector.Html.Data.Position (
 
 import           Data.Data (Data, Typeable)
 import           Data.Semigroup (Semigroup (..))
+import qualified Data.Text as T
 
 import           GHC.Generics  (Generic)
 
@@ -68,3 +70,17 @@ extractPositioned (a :@ _) =
 (@@>) :: Positioned a -> Positioned b -> Positioned b
 (_ :@ i) @@> (y :@ j) =
   y :@ (i <> j)
+
+renderRange :: Range -> Text
+renderRange (Range (Position l1 c1 file) (Position l2 c2 _)) =
+  mconcat
+    [ T.pack file
+    , ":"
+    , renderIntegral l1
+    , ":"
+    , renderIntegral c1
+    , "-"
+    , renderIntegral l2
+    , ":"
+    , renderIntegral c2
+    ]

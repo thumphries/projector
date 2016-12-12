@@ -4,6 +4,7 @@ module Projector.Html.Parser (
     parse
   , parse'
   , ParseError (..)
+  , renderParseError
   , voidElement
   ) where
 
@@ -34,6 +35,10 @@ newtype ParseError = ParseError {
     unParseError :: (P.ParseError Char ParseErrorComponent)
   } deriving (Eq, Show)
 
+renderParseError :: ParseError -> Text
+renderParseError =
+  T.pack . P.parseErrorPretty . unParseError
+
 parse :: FilePath -> Text -> Either ParseError (Template Range)
 parse =
   parse' template
@@ -57,6 +62,37 @@ instance P.ErrorComponent ParseErrorComponent where
     ParseFail
   representIndentation =
     ParseIndentError
+
+instance P.ShowErrorComponent ParseErrorComponent where
+  showErrorComponent ec =
+    case ec of
+      ParseFail e ->
+        "Internal parser fail:\n  " <> e <>
+        "\n  (consider reporting this as a bug)"
+      ParseIndentError o p1 p2 ->
+        let ror =
+              case o of
+                LT ->
+                  "less than "
+                EQ ->
+                  "equal to "
+                GT ->
+                  "greater than "
+        in mconcat
+             [ "Indentation error:\n  expected "
+             , ror
+             , show (P.unPos p1)
+             , ", got "
+             , show (P.unPos p2)
+             ]
+      TagMismatch (TTag a t1) (TTag b t2) ->
+        mconcat
+          [ "HTML tags are not balanced:\n  Tag '"
+          , T.unpack t1
+          , "' wrongly closed by '"
+          , T.unpack t2 <> "' at "
+          , T.unpack (renderRange (a <> b))
+          ]
 
 failWith :: ParseErrorComponent -> Parser a
 failWith err =
