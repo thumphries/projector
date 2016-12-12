@@ -41,11 +41,11 @@ ppTypeError' err =
       WL.annotate a $
       text
         (mconcat
-           ["Type mismatch! Expected ", ppType t1, ", but found ", ppType t2])
-    CouldNotUnify ts ->
-      text -- need a better annotation here. this is a bad error message
-        ("Type mismatch! Expected these to be equal: " <>
-         T.intercalate ", " (fmap ppType ts))
+           ["Type mismatch! Expected '", ppType t1, "', but found '", ppType t2, "'"])
+    CouldNotUnify ts a ->
+      WL.annotate a . WL.hang 2 $
+      (text "Type mismatch! Expected these types to be equal:" <$$>
+       (WL.vcat (fmap (\(ty, aa) -> WL.annotate aa (text (ppType ty))) ts)))
     ExpectedArrow t1 t2 a ->
       WL.annotate a $
       text

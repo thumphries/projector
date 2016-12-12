@@ -44,7 +44,7 @@ renderCoreError start end err =
 
 renderCoreErrorRange :: CoreError Range -> Text
 renderCoreErrorRange =
-  renderCoreError (\r -> (renderRange r <> ": Type error:\n ")) (const mempty)
+  renderCoreError (\r -> (renderRange r <> ": ")) (const mempty)
 
 templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr a)
 templateToCore t =

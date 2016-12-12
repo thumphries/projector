@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
   -- * User interface
@@ -36,7 +37,7 @@ import           Projector.Core.Type
 
 data TypeError l a
   = Mismatch (Type l) (Type l) a
-  | CouldNotUnify [Type l]
+  | CouldNotUnify [(Type l, a)] a
   | ExpectedArrow (Type l) (Type l) a
   | FreeVariable Name a
   | FreeTypeVariable TypeName a
@@ -132,11 +133,15 @@ typeCheck' tc ctx expr =
 
     ECase a e pes -> do
       ty <- typeCheck' tc ctx e
-      let tzs = fmap (uncurry (checkPattern tc ctx ty)) pes
-      unifyList (typeError (NonExhaustiveCase expr ty a)) tzs
+      let tzs = fmap fun pes
+          fun (pat, ex) = fmap (,a) (checkPattern tc ctx ty pat ex)
+      unifyList a (typeError (NonExhaustiveCase expr ty a)) tzs
 
-    EList _ ty es -> do
-      TList <$> unifyList (pure ty) (fmap (typeCheck' tc ctx) es)
+    EList _a ty es -> do
+      _ <- listC . with es $ \e -> do
+        t <- typeCheck' tc ctx e
+        when (t /= ty) (typeError (Mismatch ty t (extractAnnotation e)))
+      pure (TList ty)
 
     EForeign _ _ ty -> do
       pure ty
@@ -183,17 +188,16 @@ checkPattern' tc ctx ty pat =
         _ ->
           typeError (BadPatternConstructor c ty a)
 
--- TODO figure out sensible error locations here
-unifyList :: Ground l => Check l a (Type l) -> [Check l a (Type l)] -> Check l a (Type l)
-unifyList none es = do
+unifyList :: Ground l => a -> Check l a (Type l) -> [Check l a (Type l, a)] -> Check l a (Type l)
+unifyList a none es = do
   tzs <- listC es
-  case L.nub tzs of
-    x:[] ->
+  case L.nubBy ((==) `on` fst) tzs of
+    (x,_):[] ->
       pure x
     [] ->
       none
     xs ->
-      typeError (CouldNotUnify xs)
+      typeError (CouldNotUnify xs a)
 
 typeError :: TypeError l a -> Check l a b
 typeError =
