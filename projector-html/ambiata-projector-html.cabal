@@ -55,6 +55,21 @@ library
                        Projector.Html.Pretty
 
 
+executable cinema
+  hs-source-dirs:     gen
+  main-is:            ../main/cinema.hs
+  ghc-options:         -Wall -threaded -O2
+
+  build-depends:
+                       base
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , ambiata-x-optparse
+                     , optparse-applicative            == 0.12.*
+                     , text
+
+
 test-suite test
   type:                exitcode-stdio-1.0
 
