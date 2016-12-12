@@ -5,6 +5,8 @@
 module Projector.Html.Backend.Haskell (
     ModuleName (..)
   , renderModule
+  , renderExpr
+  -- * guts
   , genModule
   , genTypeDecs
   , genTypeDec
@@ -50,6 +52,10 @@ renderModule mn@(ModuleName n) m =
        , imports
        , decls
        ])
+
+renderExpr :: Name -> HtmlExpr a -> Text
+renderExpr n =
+  T.pack . TH.pprint . genExpDec n
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =

@@ -3,22 +3,25 @@
 module Projector.Html (
     HtmlError (..)
   , renderHtmlError
-  , thing
-  , interact
+  , parseTemplate
+  , checkTemplate
+  -- * re-exports
+  , Template
+  , Range
+  , HtmlType
+  , HtmlExpr
   ) where
 
 
-import qualified Data.Text.IO as T
-
 import           P
 
-import qualified Projector.Core as Core
 import qualified Projector.Html.Core as HC
 import           Projector.Html.Core  (CoreError(..), HtmlType, HtmlExpr)
 import           Projector.Html.Data.Position  (Range)
+import           Projector.Html.Data.Template  (Template)
 import           Projector.Html.Parser (ParseError (..), renderParseError, parse)
 
-import           System.IO  (FilePath, IO, stderr)
+import           System.IO  (FilePath)
 
 
 data HtmlError
@@ -34,13 +37,10 @@ renderHtmlError he =
     HtmlCoreError e ->
       HC.renderCoreErrorRange e
 
-thing :: FilePath -> Text -> Either HtmlError (HtmlType, HtmlExpr Range)
-thing file t =
-  first HtmlParseError (parse file t) >>= first HtmlCoreError . HC.templateToCore
+parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
+parseTemplate f =
+  first HtmlParseError . parse f
 
--- shunt to repl executable soon
-interact :: FilePath -> Text -> IO ()
-interact file t =
-  ecase (thing file t) (T.hPutStrLn stderr . renderHtmlError) $ \(ty, core) -> do
-    T.putStrLn (Core.ppType ty)
-    T.putStrLn (Core.ppExpr core)
+checkTemplate :: Template Range -> Either HtmlError (HtmlType, HtmlExpr Range)
+checkTemplate =
+  first HtmlCoreError . HC.templateToCore
