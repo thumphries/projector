@@ -81,11 +81,15 @@ readCommand t =
   case T.words t of
     [":load", foo, path] ->
       pure (LoadTemplate foo (T.unpack path))
+    (":let" : foo : xs) ->
+      pure (LetTemplate foo (T.unwords xs))
     [":template", foo] ->
       pure (DumpTemplate foo)
     [":core", foo] ->
       pure (DumpCore foo)
     [":type", foo] ->
+      pure (DumpType foo)
+    [":t", foo] ->
       pure (DumpType foo)
     [":haskell", foo] ->
       pure (DumpHaskell foo)
@@ -100,6 +104,7 @@ readCommand t =
 
 data ReplCommand
   = LoadTemplate Text FilePath
+  | LetTemplate Text Text
   | DumpTemplate Text
   | DumpCore Text
   | DumpType Text
@@ -197,8 +202,12 @@ runReplCommand :: ReplCommand -> Repl ReplResponse
 runReplCommand cmd =
   case cmd of
     LoadTemplate name path -> do
-      (ast, ty, core) <- Repl (lift (firstEitherT ReplError (loadTemplate path)))
+      (ast, ty, core) <- loadTemplate path
       bindM name (TFBind path ast ty core)
+      pure (ReplSuccess (name <> " : " <> Core.ppType ty))
+    LetTemplate name temp -> do
+      (ast, ty, core) <- parseTemplate' "<repl>" temp
+      bindM name (TBind ast ty core)
       pure (ReplSuccess (name <> " : " <> Core.ppType ty))
     DumpTemplate name -> do
       let dump t = pure (ReplSuccess (HP.uglyPrintTemplate t))
@@ -221,12 +230,17 @@ runReplCommand cmd =
     ExitRepl ->
       pure ReplExit
 
-loadTemplate :: FilePath -> EitherT HtmlError IO (Template Range, HtmlType, HtmlExpr Range)
+loadTemplate :: FilePath -> Repl (Template Range, HtmlType, HtmlExpr Range)
 loadTemplate f = do
   t <- liftIO (T.readFile f)
-  ast <- hoistEither (Html.parseTemplate f t)
-  (ty, core) <- hoistEither (Html.checkTemplate ast)
-  pure (ast, ty, core)
+  parseTemplate' f t
+
+parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr Range)
+parseTemplate' f t =
+  Repl . lift . firstEitherT ReplError $ do
+    ast <- hoistEither (Html.parseTemplate f t)
+    (ty, core) <- hoistEither (Html.checkTemplate ast)
+    pure (ast, ty, core)
 
 err :: ReplError -> Repl a
 err =
