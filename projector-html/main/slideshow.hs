@@ -42,7 +42,7 @@ repl bs = do
   T.putStr "slideshow> "
   mline <- getInput bs
   mcase mline (pure ()) $ \line ->
-    mcase (readMaybe (T.unpack line) :: Maybe ReplCommand) (T.hPutStrLn IO.stderr "Unrecognised input" *> repl bs) $ \cmd -> do
+    ecase (readCommand line) (\_ -> T.hPutStrLn IO.stderr "unknown command" *> repl bs) $ \cmd -> do
       eres <- runRepl bs (runReplCommand cmd)
       ecase eres
         (\e -> IO.hPutStrLn IO.stderr (show e) *> repl bs)
@@ -76,6 +76,28 @@ getContents =
              Nothing ->
                Just [s])
 
+readCommand :: Text -> Either ReplError ReplCommand
+readCommand t =
+  case T.words t of
+    [":load", foo, path] ->
+      pure (LoadTemplate foo (T.unpack path))
+    [":template", foo] ->
+      pure (DumpTemplate foo)
+    [":core", foo] ->
+      pure (DumpCore foo)
+    [":type", foo] ->
+      pure (DumpType foo)
+    [":haskell", foo] ->
+      pure (DumpHaskell foo)
+    [":multiline"] ->
+      pure SetMultiline
+    [":nomultiline"] ->
+      pure SetNoMultiline
+    [":exit"] ->
+      pure ExitRepl
+    _ ->
+      Left ReplBadCommand
+
 data ReplCommand
   = LoadTemplate Text FilePath
   | DumpTemplate Text
@@ -91,6 +113,7 @@ data ReplError
   = ReplError HtmlError
   | ReplUnbound Text
   | ReplNotATemplate Text
+  | ReplBadCommand
   deriving (Eq, Show)
 
 data ReplResponse
