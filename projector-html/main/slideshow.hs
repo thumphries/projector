@@ -24,7 +24,6 @@ import qualified Projector.Html.Pretty as HP
 
 import           System.Console.Haskeline as HL
 import           System.IO  (IO, FilePath)
-import qualified System.IO as IO
 
 import           X.Control.Monad.Trans.Either
 
@@ -32,13 +31,10 @@ import           X.Control.Monad.Trans.Either
 
 main :: IO ()
 main = do
-  IO.hSetBuffering IO.stdin IO.LineBuffering --IO.NoBuffering
-  IO.hSetBuffering IO.stdout IO.NoBuffering
-  IO.hSetBuffering IO.stderr IO.LineBuffering
-  repl' defaultReplState
+  repl defaultReplState
 
-repl' :: ReplState -> IO ()
-repl' bs =
+repl :: ReplState -> IO ()
+repl bs =
   HL.runInputT HL.defaultSettings (loop bs)
 
 loop :: ReplState -> HL.InputT IO ()
