@@ -70,6 +70,23 @@ executable cinema
                      , text
 
 
+executable slideshow
+  hs-source-dirs:     gen
+  main-is:            ../main/slideshow.hs
+  ghc-options:         -Wall -threaded -O2
+
+  build-depends:
+                       base
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , ambiata-x-eithert
+                     , containers
+                     , haskeline                       == 0.7.*
+                     , text
+                     , transformers
+
+
 test-suite test
   type:                exitcode-stdio-1.0
 
