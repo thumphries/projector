@@ -82,6 +82,7 @@ executable slideshow
                      , ambiata-projector-html
                      , ambiata-x-eithert
                      , containers
+                     , haskeline                       == 0.7.*
                      , text
                      , transformers
 

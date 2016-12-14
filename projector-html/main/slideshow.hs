@@ -22,9 +22,9 @@ import qualified Projector.Html as Html
 import qualified Projector.Html.Backend.Haskell as Haskell
 import qualified Projector.Html.Pretty as HP
 
+import           System.Console.Haskeline as HL
 import           System.IO  (IO, FilePath)
 import qualified System.IO as IO
-import qualified System.IO.Error as IOError
 
 import           X.Control.Monad.Trans.Either
 
@@ -35,46 +35,51 @@ main = do
   IO.hSetBuffering IO.stdin IO.LineBuffering --IO.NoBuffering
   IO.hSetBuffering IO.stdout IO.NoBuffering
   IO.hSetBuffering IO.stderr IO.LineBuffering
-  repl defaultReplState
+  repl' defaultReplState
 
-repl :: ReplState -> IO ()
-repl bs = do
-  T.putStr "slideshow> "
-  mline <- getInput bs
-  mcase mline (pure ()) $ \line ->
-    ecase (readCommand line) (\_ -> T.hPutStrLn IO.stderr "unknown command" *> repl bs) $ \cmd -> do
-      eres <- runRepl bs (runReplCommand cmd)
-      ecase eres
-        (\e -> IO.hPutStrLn IO.stderr (show e) *> repl bs)
-        (\(resp, bs') ->
-          case resp of
-            ReplSuccess t -> do
-              T.putStrLn t
-              repl bs'
-            ReplVoid -> do
-              repl bs'
-            ReplExit ->
-              pure ())
+repl' :: ReplState -> IO ()
+repl' bs =
+  HL.runInputT HL.defaultSettings (loop bs)
 
-getInput :: ReplState -> IO (Maybe Text)
-getInput (ReplState _ ml) =
-  if ml
-    then getContents
-    else fmap Just T.getLine
+loop :: ReplState -> HL.InputT IO ()
+loop bs = do
+  minput <- getInput bs
+  case minput of
+    Nothing ->
+      pure ()
+    Just line ->
+      ecase (readCommand line) (\_ -> HL.outputStrLn "unknown command" *> loop bs) $ \cmd -> do
+        eres <- lift (runRepl bs (runReplCommand cmd))
+        ecase eres
+          (\e -> HL.outputStrLn (T.unpack (renderReplError e)) *> loop bs)
+          (\(resp, bs') ->
+            case resp of
+              ReplSuccess t -> do
+                HL.outputStrLn (T.unpack t)
+                loop bs'
+              ReplVoid -> do
+                loop bs'
+              ReplExit ->
+                pure ())
 
-getContents :: IO (Maybe Text)
-getContents =
-  fmap (T.pack . L.reverse) <$> go Nothing
+getInput :: ReplState -> HL.InputT IO (Maybe Text)
+getInput bs =
+  let prompt = "slideshow> " in
+  if replMultiline bs
+    then getMultilineInput prompt
+    else fmap (fmap T.pack) (HL.getInputLine prompt)
+
+getMultilineInput :: [Char] -> HL.InputT IO (Maybe Text)
+getMultilineInput prompt = do
+  mfst <- HL.getInputLine prompt
+  maybe (pure Nothing) (go . (:[]))  mfst
   where
-    go ms = do
-      c <- IOError.tryIOError IO.getChar
-      ecase c (const (pure ms)) $ \s ->
-        go
-          (case ms of
-             Just xs ->
-               Just (s : xs)
-             Nothing ->
-               Just [s])
+    go xs = do
+      msnd <- HL.getInputLine " |"
+      maybe (pure (Just (unesc (T.pack (L.unlines (L.reverse xs)))))) (go . (:xs)) msnd
+    -- fold up escaped newlines
+    unesc = T.replace "\\\n" ""
+
 
 readCommand :: Text -> Either ReplError ReplCommand
 readCommand t =
@@ -120,6 +125,18 @@ data ReplError
   | ReplNotATemplate Text
   | ReplBadCommand
   deriving (Eq, Show)
+
+renderReplError :: ReplError -> Text
+renderReplError re =
+  case re of
+    ReplError h ->
+      renderHtmlError h
+    ReplUnbound v ->
+      "'" <> v <> "' is not bound"
+    ReplNotATemplate b ->
+      "'" <> b <> "' is a repl expression, there is no template to render!"
+    ReplBadCommand ->
+      "unknown command"
 
 data ReplResponse
   = ReplSuccess Text
