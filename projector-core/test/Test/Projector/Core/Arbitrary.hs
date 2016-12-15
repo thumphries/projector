@@ -238,16 +238,16 @@ plookup ctx want =
 pinsert :: (Ground l, Ord l) => TypeDecls l -> Context l -> Name -> Type l -> Context l
 pinsert ctx (Context ns p) n t =
   Context ns . mcons t (n, t) $ case t of
-    TLit _ ->
+    Type (TLitF _) ->
       p
 
-    TArrow _ to ->
+    Type (TArrowF _ to) ->
       mcons to (n, t) p
 
-    TList _ ->
+    Type (TListF _) ->
       p
 
-    TVar x ->
+    Type (TVarF x) ->
       maybe p (declPaths n t p) (lookupType x ctx)
 
 declPaths :: Ord l => Name -> Type l -> Paths l -> Decl l -> Paths l
@@ -293,12 +293,12 @@ genWellTypedExpr' ::
   -> Jack (Expr l ())
 genWellTypedExpr' n ty ctx names genty genval =
   let gen = case ty of
-        TLit l ->
+        Type (TLitF l) ->
           if n <= 1
             then lit <$> genval l
             else genWellTypedApp n ty ctx names genty genval
 
-        TVar x ->
+        Type (TVarF x) ->
           -- Look it up in ctx
           case lookupType x ctx of
             Just (DVariant cts) -> do
@@ -308,10 +308,10 @@ genWellTypedExpr' n ty ctx names genty genval =
             Nothing ->
               fail "free type variable!"
 
-        TArrow t1 t2 ->
+        Type (TArrowF t1 t2) ->
           genWellTypedLam n t1 t2 ctx names genty genval
 
-        TList lty -> do
+        Type (TListF lty) -> do
           k <- chooseInt (0, n)
           list lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
 
@@ -348,19 +348,19 @@ genWellTypedPath ctx names more want x have =
   if want == have
     then pure (var x) -- straightforward lookup
     else case have of
-      TArrow from _ -> do
+      Type (TArrowF from _) -> do
         arg <- more names from
         pure (app (var x) arg)
 
-      TLit _ ->
+      Type (TLitF _) ->
         -- impossible
         pure (var x)
 
-      TList _ ->
+      Type (TListF _) ->
         -- impossible
         pure (var x)
 
-      TVar n ->
+      Type (TVarF n) ->
         -- look up in ctx, run with that
         case lookupType n ctx of
           Just (DVariant cts) ->

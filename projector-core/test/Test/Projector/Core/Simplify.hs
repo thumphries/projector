@@ -12,7 +12,7 @@ import           P
 
 import           Projector.Core.Simplify (alphaNf, alpha, nf, whnf)
 import           Projector.Core.Syntax (Expr (..), lam_, var_, app)
-import           Projector.Core.Type (Type(..))
+import           Projector.Core.Type
 
 import           Test.Projector.Core.Arbitrary
 

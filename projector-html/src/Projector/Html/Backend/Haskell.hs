@@ -109,18 +109,18 @@ genCon (Constructor n) ts =
 
 -- | Types.
 genType :: HtmlType -> TH.Type
-genType ty =
+genType (Type ty) =
   case ty of
-    TLit l ->
+    TLitF l ->
       conT (mkName_ (ppGroundType l))
 
-    TVar (TypeName n) ->
+    TVarF (TypeName n) ->
       conT (mkName_ n)
 
-    TArrow t1 t2 ->
+    TArrowF t1 t2 ->
       arrowT_ (genType t1) (genType t2)
 
-    TList t ->
+    TListF t ->
       listT_ (genType t)
 
 -- | Expressions.

@@ -86,16 +86,16 @@ genCon (Constructor c) ts =
 genType :: HtmlType -> Doc a
 genType ty =
   case ty of
-    TLit l ->
+    Type (TLitF l) ->
       text (ppGroundType l)
 
-    TVar (TypeName n) ->
+    Type (TVarF (TypeName n)) ->
       text n
 
-    TArrow t1 t2 ->
+    Type (TArrowF t1 t2) ->
       WL.parens (genType t1 <+> text "->" <+> genType t2)
 
-    TList t ->
+    Type (TListF t)->
       WL.parens (text "Array" <+> genType t)
 
 genTypeSig :: Name -> HtmlType -> Doc a
