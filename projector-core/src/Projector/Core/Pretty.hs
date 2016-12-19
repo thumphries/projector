@@ -209,13 +209,13 @@ ppExpr' types e =
       WL.annotate a $ WL.parens (text n WL.<> text "#" WL.<> text (typeMay ty))
   where typeMay t = if types then " : " <> ppType t else T.empty
 
-ppPattern :: Pattern a -> Text
+ppPattern :: Pattern -> Text
 ppPattern p =
   case p of
-    PVar _ (Name n) ->
+    PVar (Name n) ->
       n
 
-    PCon _ (Constructor c) ps ->
+    PCon (Constructor c) ps ->
       c <> " " <> T.unwords (fmap (parenMay . ppPattern) ps)
 
 hasSpace :: Text -> Bool

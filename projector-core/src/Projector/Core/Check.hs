@@ -9,6 +9,7 @@
 module Projector.Core.Check (
   -- * User interface
     typeCheck
+  , typeTree
   , TypeError (..)
   -- * Guts
   , Check (..)
@@ -52,12 +53,16 @@ deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
 deriving instance (Ord l, Ord (Value l), Ord a) => Ord (TypeError l a)
 
 
-typeCheck ::
+typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
+typeCheck decls =
+  fmap extractType . typeTree decls
+
+typeTree ::
      Ground l
   => TypeDecls l
   -> Expr l a
-  -> Either [TypeError l a] (Type l)
-typeCheck c =
+  -> Either [TypeError l a] (Expr l (Type l, a))
+typeTree c =
   first D.toList . unCheck . typeCheck' c mempty
 
 
@@ -90,30 +95,34 @@ typeCheck' ::
   => TypeDecls l
   -> Ctx l
   -> Expr l a
-  -> Check l a (Type l)
+  -> Check l a (Expr l (Type l, a))
 typeCheck' tc ctx expr =
   case expr of
-    ELit _ v ->
-      pure (TLit (typeOf v))
+    ELit a v ->
+      pure (ELit (TLit (typeOf v), a) v)
 
     EVar a n ->
       case clookup n ctx of
         Just t ->
-          pure t
+          pure (EVar (t, a) n)
         Nothing ->
           typeError (FreeVariable n a)
 
-    ELam _ n ta e -> do
-      tb <- typeCheck' tc (cextend n ta ctx) e
-      pure (TArrow ta tb)
+    ELam a n ta e -> do
+      e' <- typeCheck' tc (cextend n ta ctx) e
+      let tb = extractType e'
+      pure (ELam (TArrow ta tb, a) n ta e')
 
-    EApp _ f g -> do
-      typs <- checkPair tc ctx f g
-      case typs of
-        (TArrow c d, e) ->
-          if c == e then pure d else typeError (Mismatch c e (extractAnnotation g))
-        (c, d) ->
-          typeError (ExpectedArrow d c (extractAnnotation f))
+    EApp a f g -> do
+      (f', g') <- checkPair tc ctx f g
+      let tf = extractType f'
+          tg = extractType g'
+      ty <- case tf of
+        TArrow c d ->
+          if c == tg then pure d else typeError (Mismatch c tg (extractAnnotation g))
+        c ->
+          typeError (ExpectedArrow tg c (extractAnnotation f))
+      pure (EApp (ty, a) f' g')
 
     ECon a c tn es ->
       case lookupType tn tc of
@@ -123,28 +132,33 @@ typeCheck' tc ctx expr =
           -- Check arity
           unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
           -- Typecheck all bnds against expected
-          _ <- listC . with (L.zip ts es) $ \(t1, e) -> do
-            t2 <- typeCheck' tc ctx e
+          es' <- listC . with (L.zip ts es) $ \(t1, e) -> do
+            e' <- typeCheck' tc ctx e
+            let t2 = extractType e'
             unless (t1 == t2) (typeError (Mismatch t1 t2 (extractAnnotation e)))
-          pure (TVar tn)
+            pure e'
+          pure (ECon (TVar tn, a) c tn es')
 
         Nothing ->
           typeError (FreeTypeVariable tn a)
 
     ECase a e pes -> do
-      ty <- typeCheck' tc ctx e
-      let tzs = fmap fun pes
-          fun (pat, ex) = fmap (,a) (checkPattern tc ctx ty pat ex)
-      unifyList a (typeError (NonExhaustiveCase expr ty a)) tzs
+      e' <- typeCheck' tc ctx e
+      let te = extractType e'
+      pes' <- listC (fmap (uncurry (checkPattern tc ctx te)) pes)
+      tb <- unifyList a (typeError (NonExhaustiveCase expr te a)) (fmap (extractAnnotation . snd) pes')
+      pure (ECase (tb, a) e' pes')
 
-    EList _a ty es -> do
-      _ <- listC . with es $ \e -> do
-        t <- typeCheck' tc ctx e
+    EList a ty es -> do
+      es' <- listC . with es $ \e -> do
+        e' <- typeCheck' tc ctx e
+        let t = extractType e'
         when (t /= ty) (typeError (Mismatch ty t (extractAnnotation e)))
-      pure (TList ty)
+        pure e'
+      pure (EList (TList ty, a) ty es')
 
-    EForeign _ _ ty -> do
-      pure ty
+    EForeign a n ty -> do
+      pure (EForeign (ty, a) n ty)
 
 -- | Check a pattern fits the type it is supposed to match,
 -- then check its associated branch (if the pattern makes sense)
@@ -153,26 +167,29 @@ checkPattern ::
   => TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern a
+  -> Pattern
   -> Expr l a
-  -> Check l a (Type l)
+  -> Check l a (Pattern, Expr l (Type l, a))
 checkPattern tc ctx ty pat expr = do
-  ctx' <- checkPattern' tc ctx ty pat
-  typeCheck' tc ctx' expr
+  let a = extractAnnotation expr
+  ctx' <- checkPattern' a tc ctx ty pat
+  expr' <- typeCheck' tc ctx' expr
+  pure (pat, expr')
 
 checkPattern' ::
      Ground l
-  => TypeDecls l
+  => a
+  -> TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern a
+  -> Pattern
   -> Check l a (Ctx l)
-checkPattern' tc ctx ty pat =
+checkPattern' a tc ctx ty pat =
   case pat of
-    PVar _ x ->
+    PVar x ->
       pure (cextend x ty ctx)
 
-    PCon a c pats ->
+    PCon c pats ->
       case ty of
         TVar tn ->
           case lookupType tn tc of
@@ -182,22 +199,25 @@ checkPattern' tc ctx ty pat =
               -- check the lists are the same length
               unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
               -- Check all recursive pats against type list
-              foldM (\ctx' (t', p') -> checkPattern' tc ctx' t' p') ctx (L.zip ts pats)
+              foldM (\ctx' (t', p') -> checkPattern' a tc ctx' t' p') ctx (L.zip ts pats)
             Nothing ->
               typeError (FreeTypeVariable tn a)
         _ ->
           typeError (BadPatternConstructor c ty a)
 
-unifyList :: Ground l => a -> Check l a (Type l) -> [Check l a (Type l, a)] -> Check l a (Type l)
+unifyList :: Ground l => a -> Check l a (Type l) -> [(Type l, a)] -> Check l a (Type l)
 unifyList a none es = do
-  tzs <- listC es
-  case L.nubBy ((==) `on` fst) tzs of
-    (x,_):[] ->
+  case L.nubBy ((==) `on` fst) es of
+    (x, _):[] ->
       pure x
     [] ->
       none
     xs ->
       typeError (CouldNotUnify xs a)
+
+extractType :: Expr l (Type l, a) -> Type l
+extractType =
+  fst . extractAnnotation
 
 typeError :: TypeError l a -> Check l a b
 typeError =
@@ -210,7 +230,7 @@ checkPair ::
   -> Ctx l
   -> Expr l a
   -> Expr l a
-  -> Check l a (Type l, Type l)
+  -> Check l a (Expr l (Type l, a), Expr l (Type l, a))
 checkPair tc ctx =
   pairC `on` (typeCheck' tc ctx)
 

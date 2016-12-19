@@ -149,14 +149,14 @@ nf' ctx expr =
     expr
 
 -- | Pattern matching. Returns 'Nothing' if no match is possible.
-match :: Map Name (Expr l a) -> Pattern a -> Expr l a -> Maybe (Map Name (Expr l a))
+match :: Map Name (Expr l a) -> Pattern -> Expr l a -> Maybe (Map Name (Expr l a))
 match ctx pat expr =
   case (pat, expr) of
-    (PVar _ n, e) ->
+    (PVar n, e) ->
       -- Variable patterns always succeed.
       pure (M.insert n e ctx)
 
-    (PCon _ c1 ps, ECon _ c2 _ es) ->
+    (PCon c1 ps, ECon _ c2 _ es) ->
       -- Constructor names and arity have to match.
       if (c1 == c2) && (length ps == length es)
         then foldM (\ctx' (p, e) -> match ctx' p e) ctx (L.zip ps es)
@@ -220,16 +220,16 @@ alpha' rebinds rename expr =
     EForeign _ _ _ ->
       pure expr
 
-alphaPat' :: Map Name Name -> (Name -> Name) -> Pattern a -> State (Map Name Int) (Pattern a, Map Name Name)
+alphaPat' :: Map Name Name -> (Name -> Name) -> Pattern -> State (Map Name Int) (Pattern, Map Name Name)
 alphaPat' rebinds rename p =
   case p of
-    PVar a x -> do
+    PVar x -> do
       new <- freshen (rename x)
-      pure (PVar a new, M.insert x new rebinds)
+      pure (PVar new, M.insert x new rebinds)
 
-    PCon a c pats -> do
+    PCon c pats -> do
       (pats', rebinds') <- foldM (accum rename) ([], rebinds) pats
-      pure (PCon a c (L.reverse pats'), rebinds')
+      pure (PCon c (L.reverse pats'), rebinds')
 
   where
     accum rename' (acc, rebinds') p2 = do
