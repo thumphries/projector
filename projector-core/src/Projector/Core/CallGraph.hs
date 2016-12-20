@@ -37,8 +37,6 @@ buildCallGraph =
 
 -- | Report an error if the call graph does not form a DAG.
 -- This does not return an error for free variables or reflexive edges.
---
--- TODO might be nice to return the forest here, if/when we have a use for it.
 detectCycles :: CallGraph -> Either CycleError ()
 detectCycles cg =
   let (g, lv, _) =
@@ -71,8 +69,8 @@ ppCycle cycle =
       mconcat (
           "A cycle was detected in the call graph:\n"
         : "  Function " <> renderName x <> "\n"
-        : with xs (\y -> "     calls " <> renderName y <> "\n")
-        <> ["     calls " <> renderName x <> ", forming a cycle."]
+        : with xs (\y -> "   reaches " <> renderName y <> "\n")
+        <> ["   reaches " <> renderName x <> ", forming a cycle."]
         )
   where
     renderName (Name z) = "'" <> z <> "'"
