@@ -26,13 +26,19 @@ module Projector.Core.Syntax (
   , list
   , foreign_
   , foreign_'
-  -- * pattern constructors
+  -- ** pattern constructors
   , pvar
   , pvar_
   , pcon
   , pcon_
+  -- * AST traversals
+  , foldFree
+  , gatherFree
   ) where
 
+
+import           Data.Set (Set)
+import qualified Data.Set as S
 
 import           P
 
@@ -155,3 +161,45 @@ pcon =
 pcon_ :: Text -> [Pattern] -> Pattern
 pcon_ =
   pcon . Constructor
+
+-- | Strict fold over free variables, including foreign definitions.
+foldFree :: (b -> Name -> b) -> b -> Expr l a -> b
+foldFree f acc expr =
+  go f expr mempty acc
+  where
+    go f' expr' bound acc' =
+      case expr' of
+        ELit _ _ ->
+          acc'
+
+        EVar _ x ->
+          if (S.member x bound) then acc' else f' acc' $! x
+
+        ELam _ n _ body ->
+          go f' body (S.insert n $! bound) acc'
+
+        EApp _ a b ->
+          go f' b bound $! go f' a bound acc'
+
+        ECon _ _ _ es ->
+          foldl' (\a e -> go f' e bound a) acc' es
+
+        ECase _ e pes ->
+          let patBinds bnd pat =
+                case pat of
+                  PVar x ->
+                    S.insert x $! bnd
+                  PCon _ pats ->
+                    foldl' patBinds bnd pats
+          in foldl' (\a (p, ee) -> go f' ee (patBinds bound p) a) (go f' e bound acc') $! pes
+
+        EList _ _ es ->
+          foldl' (\a e -> go f' e bound a) acc' es
+
+        EForeign _ x _ ->
+          if (S.member x bound) then acc' else f' acc' $! x
+
+-- | Gather all free variables in an expression.
+gatherFree :: Expr l a -> Set Name
+gatherFree =
+  foldFree (flip S.insert) mempty
