@@ -31,6 +31,7 @@ library
                        Paths_ambiata_projector_core
 
                        Projector.Core
+                       Projector.Core.CallGraph
                        Projector.Core.Check
                        Projector.Core.Pretty
                        Projector.Core.Simplify
