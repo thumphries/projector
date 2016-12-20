@@ -32,10 +32,33 @@ prop_no_cycles =
     detectCycles (buildCallGraph me) === pure ()
 
 genCyclicExprs :: Jack (Map Name (Expr TestLitT ()))
-genCyclicExprs = sized $ \n -> do
-  k <- chooseInt (2, n + 2)
-  names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
-  pure $ case names of
+genCyclicExprs =
+  sized $ \n -> do
+    k <- chooseInt (2, n + 2)
+    names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
+    -- take partitions of at least two
+    sets <- partition 2 names
+    pure (fold (fmap genCycle sets))
+
+genAcyclicExprs :: Jack (Map Name (Expr TestLitT ()))
+genAcyclicExprs =
+  sized $ \n -> do
+    k <- chooseInt (0, n)
+    names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
+    sets <- partition 1 names
+    pure (fold (fmap genAcycle sets))
+
+partition :: Int -> [a] -> Jack [[a]]
+partition _ [] = pure []
+partition i xs =
+  sized $ \n -> do
+    k <- chooseInt (i, n+i)
+    let (y, ys) = L.splitAt k xs
+    fmap (y:) (partition i ys)
+
+genCycle :: [Name] -> Map Name (Expr TestLitT ())
+genCycle names = do
+  case names of
     (x:y:xs) ->
       M.fromList ((x, var y) : genem x y xs)
     _ ->
@@ -45,22 +68,19 @@ genCyclicExprs = sized $ \n -> do
     genem x y (z:zs) =
       (y, var z) : genem x z zs
 
-
-genAcyclicExprs :: Jack (Map Name (Expr TestLitT ()))
-genAcyclicExprs =
-  sized $ \n -> do
-    k <- chooseInt (0, n)
-    names <- L.nub <$> vectorOf k genName
-    pure $ case names of
-      [] ->
-        mempty
-      (x:xs) ->
-        M.fromList (genem x xs)
+genAcycle :: [Name] -> Map Name (Expr TestLitT ())
+genAcycle names =
+  case names of
+    [] ->
+      mempty
+    (x:xs) ->
+      M.fromList (genem x xs)
   where
     genem _ [] =
       []
     genem x (y:ys) =
       (y, var x) : genem y ys
+
 
 genName :: Jack Name
 genName =
