@@ -6,6 +6,7 @@ module Projector.Core.CallGraph (
   , buildCallGraph
   , detectCycles
   , CycleError (..)
+  , renderCycleError
   ) where
 
 
@@ -14,7 +15,8 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Set (Set)
 import qualified Data.Set as S
-import qualified Data.Tree as T
+import qualified Data.Text as T
+import qualified Data.Tree as Tree
 
 import           P
 
@@ -35,6 +37,8 @@ buildCallGraph =
 
 -- | Report an error if the call graph does not form a DAG.
 -- This does not return an error for free variables or reflexive edges.
+--
+-- TODO might be nice to return the forest here, if/when we have a use for it.
 detectCycles :: CallGraph -> Either CycleError ()
 detectCycles cg =
   let (g, lv, _) =
@@ -43,12 +47,32 @@ detectCycles cg =
         . M.toList
         $ unCallGraph cg
       sccs = G.scc g
-      -- for each cycle, take the first, simplest path for error reporting.
-      path n = T.rootLabel n : case T.subForest n of [] -> []; (x:_) -> path x
+      -- for each cycle, take a representative path for error reporting.
+      path n = Tree.rootLabel n : case Tree.subForest n of [] -> []; (x:_) -> path x
       labelled = fmap ((\(a, _, _) -> a) . lv)
-  in case filter (not . null . T.subForest) sccs of
+  in case filter (not . null . Tree.subForest) sccs of
        [] ->
          pure ()
        xs ->
-         trace (show sccs) $
          Left (CycleError (fmap (labelled . path) xs))
+
+renderCycleError :: CycleError -> Text
+renderCycleError ce =
+  case ce of
+    CycleError cycles ->
+      T.intercalate "\n\n" (fmap ppCycle cycles)
+
+ppCycle :: [Name] -> Text
+ppCycle cycle =
+  case cycle of
+    [] ->
+      mempty
+    (x:xs) ->
+      mconcat (
+          "A cycle was detected in the call graph:\n"
+        : "  Function " <> renderName x <> "\n"
+        : with xs (\y -> "     calls " <> renderName y <> "\n")
+        <> ["     calls " <> renderName x <> ", forming a cycle."]
+        )
+  where
+    renderName (Name z) = "'" <> z <> "'"
