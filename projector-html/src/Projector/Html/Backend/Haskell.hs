@@ -3,8 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 module Projector.Html.Backend.Haskell (
-    ModuleName (..)
-  , renderModule
+    renderModule
   , renderExpr
   -- * guts
   , genModule
