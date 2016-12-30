@@ -19,6 +19,7 @@
   "license": "AllRightsReserved",
   "devDependencies": {
     "bower": "^1.7.9",
-    "pulp": "^9.0.1"
+    "pulp": "^9.0.1",
+    "purescript-psa": "^0.4.0"
   }
 }
