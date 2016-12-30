@@ -42,6 +42,7 @@ library
                        Projector.Html.Core.Library
                        Projector.Html.Core.Prim
 
+                       Projector.Html.Backend
                        Projector.Html.Backend.Data
                        Projector.Html.Backend.Haskell
                        Projector.Html.Backend.Haskell.TH
