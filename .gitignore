@@ -12,3 +12,6 @@ cabal.sandbox.config
 gen
 *.aux
 *.pdf
+output
+bower_components
+node_modules

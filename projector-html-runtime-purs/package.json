@@ -1,0 +1,24 @@
+{
+  "name": "purescript-projector-html-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Runtime for projector-html",
+  "repository": "https://github.com/ambiata/projector",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "pulp test -- --censor-lib",
+    "build": "pulp build -- --censor-lib",
+    "build:watch": "pulp -w build -- --censor-lib",
+    "test:watch": "pulp -w test -- --censor-lib",
+    "psci": "pulp psci",
+    "postinstall": "bower install"
+  },
+  "author": "Ambiata <info@ambiata.com>",
+  "license": "AllRightsReserved",
+  "devDependencies": {
+    "bower": "^1.7.9",
+    "pulp": "^9.0.1"
+  }
+}
