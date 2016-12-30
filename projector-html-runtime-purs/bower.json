@@ -7,7 +7,7 @@
     "output"
   ],
   "dependencies": {
-    "purescript-p": "ambiata/p.purs#0179678a83d5289863bdb04a81d032e7858640f7",
+    "purescript-p": "git@github.com:ambiata/p.purs#0179678a83d5289863bdb04a81d032e7858640f7",
     "purescript-arrays": "^1.0.0",
     "purescript-control": "^1.0.0",
     "purescript-enums": "^1.1.0",
