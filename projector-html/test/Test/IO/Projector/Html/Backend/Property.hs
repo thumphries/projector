@@ -38,7 +38,7 @@ processProp f (code, out, err) =
 
 fileProp :: FilePath -> Text -> (FilePath -> IO a) -> (a -> Property) -> Property
 fileProp mname modl f g =
-  testIO . withTempDirectory "./dist/" "gen-hs-XXXXXX" $ \tmpDir -> do
+  testIO . withTempDirectory "./dist/" "gen-XXXXXX" $ \tmpDir -> do
     let path = tmpDir </> mname <.> "hs"
         dir = takeDirectory path
     createDirectoryIfMissing True dir
