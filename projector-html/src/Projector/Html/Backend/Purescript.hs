@@ -72,12 +72,16 @@ genTypeDec :: TypeName -> HtmlDecl -> Doc a
 genTypeDec (TypeName n) ty =
   case ty of
     DVariant cts ->
-      WL.hang 2 (text "data" <+> text n <$$> text "="
-        <+> (WL.hcat (WL.punctuate (text "|") (fmap (uncurry genCon) cts))))
+      WL.hang 2
+        (text "data" <+> text n <$$> text "="
+          WL.<> (foldl'
+                  (<+>)
+                  WL.empty
+                  (WL.punctuate (WL.linebreak WL.<> text "|") (fmap (uncurry genCon) cts))))
 
 genCon :: Constructor -> [HtmlType] -> Doc a
 genCon (Constructor c) ts =
-  WL.hang 2 (text c <+> WL.hcat (fmap genType ts))
+  WL.hang 2 (text c WL.<> foldl' (<+>) WL.empty (fmap genType ts))
 
 genType :: HtmlType -> Doc a
 genType ty =
@@ -100,7 +104,7 @@ genTypeSig (Name n) ty =
 
 genExpDec :: Name -> HtmlExpr a -> Doc a
 genExpDec (Name n) expr =
-  text n <+> text "=" <+> genExp expr
+  WL.hang 2 (text n <+> text "=" <$$> genExp expr)
 
 genExp :: HtmlExpr a -> Doc a
 genExp expr =
@@ -112,7 +116,7 @@ genExp expr =
       WL.annotate a (text x)
 
     ELam a (Name n) _ body ->
-      WL.annotate a (WL.hang 2 (text ("\\" <> n <> " -> ") <$$> genExp body))
+      WL.annotate a (WL.hang 2 (WL.parens (text ("\\" <> n <> " -> ") <$$> genExp body)))
 
     EApp a fun arg ->
       WL.annotate a (WL.hang 2 (WL.parens (genExp fun </> genExp arg)))
@@ -123,10 +127,11 @@ genExp expr =
     ECase a f bs ->
       WL.annotate a
        (WL.hang 2
-             (text "case" <+> genExp f <+> text "of")
-         </> (foldr (\(p, g) doc -> WL.hang 2 (genMatch p g) </> (doc WL.<> text ";"))
-                    WL.empty
-                    bs))
+         (WL.parens
+                ((text "case" <+> genExp f <+> text "of")
+           <$$> (foldr (\(p, g) doc -> WL.hang 2 (genMatch p g) <$$> doc)
+                      WL.empty
+                      bs))))
 
     EList a _ es ->
       WL.annotate a (WL.hang 2 (WL.list (fmap genExp es)))
@@ -136,7 +141,7 @@ genExp expr =
 
 genMatch :: Pattern -> HtmlExpr a -> Doc a
 genMatch p e =
-  WL.hang 2 ((genPat p WL.<> text " ->") <+> genExp e)
+  WL.hang 2 ((genPat p WL.<> text " ->") <$$> genExp e)
 
 genPat :: Pattern -> Doc a
 genPat p =

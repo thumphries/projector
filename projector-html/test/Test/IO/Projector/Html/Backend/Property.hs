@@ -12,6 +12,10 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core
+import qualified Projector.Html.Core.Prim as Prim
+import qualified Projector.Html.Core.Library as Lib
+
 import           System.Directory (createDirectoryIfMissing)
 import           System.Exit (ExitCode(..))
 import           System.FilePath.Posix ((</>), (<.>), takeDirectory)
@@ -39,4 +43,16 @@ fileProp mname modl f g =
         dir = takeDirectory path
     createDirectoryIfMissing True dir
     T.writeFile path modl
+    T.writeFile "/tmp/out" modl
     fmap g (f path)
+
+
+helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
+helloWorld =
+  ( Name "helloWorld"
+  , ( Lib.tHtml
+    , con (Constructor "Html") Lib.nHtml [
+        list Lib.tHtmlNode [
+            con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello, world!")]
+          ]
+      ]))

@@ -21,7 +21,7 @@ import           Projector.Html.Backend.Haskell
 
 import           System.Process (readProcessWithExitCode)
 
-import           Test.IO.Projector.Html.Backend.Property  (processProp, fileProp)
+import           Test.IO.Projector.Html.Backend.Property  (processProp, fileProp, helloWorld)
 import           Test.Projector.Core.Arbitrary (freshNames)
 import           Test.Projector.Html.Arbitrary
 
@@ -66,16 +66,6 @@ prop_hello_world =
               helloWorld
             ]
         }
-
-helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
-helloWorld =
-  ( Name "helloWorld"
-  , ( Lib.tHtml
-    , con (Constructor "Html") Lib.nHtml [
-        list Lib.tHtmlNode [
-            con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello, world!")]
-          ]
-      ]))
 
 prop_welltyped :: Property
 prop_welltyped =
