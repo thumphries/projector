@@ -128,10 +128,10 @@ ppTypeInfo ctx =
 ppType' :: Ground l => TypeDecls l -> Bool -> Type l -> Text
 ppType' ctx verbose t =
   case t of
-    TLit g ->
+    Type (TLitF g) ->
       ppGroundType g
 
-    TVar tn@(TypeName ty) ->
+    Type (TVarF tn@(TypeName ty)) ->
       let mty = lookupType tn ctx
       in ty <> case (verbose, mty) of
            (True, Just (DVariant cts)) ->
@@ -141,10 +141,10 @@ ppType' ctx verbose t =
            (_, Nothing) ->
              T.empty
 
-    TArrow a b ->
+    Type (TArrowF a b) ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
 
-    TList ty ->
+    Type (TListF ty) ->
       "[" <> ppType ty <> "]"
 
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
