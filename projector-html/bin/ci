@@ -1,0 +1,13 @@
+#!/bin/sh -exu
+
+# We need purescript and npm on the path, but otherwise this is a
+# normal haskell build.
+
+if command -v purescript-path >/dev/null 2>&1; then
+    PURESCRIPT_PATH=$(purescript-path)
+    export PATH=$PURESCRIPT_PATH:$PATH
+else
+    echo "Warning: purescript-path not available, defaulting to psc on path." >&2
+fi
+
+master build haskell
