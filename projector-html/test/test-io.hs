@@ -4,8 +4,8 @@ import qualified Test.IO.Projector.Html.Backend.Haskell as Haskell
 import qualified Test.IO.Projector.Html.Backend.Purescript as Purescript
 
 main :: IO ()
-main =
+main = do
   disorderMain [
-      Haskell.tests
-    , Purescript.tests
+      Purescript.tests
+    , Haskell.tests
     ]

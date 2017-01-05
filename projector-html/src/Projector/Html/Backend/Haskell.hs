@@ -76,7 +76,7 @@ genModule (Module ts _ es) =
 
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
-  T.unpack (T.replace "." "/" n)
+  T.unpack (T.replace "." "/" n) <> ".hs"
 
 -- -----------------------------------------------------------------------------
 
