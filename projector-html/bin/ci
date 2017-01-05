@@ -10,4 +10,6 @@ else
     echo "Warning: purescript-path not available, defaulting to psc on path." >&2
 fi
 
+# TODO add npm-path once it's a thing
+
 master build haskell
