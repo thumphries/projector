@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -7,39 +10,33 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
-  -- * User interface
     typeCheck
   , typeTree
-  , TypeError (..)
-  -- * Guts
-  , Check (..)
-  , typeError
-  , typeCheck'
-  , checkPair
-  , listC
-  , pairC
-  , apC
-  -- * Reusable stuff
-  , apE
   ) where
 
 
+import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
+import qualified Control.Monad.Trans.Reader as R
+import           Control.Monad.Trans.State.Strict (State, evalState, gets, modify')
+
 import           Data.DList (DList)
 import qualified Data.DList as D
-import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 
 import           P
 
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
+import           X.Control.Monad.Trans.Either
+
 
 data TypeError l a
   = Mismatch (Type l) (Type l) a
-  | CouldNotUnify [(Type l, a)] a
-  | ExpectedArrow (Type l) (Type l) a
   | FreeVariable Name a
   | FreeTypeVariable TypeName a
   | BadConstructorName Constructor TypeName (Decl l) a
@@ -47,6 +44,7 @@ data TypeError l a
   | BadPatternArity Constructor (Type l) Int Int a
   | BadPatternConstructor Constructor (Type l) a
   | NonExhaustiveCase (Expr l a) (Type l) a
+  | InferenceError a
 
 deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
 deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
@@ -62,211 +60,152 @@ typeTree ::
   => TypeDecls l
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
-typeTree c =
-  first D.toList . unCheck . typeCheck' c mempty
-
+typeTree =
+  undefined
 
 -- -----------------------------------------------------------------------------
+-- Types
 
+-- | 'IType l a' is a fixpoint of 'IVar a (TypeF l)'.
+--
+-- i.e. regular types, recursively extended with annotations and an
+-- extra constructor, 'IDunno', representing fresh type/unification variables.
+newtype IType l a = I (IVar a (TypeF l (IType l a)))
+  deriving (Eq, Ord, Show)
+
+-- | 'IVar' is an open functor equivalent to an annotated 'Either Int'.
+data IVar ann a
+  = IDunno ann Int
+  | IAm ann a
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+-- | Lift a known type into an 'IType', with an annotation.
+hoistType :: a -> Type l -> IType l a
+hoistType a (Type ty) =
+  I (IAm a (fmap (hoistType a) ty))
+
+-- | Assert that we have a monotype. Returns 'InferenceError' if we
+-- encounter a unification variable.
+lowerIType :: IType l a -> Either (TypeError l a) (Type l)
+lowerIType (I v) =
+  case v of
+    IDunno a _ ->
+      Left (InferenceError a)
+    IAm _ ty ->
+      fmap Type (traverse lowerIType ty)
+
+-- -----------------------------------------------------------------------------
+-- Monad stack
+
+-- | 'Check' permits multiple errors via 'EitherT', lexically-scoped
+-- state via 'ReaderT', and global accumulating state via 'State'.
 newtype Check l a b = Check {
-    unCheck :: Either (DList (TypeError l a)) b
+    unCheck :: EitherT (DList (TypeError l a)) (ReaderT (Env l a) (State (SolverState l a))) b
   } deriving (Functor, Applicative, Monad)
 
--- typing context
-newtype Ctx l = Ctx { unCtx :: Map Name (Type l) }
+runCheck :: Check l a b -> Either [TypeError l a] b
+runCheck f =
+    unCheck f
+  & runEitherT
+  & flip runReaderT mempty
+  & flip evalState initialSolverState
+  & first D.toList
 
-instance Monoid (Ctx l) where
-  mempty = Ctx mempty
-  mappend (Ctx a) (Ctx b) = Ctx (mappend a b)
+local :: (Env l a -> Env l a) -> Check l a b -> Check l a b
+local f =
+  Check . mapEitherT (R.local f) . unCheck
 
-cextend :: Name -> Type l -> Ctx l -> Ctx l
-cextend n t =
-  Ctx . M.insert n t . unCtx
+data SolverState l a = SolverState {
+    sConstraints :: DList (Constraint l a)
+  , sAssumptions :: Map Name (Set (IType l a))
+  , sSupply :: NameSupply
+  } deriving (Eq, Ord, Show)
 
-clookup :: Name -> Ctx l -> Maybe (Type l)
-clookup n =
-  M.lookup n . unCtx
+initialSolverState :: SolverState l a
+initialSolverState =
+  SolverState {
+      sConstraints = mempty
+    , sAssumptions = mempty
+    , sSupply = emptyNameSupply
+    }
 
--- As we've got an explicitly-typed calculus, typechecking is
--- straightforward and syntax-directed. All we have to do is propagate
--- our type annotations around the tree and use (==) in the right spots.
-typeCheck' ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Expr l a
-  -> Check l a (Expr l (Type l, a))
-typeCheck' tc ctx expr =
-  case expr of
-    ELit a v ->
-      pure (ELit (TLit (typeOf v), a) v)
+-- -----------------------------------------------------------------------------
+-- Name supply
 
-    EVar a n ->
-      case clookup n ctx of
-        Just t ->
-          pure (EVar (t, a) n)
-        Nothing ->
-          typeError (FreeVariable n a)
+-- | Supply of fresh unification variables.
+newtype NameSupply = NameSupply { nextVar :: Int }
+  deriving (Eq, Ord, Show)
 
-    ELam a n ta e -> do
-      e' <- typeCheck' tc (cextend n ta ctx) e
-      let tb = extractType e'
-      pure (ELam (TArrow ta tb, a) n ta e')
+emptyNameSupply :: NameSupply
+emptyNameSupply =
+  NameSupply 0
 
-    EApp a f g -> do
-      (f', g') <- checkPair tc ctx f g
-      let tf = extractType f'
-          tg = extractType g'
-      ty <- case tf of
-        TArrow c d ->
-          if c == tg then pure d else typeError (Mismatch c tg (extractAnnotation g))
-        c ->
-          typeError (ExpectedArrow tg c (extractAnnotation f))
-      pure (EApp (ty, a) f' g')
+-- | Grab a fresh type variable.
+freshTypeVar :: a -> Check l a (IType l a)
+freshTypeVar a =
+  Check . lift . lift $ do
+    v <- gets (nextVar . sSupply)
+    modify' (\s -> s { sSupply = NameSupply (v + 1) })
+    return (I (IDunno a v))
 
-    ECon a c tn es ->
-      case lookupType tn tc of
-        Just ty@(DVariant cs) -> do
-          -- Look up constructor name
-          ts <- maybe (typeError (BadConstructorName c tn ty a)) pure (L.lookup c cs)
-          -- Check arity
-          unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
-          -- Typecheck all bnds against expected
-          es' <- listC . with (L.zip ts es) $ \(t1, e) -> do
-            e' <- typeCheck' tc ctx e
-            let t2 = extractType e'
-            unless (t1 == t2) (typeError (Mismatch t1 t2 (extractAnnotation e)))
-            pure e'
-          pure (ECon (TVar tn, a) c tn es')
+-- -----------------------------------------------------------------------------
+-- Env
 
-        Nothing ->
-          typeError (FreeTypeVariable tn a)
+-- | Known types for local bindings.
+newtype Env l a = Env { unEnv :: Map Name (IType l a) }
+  deriving (Eq, Ord, Show, Monoid)
 
-    ECase a e pes -> do
-      e' <- typeCheck' tc ctx e
-      let te = extractType e'
-      pes' <- listC (fmap (uncurry (checkPattern tc ctx te)) pes)
-      tb <- unifyList a (typeError (NonExhaustiveCase expr te a)) (fmap (extractAnnotation . snd) pes')
-      pure (ECase (tb, a) e' pes')
+eBind :: Name -> IType l a -> Env l a -> Env l a
+eBind n ty =
+  Env . M.insert n ty . unEnv
 
-    EList a ty es -> do
-      es' <- listC . with es $ \e -> do
-        e' <- typeCheck' tc ctx e
-        let t = extractType e'
-        when (t /= ty) (typeError (Mismatch ty t (extractAnnotation e)))
-        pure e'
-      pure (EList (TList ty, a) ty es')
+eLookup :: Name -> Env l a -> Maybe (IType l a)
+eLookup n =
+  M.lookup n . unEnv
 
-    EForeign a n ty -> do
-      pure (EForeign (ty, a) n ty)
+-- | Record a known type in a lexical scope.
+know :: Name -> IType l a -> Check l a b -> Check l a b
+know n ty k =
+  local (eBind n ty) k
 
--- | Check a pattern fits the type it is supposed to match,
--- then check its associated branch (if the pattern makes sense)
-checkPattern ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Type l
-  -> Pattern a
-  -> Expr l a
-  -> Check l a (Pattern (Type l, a), Expr l (Type l, a))
-checkPattern tc ctx ty pat expr = do
-  (pat', ctx') <- checkPattern' tc ctx ty pat
-  expr' <- typeCheck' tc ctx' expr
-  pure (pat', expr')
+-- -----------------------------------------------------------------------------
+-- Constraints
 
-checkPattern' ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Type l
-  -> Pattern a
-  -> Check l a (Pattern (Type l, a), Ctx l)
-checkPattern' tc ctx ty pat =
-  case pat of
-    PVar a x ->
-      pure (PVar (ty, a) x, cextend x ty ctx)
+data Constraint l a
+  = Equal (IType l a) (IType l a)
+  deriving (Eq, Ord, Show)
 
-    PCon a c pats ->
-      case ty of
-        TVar tn ->
-          case lookupType tn tc of
-            Just (DVariant cs) -> do
-              -- find the constructor in the type
-              ts <- maybe (typeError (BadPatternConstructor c ty a)) pure (L.lookup c cs)
-              -- check the lists are the same length
-              unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
-              -- Check all recursive pats against type list
-              (pats', ctx') <- foldrM
-                                 (\(t', p') (pat', ctx') ->
-                                   fmap (\(p,cc) -> (p:pat', cc)) (checkPattern' tc ctx' t' p'))
-                                 ([], ctx)
-                                 (L.zip ts pats)
-              pure (PCon (ty, a) c pats', ctx')
-            Nothing ->
-              typeError (FreeTypeVariable tn a)
-        _ ->
-          typeError (BadPatternConstructor c ty a)
+-- | Record a new constraint.
+addConstraint :: Ground l => Constraint l a -> Check l a ()
+addConstraint c =
+  Check . lift . lift $
+    modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
 
-unifyList :: Ground l => a -> Check l a (Type l) -> [(Type l, a)] -> Check l a (Type l)
-unifyList a none es = do
-  case L.nubBy ((==) `on` fst) es of
-    (x, _):[] ->
-      pure x
-    [] ->
-      none
-    xs ->
-      typeError (CouldNotUnify xs a)
+-- -----------------------------------------------------------------------------
+-- Assumptions
+
+-- | Add an assumed type for some variable we've encountered.
+addAssumption :: Ground l => Ord a => Name -> IType l a -> Check l a ()
+addAssumption n ty =
+  Check . lift . lift $
+    modify' (\s -> s { sAssumptions = M.insertWith (<>) n (S.singleton ty) (sAssumptions s)})
+
+-- | Delete all assumptions for some variable.
+--
+-- This is called when leaving the lexical scope in which the variable was bound.
+deleteAssumptions :: Ground l => Name -> Check l a ()
+deleteAssumptions n =
+  Check . lift . lift $
+    modify' (\s -> s { sAssumptions = M.delete n (sAssumptions s)})
+
+-- | Look up all assumptions for a given name. Returns the empty set if there are none.
+lookupAssumptions :: Ground l => Ord a => Name -> Check l a (Set (IType l a))
+lookupAssumptions n =
+  Check . lift . lift $
+    fmap (fromMaybe mempty) (gets (M.lookup n . sAssumptions))
+
+-- -----------------------------------------------------------------------------
 
 extractType :: Expr l (Type l, a) -> Type l
 extractType =
   fst . extractAnnotation
-
-typeError :: TypeError l a -> Check l a b
-typeError =
-  Check . Left . D.singleton
-
--- Check a pair of 'Expr', using 'apE' to accumulate the errors.
-checkPair ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Expr l a
-  -> Expr l a
-  -> Check l a (Expr l (Type l, a), Expr l (Type l, a))
-checkPair tc ctx =
-  pairC `on` (typeCheck' tc ctx)
-
--- -----------------------------------------------------------------------------
-
--- | Sequence errors from a list of 'Check'.
-listC :: [Check l a b] -> Check l a [b]
-listC =
-  fmap D.toList . foldl' (apC . fmap D.snoc) (pure mempty)
-
--- | Sequence errors from two 'Check' functions.
-pairC :: Check l a b -> Check l a c -> Check l a (b, c)
-pairC l r =
-  apC (fmap (,) l) r
-
--- | 'apE' lifted to 'Check'.
-apC :: Check l a (b -> c) -> Check l a b -> Check l a c
-apC l r =
-  Check $ apE (unCheck l) (unCheck r)
-
--- -----------------------------------------------------------------------------
-
--- A version of 'ap' that accumulates errors.
--- Useful when expressions do not relate to one another at all.
-apE :: Monoid e => Either e (a -> b) -> Either e a -> Either e b
-apE l r =
-  case (l, r) of
-    (Right f, Right a) ->
-      pure (f a)
-    (Left a, Right _) ->
-      Left a
-    (Right _, Left b) ->
-      Left b
-    (Left a, Left b) ->
-      Left (a <> b)
-
