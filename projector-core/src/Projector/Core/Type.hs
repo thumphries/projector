@@ -26,6 +26,7 @@ module Projector.Core.Type (
   , TypeDecls (..)
   , declareType
   , lookupType
+  , lookupConstructor
   , subtractTypes
   ) where
 
@@ -97,3 +98,12 @@ lookupType n =
 subtractTypes :: Ground l => TypeDecls l -> TypeDecls l -> TypeDecls l
 subtractTypes (TypeDecls m) (TypeDecls n) =
   TypeDecls (M.difference m n)
+
+-- FIX this really sucks, maintain the map in Decls if need be
+lookupConstructor :: Ground l => Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
+lookupConstructor con (TypeDecls m) =
+  M.lookup con . M.fromList . mconcat . with (M.toList m) $ \(tn, dec) ->
+    case dec of
+      DVariant cts ->
+        with cts $ \(c, ts) ->
+          (c, (tn, ts))
