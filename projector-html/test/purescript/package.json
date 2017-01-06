@@ -1,0 +1,20 @@
+{
+  "name": "purescript-projector-html-testsuite",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Purescript testsuite for projector-html",
+  "repository": "https://github.com/ambiata/projector",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build": "psa --censor-lib --censor-codes=ShadowedName,UnusedImport --strict 'bower_components/purescript-*/src/**/*.purs'",
+    "postinstall": "bower install"
+  },
+  "author": "Ambiata <info@ambiata.com>",
+  "license": "AllRightsReserved",
+  "devDependencies": {
+    "bower": "^1.7.9",
+    "purescript-psa": "^0.4.0"
+  }
+}

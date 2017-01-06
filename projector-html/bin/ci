@@ -11,5 +11,6 @@ else
 fi
 
 # TODO add npm-path once it's a thing
+cd test/purescript && npm install && npm run -s build && cd ../..
 
 master build haskell

@@ -16,9 +16,9 @@ import           Projector.Core
 import qualified Projector.Html.Core.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
-import           System.Directory (createDirectoryIfMissing)
+import           System.Directory (createDirectoryIfMissing, makeAbsolute)
 import           System.Exit (ExitCode(..))
-import           System.FilePath.Posix ((</>), (<.>), takeDirectory)
+import           System.FilePath.Posix ((</>), takeDirectory)
 import           System.IO (FilePath, IO)
 import           System.IO.Temp (withTempDirectory)
 
@@ -39,11 +39,12 @@ processProp f (code, out, err) =
 fileProp :: FilePath -> Text -> (FilePath -> IO a) -> (a -> Property) -> Property
 fileProp mname modl f g =
   testIO . withTempDirectory "./dist/" "gen-XXXXXX" $ \tmpDir -> do
-    let path = tmpDir </> mname <.> "hs"
+    let path = tmpDir </> mname
         dir = takeDirectory path
     createDirectoryIfMissing True dir
     T.writeFile path modl
-    fmap g (f path)
+    path' <- makeAbsolute path
+    fmap g (f path')
 
 
 helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
