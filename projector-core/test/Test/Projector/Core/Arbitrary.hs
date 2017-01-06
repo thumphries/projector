@@ -117,13 +117,13 @@ genCon t v =
     <*> t
     <*> listOf v
 
-genCase :: Jack (Expr l ()) -> Jack Pattern -> Jack (Expr l ())
+genCase :: Jack (Expr l ()) -> Jack (Pattern ()) -> Jack (Expr l ())
 genCase e p =
   case_
     <$> e
     <*> (fmap NE.toList (listOf1 $ (,) <$> p <*> e))
 
-genPattern :: Jack Constructor -> Jack Name -> Jack Pattern
+genPattern :: Jack Constructor -> Jack Name -> Jack (Pattern ())
 genPattern c n =
   oneOfRec [fmap pvar n] [pcon <$> c <*> listOf (genPattern c n)]
 
@@ -375,7 +375,7 @@ genAlternatives ::
   -> (Context l -> Type l -> Jack (Expr l ()))
   -> [(Constructor, [Type l])]
   -> Type l
-  -> Jack [(Pattern, Expr l ())]
+  -> Jack [(Pattern (), Expr l ())]
 genAlternatives ctx names more cts want =
   for cts $ \(c, tys) -> do
     let bnds = L.take (length tys) (freshNames "x")

@@ -167,29 +167,27 @@ checkPattern ::
   => TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern
+  -> Pattern a
   -> Expr l a
-  -> Check l a (Pattern, Expr l (Type l, a))
+  -> Check l a (Pattern (Type l, a), Expr l (Type l, a))
 checkPattern tc ctx ty pat expr = do
-  let a = extractAnnotation expr
-  ctx' <- checkPattern' a tc ctx ty pat
+  (pat', ctx') <- checkPattern' tc ctx ty pat
   expr' <- typeCheck' tc ctx' expr
-  pure (pat, expr')
+  pure (pat', expr')
 
 checkPattern' ::
      Ground l
-  => a
-  -> TypeDecls l
+  => TypeDecls l
   -> Ctx l
   -> Type l
-  -> Pattern
-  -> Check l a (Ctx l)
-checkPattern' a tc ctx ty pat =
+  -> Pattern a
+  -> Check l a (Pattern (Type l, a), Ctx l)
+checkPattern' tc ctx ty pat =
   case pat of
-    PVar x ->
-      pure (cextend x ty ctx)
+    PVar a x ->
+      pure (PVar (ty, a) x, cextend x ty ctx)
 
-    PCon c pats ->
+    PCon a c pats ->
       case ty of
         TVar tn ->
           case lookupType tn tc of
@@ -199,7 +197,12 @@ checkPattern' a tc ctx ty pat =
               -- check the lists are the same length
               unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
               -- Check all recursive pats against type list
-              foldM (\ctx' (t', p') -> checkPattern' a tc ctx' t' p') ctx (L.zip ts pats)
+              (pats', ctx') <- foldrM
+                                 (\(t', p') (pat', ctx') ->
+                                   fmap (\(p,cc) -> (p:pat', cc)) (checkPattern' tc ctx' t' p'))
+                                 ([], ctx)
+                                 (L.zip ts pats)
+              pure (PCon (ty, a) c pats', ctx')
             Nothing ->
               typeError (FreeTypeVariable tn a)
         _ ->

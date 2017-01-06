@@ -58,7 +58,7 @@ data Expr l a
   | ELam a Name (Type l) (Expr l a)
   | EApp a (Expr l a) (Expr l a)
   | ECon a Constructor TypeName [Expr l a]
-  | ECase a (Expr l a) [(Pattern, Expr l a)]
+  | ECase a (Expr l a) [(Pattern a, Expr l a)]
   | EList a (Type l) [Expr l a]
   | EForeign a Name (Type l)
   deriving (Functor, Foldable, Traversable)
@@ -91,10 +91,10 @@ newtype Name = Name { unName :: Text }
   deriving (Eq, Ord, Show)
 
 -- | Pattern matching. Note that these are necessarily recursive.
-data Pattern
-  = PVar Name
-  | PCon Constructor [Pattern]
-  deriving (Eq, Ord, Show)
+data Pattern a
+  = PVar a Name
+  | PCon a Constructor [Pattern a]
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- lazy exprs
 lit :: Value l -> Expr l ()
@@ -121,7 +121,7 @@ app :: Expr l () -> Expr l () -> Expr l ()
 app =
   EApp ()
 
-case_ :: Expr l () -> [(Pattern, Expr l ())] -> Expr l ()
+case_ :: Expr l () -> [(Pattern (), Expr l ())] -> Expr l ()
 case_ =
   ECase ()
 
@@ -146,19 +146,19 @@ foreign_' =
   foreign_ . Name
 
 -- lazy pats
-pvar :: Name -> Pattern
+pvar :: Name -> Pattern ()
 pvar =
-  PVar
+  PVar ()
 
-pvar_ :: Text -> Pattern
+pvar_ :: Text -> Pattern ()
 pvar_ =
   pvar . Name
 
-pcon :: Constructor -> [Pattern] -> Pattern
+pcon :: Constructor -> [Pattern ()] -> Pattern ()
 pcon =
-  PCon
+  PCon ()
 
-pcon_ :: Text -> [Pattern] -> Pattern
+pcon_ :: Text -> [Pattern ()] -> Pattern ()
 pcon_ =
   pcon . Constructor
 
@@ -187,9 +187,9 @@ foldFree f acc expr =
         ECase _ e pes ->
           let patBinds bnd pat =
                 case pat of
-                  PVar x ->
+                  PVar _ x ->
                     S.insert x $! bnd
-                  PCon _ pats ->
+                  PCon _ _ pats ->
                     foldl' patBinds bnd pats
           in foldl' (\a (p, ee) -> go f' ee (patBinds bound p) a) (go f' e bound acc') $! pes
 
