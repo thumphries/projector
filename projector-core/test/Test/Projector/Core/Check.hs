@@ -10,10 +10,12 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Check (typeCheck)
+import           Projector.Core.Check
 import           Projector.Core.Simplify (nf, whnf)
 
 import           Test.Projector.Core.Arbitrary
+
+import           Text.Show.Pretty (ppShow)
 
 
 prop_welltyped =
@@ -26,7 +28,12 @@ prop_welltyped_shrink =
 
 prop_illtyped =
   gamble genIllTypedTestExpr' $ \(ctx, e) ->
-    property (isLeft (typeCheck ctx e))
+    property
+      (case typeCheck ctx e of
+         Left _ ->
+           property True
+         Right ty ->
+           counterexample (ppShow ty) (property False))
 
 prop_illtyped_shrink =
   jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->

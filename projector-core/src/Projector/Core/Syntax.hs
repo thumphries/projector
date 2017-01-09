@@ -34,6 +34,7 @@ module Projector.Core.Syntax (
   -- * AST traversals
   , foldFree
   , gatherFree
+  , patternBinds
   ) where
 
 
@@ -203,3 +204,12 @@ foldFree f acc expr =
 gatherFree :: Expr l a -> Set Name
 gatherFree =
   foldFree (flip S.insert) mempty
+
+-- | Gather all names bound by a pattern.
+patternBinds :: Pattern a -> Set Name
+patternBinds pat =
+  case pat of
+    PVar _ x ->
+      S.singleton x
+    PCon _ _ pats ->
+      foldl' (<>) mempty (fmap patternBinds pats)
