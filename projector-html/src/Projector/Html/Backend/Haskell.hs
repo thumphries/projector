@@ -152,17 +152,17 @@ genExp expr =
       varE (mkName_ x)
 
 -- | Case alternatives.
-genMatch :: Pattern -> HtmlExpr a -> TH.Match
+genMatch :: Pattern a -> HtmlExpr a -> TH.Match
 genMatch p e =
   match_ (genPat p) (genExp e)
 
 -- | Patterns.
-genPat :: Pattern -> TH.Pat
+genPat :: Pattern a -> TH.Pat
 genPat p = case p of
-  PVar (Name n) ->
+  PVar _ (Name n) ->
     varP (mkName_ n)
 
-  PCon (Constructor n) ps ->
+  PCon _ (Constructor n) ps ->
     conP (mkName_ n) (fmap genPat ps)
 
 -- | Literals.

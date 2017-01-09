@@ -139,17 +139,17 @@ genExp expr =
     EForeign a (Name n) _ ->
       WL.annotate a (text n)
 
-genMatch :: Pattern -> HtmlExpr a -> Doc a
+genMatch :: Pattern a -> HtmlExpr a -> Doc a
 genMatch p e =
   WL.hang 2 ((genPat p WL.<> text " ->") <$$> genExp e)
 
-genPat :: Pattern -> Doc a
+genPat :: Pattern a -> Doc a
 genPat p =
   case p of
-    PVar (Name n) ->
-      text n
-    PCon (Constructor n) ps ->
-      WL.parens (text n <+> WL.hsep (fmap genPat ps))
+    PVar a (Name n) ->
+      WL.annotate a (text n)
+    PCon a (Constructor n) ps ->
+      WL.annotate a (WL.parens (text n <+> WL.hsep (fmap genPat ps)))
 
 genLit :: Value PrimT -> Doc a
 genLit v =

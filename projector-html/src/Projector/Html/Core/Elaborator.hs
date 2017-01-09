@@ -107,18 +107,18 @@ eExpr expr =
     TECase a e alts ->
       ECase a (eExpr e) (NE.toList (fmap eAlt alts))
 
-eAlt :: TAlt a -> (Pattern, HtmlExpr a)
+eAlt :: TAlt a -> (Pattern a, HtmlExpr a)
 eAlt (TAlt _ pat body) =
   (ePat pat, eAltBody body)
 
-ePat :: TPattern a -> Pattern
+ePat :: TPattern a -> Pattern a
 ePat pat =
   -- TODO find something we can do with these annotations
   case pat of
-    TPVar _ (TId x) ->
-      PVar (Name x)
-    TPCon _ (TConstructor x) pats ->
-      PCon (Constructor x) (fmap ePat pats)
+    TPVar a (TId x) ->
+      PVar a (Name x)
+    TPCon a (TConstructor x) pats ->
+      PCon a (Constructor x) (fmap ePat pats)
 
 eAltBody :: TAltBody a -> HtmlExpr a
 eAltBody body =
