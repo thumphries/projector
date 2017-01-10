@@ -5,15 +5,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
-module Projector.Core.Check where {- (
-    typeCheck
+module Projector.Core.Check (
+  -- * Interface
+    TypeError (..)
+  , typeCheck
   , typeTree
-  ) where -}
+  -- * Guts
+  , generateConstraints
+  , solveConstraints
+  ) where
 
 
 import           Control.Applicative.Lift (Errors, Lift (..), runErrors)
@@ -40,7 +43,7 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           X.Control.Monad.Trans.Either
+import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT)
 
 
 data TypeError l a
@@ -85,31 +88,31 @@ newtype IType l a = I (IVar a (TypeF l (IType l a)))
 
 -- | 'IVar' is an open functor equivalent to an annotated 'Either Int'.
 data IVar ann a
-  = IDunno ann Int
-  | IAm ann a
+  = Dunno ann Int
+  | Am ann a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- | Lift a known type into an 'IType', with an annotation.
 hoistType :: a -> Type l -> IType l a
 hoistType a (Type ty) =
-  I (IAm a (fmap (hoistType a) ty))
+  I (Am a (fmap (hoistType a) ty))
 
 -- | Assert that we have a monotype. Returns 'InferenceError' if we
 -- encounter a unification variable.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
 lowerIType (I v) =
   case v of
-    IDunno a _ ->
+    Dunno a _ ->
       Left (InferenceError a)
-    IAm _ ty ->
+    Am _ ty ->
       fmap Type (traverse lowerIType ty)
 
 typeVar :: IType l a -> Maybe Int
 typeVar ty =
   case ty of
-    I (IDunno _ x) ->
+    I (Dunno _ x) ->
       pure x
-    I (IAm _ _) ->
+    I (Am _ _) ->
       Nothing
 
 -- Produce concrete type name for a fresh variable.
@@ -128,18 +131,18 @@ flattenIType :: IType l a -> (Type l, a)
 flattenIType i@(I v) =
   (flattenIType' i,
     case v of
-      IDunno a _ ->
+      Dunno a _ ->
         a
-      IAm a _ ->
+      Am a _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
 flattenIType' (I v) =
   case v of
-    IDunno _ x ->
+    Dunno _ x ->
       TVar (dunnoTypeVar x)
 
-    IAm _ ty ->
+    Am _ ty ->
       Type (fmap flattenIType' ty)
 
 -- | Report a unification error.
@@ -198,7 +201,7 @@ freshTypeVar a =
   Check . lift $ do
     v <- gets (nextVar . sSupply)
     modify' (\s -> s { sSupply = NameSupply (v + 1) })
-    return (I (IDunno a v))
+    return (I (Dunno a v))
 
 -- -----------------------------------------------------------------------------
 -- Constraints
@@ -290,7 +293,7 @@ generateConstraints' decls expr =
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
       for_ (S.toList as) (addConstraint . Equal (hoistType a ta))
-      let ty = I (IAm a (TArrowF (hoistType a ta) (extractType e')))
+      let ty = I (Am a (TArrowF (hoistType a ta) (extractType e')))
       pure (ELam (ty, a) n ta e')
 
     EApp a f g -> do
@@ -300,7 +303,7 @@ generateConstraints' decls expr =
       f' <- generateConstraints' decls f
       g' <- generateConstraints' decls g
       t <- freshTypeVar a
-      addConstraint (Equal (I (IAm a (TArrowF (extractType g') t))) (extractType f'))
+      addConstraint (Equal (I (Am a (TArrowF (extractType g') t))) (extractType f'))
       pure (EApp (t, a) f' g')
 
     EList a te es -> do
@@ -308,7 +311,7 @@ generateConstraints' decls expr =
       -- Constrain each type to be the annotated 'ty'.
       es' <- for es (generateConstraints' decls)
       for_ es' (addConstraint . Equal (hoistType a te) . extractType)
-      let ty = I (IAm a (TListF (hoistType a te)))
+      let ty = I (Am a (TListF (hoistType a te)))
       pure (EList (ty, a) te es')
 
     ECon a c tn es ->
@@ -321,7 +324,7 @@ generateConstraints' decls expr =
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType a) ts) (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal expected inferred))
-          let ty' = I (IAm a (TVarF tn))
+          let ty' = I (Am a (TVarF tn))
           pure (ECon (ty', a) c tn es')
 
         Nothing ->
@@ -368,7 +371,7 @@ patternConstraints decls ty pat =
         Just (tn, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
-          let ty' = I (IAm a (TVarF tn))
+          let ty' = I (Am a (TVarF tn))
           addConstraint (Equal ty' ty)
           pats' <- for (L.zip (fmap (hoistType a) ts) pats) (uncurry (patternConstraints decls))
           pure (PCon (ty', a) c pats')
@@ -385,6 +388,7 @@ extractType =
 
 newtype Substitutions l a
   = Substitutions { unSubstitutions :: Map Int (IType l a) }
+  deriving (Eq, Ord, Show)
 
 substitute :: Ground l => Expr l (IType l a, a) -> Substitutions l a -> Expr l (IType l a, a)
 substitute expr subs =
@@ -394,19 +398,19 @@ substitute expr subs =
 substituteType :: Ground l => Substitutions l a -> IType l a -> IType l a
 substituteType subs ty =
   case ty of
-    I (IDunno _ x) ->
+    I (Dunno _ x) ->
       maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
 
-    I (IAm a (TArrowF t1 t2)) ->
-      I (IAm a (TArrowF (substituteType subs t1) (substituteType subs t2)))
+    I (Am a (TArrowF t1 t2)) ->
+      I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)))
 
-    I (IAm a (TListF t)) ->
-      I (IAm a (TListF (substituteType subs t)))
+    I (Am a (TListF t)) ->
+      I (Am a (TListF (substituteType subs t)))
 
-    I (IAm _ (TLitF _)) ->
+    I (Am _ (TLitF _)) ->
       ty
 
-    I (IAm _ (TVarF _)) ->
+    I (Am _ (TVarF _)) ->
       ty
 {-# INLINE substituteType #-}
 
@@ -427,7 +431,7 @@ mguST ::
   -> EitherT (TypeError l a) (ST s) ()
 mguST points t1 t2 =
   case (t1, t2) of
-    (I (IDunno _ x), _) -> do
+    (I (Dunno _ x), _) -> do
       mty <- lift (getRepr points x)
       case mty of
         Just ty ->
@@ -436,7 +440,7 @@ mguST points t1 t2 =
         Nothing ->
           lift (union points t1 t2)
 
-    (_, I (IDunno _ x)) -> do
+    (_, I (Dunno _ x)) -> do
       mty <- lift (getRepr points x)
       case mty of
         Just ty ->
@@ -445,17 +449,17 @@ mguST points t1 t2 =
         Nothing ->
           lift (union points t2 t1)
 
-    (I (IAm _ (TVarF x)), I (IAm _ (TVarF y))) ->
+    (I (Am _ (TVarF x)), I (Am _ (TVarF y))) ->
       unless (x == y) (left (unificationError t1 t2))
 
-    (I (IAm _ (TLitF x)), I (IAm _ (TLitF y))) ->
+    (I (Am _ (TLitF x)), I (Am _ (TLitF y))) ->
       unless (x == y) (left (unificationError t1 t2))
 
-    (I (IAm _ (TArrowF f g)), I (IAm _ (TArrowF h i))) -> do
+    (I (Am _ (TArrowF f g)), I (Am _ (TArrowF h i))) -> do
       mguST points f h
       mguST points g i
 
-    (I (IAm _ (TListF a)), I (IAm _ (TListF b))) ->
+    (I (Am _ (TListF a)), I (Am _ (TListF b))) ->
       mguST points a b
 
     (_, _) ->
@@ -488,7 +492,7 @@ union points t1 t2 = do
 getPoint :: STRef s (Map Int (UF.Point s (IType l a))) -> IType l a -> ST s (UF.Point s (IType l a))
 getPoint mref ty =
   case ty of
-    I (IDunno _ x) -> do
+    I (Dunno _ x) -> do
       ps <- ST.readSTRef mref
       case M.lookup x ps of
         Just point ->
@@ -498,7 +502,7 @@ getPoint mref ty =
           ST.modifySTRef' mref (M.insert x point)
           pure point
 
-    I (IAm _ _) ->
+    I (Am _ _) ->
       UF.fresh ty
 {-# INLINE getPoint #-}
 
