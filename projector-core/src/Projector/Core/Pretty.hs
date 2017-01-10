@@ -37,30 +37,11 @@ ppTypeErrorDecorated start end =
 ppTypeError' :: Ground l => TypeError l a -> Doc a
 ppTypeError' err =
   case err of
-    Mismatch t1 t2 a ->
-      WL.annotate a $
-      text
-        (mconcat
-           ["Type mismatch! Expected '", ppType t1, "', but found '", ppType t2, "'"])
-    CouldNotUnify ts a ->
-      WL.annotate a . WL.hang 2 $
-      (text "Type mismatch! Expected these types to be equal:" <$$>
-       (WL.vcat (fmap (\(ty, aa) -> WL.annotate aa (text (ppType ty))) ts)))
-    ExpectedArrow t1 t2 a ->
-      WL.annotate a $
-      text
-        (T.unwords
-           [ "Type mismatch! Expected a function from"
-           , ppType t1
-           , ", but found"
-           , ppType t2
-           ])
-    FreeVariable (Name n) a ->
-      WL.annotate a $
-      text (mconcat ["Unknown variable! '", n, "' is not in scope"])
-    FreeTypeVariable (TypeName tn) a ->
-      WL.annotate a $
-      text (mconcat ["Unknown type! '", tn, "' has not been declared"])
+    UnificationError (t1, a) (t2, b) ->
+      WL.hang 2
+        (text "Type error. The differing types are:"
+          <$$> WL.annotate a (text (ppType t1))
+          <$$> WL.annotate b (text (ppType t2)))
     BadConstructorName (Constructor c) (TypeName tn) d a ->
       case d of
         DVariant cts ->
@@ -99,21 +80,13 @@ ppTypeError' err =
                , "arguments, but got"
                , renderIntegral ngot
                ])))
-    BadPatternConstructor (Constructor c) ty a ->
-      WL.annotate a $
-      WL.hang
-        2
-        ((text "Invalid pattern for type" <+> text (ppType ty) <+> text ":") <$$>
-         (text "Constructor" <+>
-          (WL.squotes (text c)) <+>
-          text "is not a constructor for type" <+> text (ppType ty)))
-    NonExhaustiveCase _e ty a ->
-      WL.annotate a $
-      text
-        (T.unwords
-           [ "Pattern matches are non-exhaustive for an expression of type"
-           , ppType ty
-           ])
+    BadPatternConstructor (Constructor c) a ->
+      WL.annotate a (text "Unknown constructor: " WL.<> WL.squotes (text c))
+    UndeclaredType (TypeName n) a ->
+      WL.annotate a (text "Undeclared type: " WL.<> WL.squotes (text n))
+    InferenceError a ->
+      -- TODO this error is really awful
+      WL.annotate a (text "Could not infer a monotype for some expression.")
 
 -- -----------------------------------------------------------------------------
 

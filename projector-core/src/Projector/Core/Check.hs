@@ -21,6 +21,7 @@ import           Control.Monad.ST (ST, runST)
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.State.Strict (State, runState, gets, modify')
 
+import           Data.Char (chr, ord)
 import           Data.DList (DList)
 import qualified Data.DList as D
 import           Data.Functor.Constant (Constant(..))
@@ -31,6 +32,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.STRef (STRef)
 import qualified Data.STRef as ST
+import qualified Data.Text as T
 import qualified Data.UnionFind.ST as UF
 
 import           P
@@ -42,14 +44,12 @@ import           X.Control.Monad.Trans.Either
 
 
 data TypeError l a
-  = UnificationError (IType l a) (IType l a)
-  | FreeVariable Name a
+  = UnificationError (Type l, a) (Type l, a)
   | UndeclaredType TypeName a
   | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
   | BadPatternArity Constructor (Type l) Int Int a
   | BadPatternConstructor Constructor a
-  | NonExhaustiveCase (Expr l a) (Type l) a
   | InferenceError a
 
 deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
@@ -111,6 +111,41 @@ typeVar ty =
       pure x
     I (IAm _ _) ->
       Nothing
+
+-- Produce concrete type name for a fresh variable.
+dunnoTypeVar :: Int -> TypeName
+dunnoTypeVar x =
+  let letter j = chr (ord 'a' + j)
+  in case (x `mod` 26, x `div` 26) of
+    (i, 0) ->
+      TypeName (T.pack [letter i])
+    (m, n) ->
+      TypeName (T.pack [letter m] <> renderIntegral n)
+
+-- Produce a regular type, concretising fresh variables.
+-- This is currently used for error reporting.
+flattenIType :: IType l a -> (Type l, a)
+flattenIType i@(I v) =
+  (flattenIType' i,
+    case v of
+      IDunno a _ ->
+        a
+      IAm a _ ->
+        a)
+
+flattenIType' :: IType l a -> Type l
+flattenIType' (I v) =
+  case v of
+    IDunno _ x ->
+      TVar (dunnoTypeVar x)
+
+    IAm _ ty ->
+      Type (fmap flattenIType' ty)
+
+-- | Report a unification error.
+unificationError :: IType l a -> IType l a -> TypeError l a
+unificationError =
+  UnificationError `on` flattenIType
 
 -- -----------------------------------------------------------------------------
 -- Monad stack
@@ -411,10 +446,10 @@ mguST points t1 t2 =
           lift (union points t2 t1)
 
     (I (IAm _ (TVarF x)), I (IAm _ (TVarF y))) ->
-      unless (x == y) (left (UnificationError t1 t2))
+      unless (x == y) (left (unificationError t1 t2))
 
     (I (IAm _ (TLitF x)), I (IAm _ (TLitF y))) ->
-      unless (x == y) (left (UnificationError t1 t2))
+      unless (x == y) (left (unificationError t1 t2))
 
     (I (IAm _ (TArrowF f g)), I (IAm _ (TArrowF h i))) -> do
       mguST points f h
@@ -424,7 +459,7 @@ mguST points t1 t2 =
       mguST points a b
 
     (_, _) ->
-      left (UnificationError t1 t2)
+      left (unificationError t1 t2)
 
 solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
 solveConstraints constraints =
