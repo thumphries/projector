@@ -11,6 +11,7 @@
 module Projector.Core.Check (
   -- * Interface
     TypeError (..)
+  , typeCheckAll
   , typeCheck
   , typeTree
   -- * Guts
@@ -57,6 +58,29 @@ deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
 deriving instance (Ord l, Ord (Value l), Ord a) => Ord (TypeError l a)
 
 
+-- | Typecheck an interdependent set of named expressions.
+-- This is essentially top-level letrec.
+--
+-- TODO: This admits general recursion. We need to write a totality checker.
+--
+-- We cannot cache the intermediate results here, so we need to
+-- recheck everything each time. To support incremental builds we need
+-- to group expressions into "modules", figure out the module
+-- dependency DAG, and traverse only the dirty subtrees of that DAG.
+typeCheckAll ::
+     Ground l
+  => TypeDecls l
+  -> Map Name (Expr l a)
+  -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
+typeCheckAll =
+  -- for each declaration,
+  --   - generate constraints and assumptions
+  --   - build up new global set of constraints from the assumptions
+  --   - solve them all at once
+  --   - substitute them all at once
+  --   - lower them all at once
+  undefined
+
 typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
 typeCheck decls =
   fmap extractType . typeTree decls
@@ -67,7 +91,7 @@ typeTree ::
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
 typeTree decls expr = do
-  (expr', constraints) <- generateConstraints decls expr
+  (expr', constraints, _assums) <- generateConstraints decls expr
   subs <- solveConstraints constraints
   let subbed = substitute expr' subs
   sequenceEither (fmap (\(i, a) -> fmap (,a) (first pure (lowerIType i))) subbed)
@@ -164,7 +188,7 @@ runCheck f =
 
 data SolverState l a = SolverState {
     sConstraints :: DList (Constraint l a)
-  , sAssumptions :: Map Name [IType l a]
+  , sAssumptions :: Assumptions l a
   , sSupply :: NameSupply
   } deriving (Eq, Ord, Show)
 
@@ -175,6 +199,10 @@ initialSolverState =
     , sAssumptions = mempty
     , sSupply = emptyNameSupply
     }
+
+newtype Assumptions l a = Assumptions {
+    unAssumptions :: Map Name [IType l a]
+  } deriving (Eq, Ord, Show, Monoid)
 
 throwError :: TypeError l a -> Check l a b
 throwError =
@@ -219,13 +247,17 @@ addConstraint c =
 addAssumption :: Ground l => Name -> IType l a -> Check l a ()
 addAssumption n ty =
   Check . lift $
-    modify' (\s -> s { sAssumptions = M.insertWith (<>) n [ty] (sAssumptions s)})
+    modify' (\s -> s {
+        sAssumptions = Assumptions (M.insertWith (<>) n [ty] (unAssumptions (sAssumptions s)))
+      })
 
 -- | Clobber the assumption set for some variable.
 setAssumptions :: Ground l => Name -> [IType l a] -> Check l a ()
 setAssumptions n assums =
   Check . lift $
-    modify' (\s -> s { sAssumptions = M.insert n assums (sAssumptions s)})
+    modify' (\s -> s {
+        sAssumptions = Assumptions (M.insert n assums (unAssumptions (sAssumptions s)))
+      })
 
 -- | Delete all assumptions for some variable.
 --
@@ -233,13 +265,15 @@ setAssumptions n assums =
 deleteAssumptions :: Ground l => Name -> Check l a ()
 deleteAssumptions n =
   Check . lift $
-    modify' (\s -> s { sAssumptions = M.delete n (sAssumptions s)})
+    modify' (\s -> s {
+        sAssumptions = Assumptions (M.delete n (unAssumptions (sAssumptions s)))
+      })
 
 -- | Look up all assumptions for a given name. Returns the empty set if there are none.
 lookupAssumptions :: Ground l => Name -> Check l a [IType l a]
 lookupAssumptions n =
   Check . lift $
-    fmap (fromMaybe mempty) (gets (M.lookup n . sAssumptions))
+    fmap (fromMaybe mempty) (gets (M.lookup n . unAssumptions . sAssumptions))
 
 -- | Run some continuation with lexically-scoped assumptions.
 -- This is sorta like 'local', but we need to keep changes to other keys in the map.
@@ -264,9 +298,14 @@ withBinding x k = do
 -- -----------------------------------------------------------------------------
 -- Constraint generation
 
-generateConstraints :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Expr l (IType l a, a), [Constraint l a])
+generateConstraints ::
+     Ground l
+  => TypeDecls l
+  -> Expr l a
+  -> Either [TypeError l a] (Expr l (IType l a, a), [Constraint l a], Assumptions l a)
 generateConstraints decls expr = do
-  (fmap (second (D.toList . sConstraints)) (runCheck (generateConstraints' decls expr)))
+  (e, st) <- runCheck (generateConstraints' decls expr)
+  pure (e, D.toList (sConstraints st), sAssumptions st)
 
 generateConstraints' :: Ground l => TypeDecls l -> Expr l a -> Check l a (Expr l (IType l a, a))
 generateConstraints' decls expr =
@@ -422,6 +461,7 @@ mostGeneralUnifierST ::
 mostGeneralUnifierST points t1 t2 =
   runEitherT (mguST points t1 t2)
 
+-- FIX need occurs check
 mguST ::
      Ground l
   => STRef s (Points s l a)
