@@ -414,9 +414,13 @@ substituteType subs ty =
       ty
 {-# INLINE substituteType #-}
 
+newtype Points s l a = Points {
+    unPoints :: Map Int (UF.Point s (IType l a))
+  }
+
 mostGeneralUnifierST ::
      Ground l
-  => STRef s (Map Int (UF.Point s (IType l a)))
+  => STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> ST s (Either (TypeError l a) ())
@@ -425,7 +429,7 @@ mostGeneralUnifierST points t1 t2 =
 
 mguST ::
      Ground l
-  => STRef s (Map Int (UF.Point s (IType l a)))
+  => STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> EitherT (TypeError l a) (ST s) ()
@@ -469,7 +473,7 @@ solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [T
 solveConstraints constraints =
   runST $ do
     -- Initialise mutable state.
-    points <- ST.newSTRef M.empty
+    points <- ST.newSTRef (Points M.empty)
 
     -- Solve all the constraints independently.
     es <- fmap sequenceErrors . for constraints $ \c ->
@@ -480,36 +484,36 @@ solveConstraints constraints =
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
     for (first D.toList es) $ \_ -> do
-      fmap Substitutions (for solvedPoints (UF.descriptor <=< UF.repr))
+      fmap Substitutions (for (unPoints solvedPoints) (UF.descriptor <=< UF.repr))
 
-union :: STRef s (Map Int (UF.Point s (IType l a))) -> IType l a -> IType l a -> ST s ()
+union :: STRef s (Points s l a) -> IType l a -> IType l a -> ST s ()
 union points t1 t2 = do
   p1 <- getPoint points t1
   p2 <- getPoint points t2
   UF.union p1 p2
 
 -- | Fills the 'lookup' API hole in the union-find package.
-getPoint :: STRef s (Map Int (UF.Point s (IType l a))) -> IType l a -> ST s (UF.Point s (IType l a))
+getPoint :: STRef s (Points s l a) -> IType l a -> ST s (UF.Point s (IType l a))
 getPoint mref ty =
   case ty of
     I (Dunno _ x) -> do
       ps <- ST.readSTRef mref
-      case M.lookup x ps of
+      case M.lookup x (unPoints ps) of
         Just point ->
           pure point
         Nothing -> do
           point <- UF.fresh ty
-          ST.modifySTRef' mref (M.insert x point)
+          ST.modifySTRef' mref (Points . M.insert x point . unPoints)
           pure point
 
     I (Am _ _) ->
       UF.fresh ty
 {-# INLINE getPoint #-}
 
-getRepr :: STRef s (Map Int (UF.Point s (IType l a))) -> Int -> ST s (Maybe (IType l a))
+getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
 getRepr points x = do
   ps <- ST.readSTRef points
-  for (M.lookup x ps) (UF.descriptor <=< UF.repr)
+  for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
 
 hoistErrors :: Either e a -> Errors e a
 hoistErrors e =
