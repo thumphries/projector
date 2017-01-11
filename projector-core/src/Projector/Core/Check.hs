@@ -395,13 +395,11 @@ substitute expr subs =
   with expr $ \(ty, a) ->
     (substituteType subs ty, a)
 
--- | nonrecursive substitution. We assume the substitution map does
--- not have any spurious Dunnos on the right hand side of a substitution.
 substituteType :: Ground l => Substitutions l a -> IType l a -> IType l a
 substituteType subs ty =
   case ty of
     I (Dunno _ x) ->
-      fromMaybe ty (M.lookup x (unSubstitutions subs))
+      maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
 
     I (Am a (TArrowF t1 t2)) ->
       I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)))
@@ -485,33 +483,8 @@ solveConstraints constraints =
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
-    for (first D.toList es) $ \_ ->
-      substitutionMap solvedPoints
-
--- | Build the substitution map.
-substitutionMap :: Ground l => Points s l a -> ST s (Substitutions l a)
-substitutionMap solvedPoints = do
-  subs <- for (unPoints solvedPoints) (UF.descriptor <=< UF.repr)
-  pure (Substitutions (fmap (substituteType' (Substitutions subs)) subs))
-
--- Recursive substitution.
-substituteType' :: Ground l => Substitutions l a -> IType l a -> IType l a
-substituteType' subs ty =
-  case ty of
-    I (Dunno _ x) ->
-      maybe ty (substituteType' subs) (M.lookup x (unSubstitutions subs))
-
-    I (Am a (TArrowF t1 t2)) ->
-      I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)))
-
-    I (Am a (TListF t)) ->
-      I (Am a (TListF (substituteType subs t)))
-
-    I (Am _ (TLitF _)) ->
-      ty
-
-    I (Am _ (TVarF _)) ->
-      ty
+    for (first D.toList es) $ \_ -> do
+      fmap Substitutions (for (unPoints solvedPoints) (UF.descriptor <=< UF.repr))
 
 union :: STRef s (Points s l a) -> IType l a -> IType l a -> ST s ()
 union points t1 t2 = do
