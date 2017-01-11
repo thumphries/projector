@@ -20,6 +20,7 @@ import qualified Projector.Core as Core
 import           Projector.Html
 import qualified Projector.Html as Html
 import qualified Projector.Html.Backend.Haskell as Haskell
+import qualified Projector.Html.Backend.Purescript as Purescript
 import qualified Projector.Html.Pretty as HP
 
 import           System.Console.Haskeline as HL
@@ -94,6 +95,8 @@ readCommand t =
       pure (DumpType foo)
     [":haskell", foo] ->
       pure (DumpHaskell foo)
+    [":purescript", foo] ->
+      pure (DumpPurescript foo)
     [":multiline"] ->
       pure SetMultiline
     [":nomultiline"] ->
@@ -110,6 +113,7 @@ data ReplCommand
   | DumpCore Text
   | DumpType Text
   | DumpHaskell Text
+  | DumpPurescript Text
   | SetMultiline
   | SetNoMultiline
   | ExitRepl
@@ -233,6 +237,9 @@ runReplCommand cmd =
       withBind name $ dump . boundType
     DumpHaskell name -> do
       let dump = pure . ReplSuccess . Haskell.renderExpr (Core.Name name)
+      withBind name $ dump . boundCore
+    DumpPurescript name -> do
+      let dump = pure . ReplSuccess . Purescript.renderExpr (Core.Name name)
       withBind name $ dump . boundCore
     SetMultiline -> do
       Repl (modify' (\s -> s { replMultiline = True }))
