@@ -524,6 +524,7 @@ unifyVar points a x t2 = do
 -- | Check that a given unification variable isn't present inside the
 -- type it's being unified with. This is necessary for typechecking
 -- to be sound, it prevents us from constructing the infinite type.
+-- FIX whoops, this needs another special case for refl
 occurs :: a -> Int -> IType l a -> Either (TypeError l a) ()
 occurs a q ity =
   go q ity
