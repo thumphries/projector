@@ -72,14 +72,23 @@ typeCheckAll ::
   => TypeDecls l
   -> Map Name (Expr l a)
   -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
-typeCheckAll =
+typeCheckAll decls exprs = do
   -- for each declaration,
   --   - generate constraints and assumptions
+  (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
   --   - build up new global set of constraints from the assumptions
+  let localConstraints = sConstraints sstate
+      Assumptions assums = sAssumptions sstate
+      types = fmap extractType annotated
+      globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
+        maybe mempty (with itys . Equal) (M.lookup n types)
+      constraints = D.toList (localConstraints <> globalConstraints)
   --   - solve them all at once
+  subs <- solveConstraints constraints
   --   - substitute them all at once
+  let subbed = fmap (substitute subs) annotated
   --   - lower them all at once
-  undefined
+  first D.toList (sequenceErrors (fmap lowerExpr subbed))
 
 typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
 typeCheck decls =
@@ -170,6 +179,10 @@ unificationError :: IType l a -> IType l a -> TypeError l a
 unificationError =
   UnificationError `on` flattenIType
 
+lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Type l, a))
+lowerExpr =
+  sequenceErrors . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
+
 -- -----------------------------------------------------------------------------
 -- Monad stack
 
@@ -207,6 +220,15 @@ newtype Assumptions l a = Assumptions {
 throwError :: TypeError l a -> Check l a b
 throwError =
   Check . left . D.singleton
+
+sequenceCheck :: Traversable t => t (Check l a b) -> Check l a (t b)
+sequenceCheck =
+  Check . sequenceEitherT . fmap unCheck
+
+sequenceEitherT :: (Monad m, Monoid e, Traversable t) => t (EitherT e m a) -> EitherT e m (t a)
+sequenceEitherT es = do
+  es' <- lift (traverse runEitherT es)
+  hoistEither (sequenceErrors es')
 
 -- -----------------------------------------------------------------------------
 -- Name supply
@@ -424,8 +446,8 @@ newtype Substitutions l a
   = Substitutions { unSubstitutions :: Map Int (IType l a) }
   deriving (Eq, Ord, Show)
 
-substitute :: Ground l => Expr l (IType l a, a) -> Substitutions l a -> Expr l (IType l a, a)
-substitute expr subs =
+substitute :: Ground l => Substitutions l a -> Expr l (IType l a, a) -> Expr l (IType l a, a)
+substitute subs expr =
   with expr $ \(ty, a) ->
     (substituteType subs ty, a)
 
@@ -461,7 +483,7 @@ mostGeneralUnifierST ::
 mostGeneralUnifierST points t1 t2 =
   runEitherT (mguST points t1 t2)
 
--- FIX need occurs check
+-- FIX need occurs check or this will spin on some illtyped programs
 mguST ::
      Ground l
   => STRef s (Points s l a)
