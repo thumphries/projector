@@ -46,12 +46,12 @@ renderCoreErrorRange :: CoreError Range -> Text
 renderCoreErrorRange =
   renderCoreError (\r -> (renderRange r <> ": ")) (const mempty)
 
-templateToCore :: Ord a => Template a -> Either (CoreError a) (HtmlType, HtmlExpr a)
+templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr a)
 templateToCore t =
   let core = Elab.elaborate t
   in fmap (, Simp.nf core) (typeCheck core)
 
-typeCheck :: Ord a => HtmlExpr a -> Either (CoreError a) HtmlType
+typeCheck :: HtmlExpr a -> Either (CoreError a) HtmlType
 typeCheck =
   first HtmlTypeError . PC.typeCheck htmlTypes
 

@@ -31,7 +31,6 @@ import           Data.Functor.Constant (Constant(..))
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.STRef (STRef)
 import qualified Data.STRef as ST
@@ -60,13 +59,12 @@ deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
 deriving instance (Ord l, Ord (Value l), Ord a) => Ord (TypeError l a)
 
 
-typeCheck :: Ground l => Ord a => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
+typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
 typeCheck decls =
   fmap extractType . typeTree decls
 
 typeTree ::
      Ground l
-  => Ord a
   => TypeDecls l
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
@@ -168,7 +166,7 @@ runCheck f =
 
 data SolverState l a = SolverState {
     sConstraints :: DList (Constraint l a)
-  , sAssumptions :: Map Name (Set (IType l a))
+  , sAssumptions :: Map Name [IType l a]
   , sSupply :: NameSupply
   } deriving (Eq, Ord, Show)
 
@@ -220,13 +218,13 @@ addConstraint c =
 -- Assumptions
 
 -- | Add an assumed type for some variable we've encountered.
-addAssumption :: Ground l => Ord a => Name -> IType l a -> Check l a ()
+addAssumption :: Ground l => Name -> IType l a -> Check l a ()
 addAssumption n ty =
   Check . lift $
-    modify' (\s -> s { sAssumptions = M.insertWith (<>) n (S.singleton ty) (sAssumptions s)})
+    modify' (\s -> s { sAssumptions = M.insertWith (<>) n [ty] (sAssumptions s)})
 
 -- | Clobber the assumption set for some variable.
-setAssumptions :: Ground l => Ord a => Name -> Set (IType l a) -> Check l a ()
+setAssumptions :: Ground l => Name -> [IType l a] -> Check l a ()
 setAssumptions n assums =
   Check . lift $
     modify' (\s -> s { sAssumptions = M.insert n assums (sAssumptions s)})
@@ -240,14 +238,14 @@ deleteAssumptions n =
     modify' (\s -> s { sAssumptions = M.delete n (sAssumptions s)})
 
 -- | Look up all assumptions for a given name. Returns the empty set if there are none.
-lookupAssumptions :: Ground l => Ord a => Name -> Check l a (Set (IType l a))
+lookupAssumptions :: Ground l => Name -> Check l a [IType l a]
 lookupAssumptions n =
   Check . lift $
     fmap (fromMaybe mempty) (gets (M.lookup n . sAssumptions))
 
 -- | Run some continuation with lexically-scoped assumptions.
 -- This is sorta like 'local', but we need to keep changes to other keys in the map.
-withBindings :: Ground l => Traversable f => Ord a => f Name -> Check l a b -> Check l a (Map Name (Set (IType l a)), b)
+withBindings :: Ground l => Traversable f => f Name -> Check l a b -> Check l a (Map Name [IType l a], b)
 withBindings xs k = do
   old <- fmap (M.fromList . toList) . for xs $ \n -> do
     as <- lookupAssumptions n
@@ -260,7 +258,7 @@ withBindings xs k = do
     pure (n, as)
   pure (new, res)
 
-withBinding :: Ground l => Ord a => Name -> Check l a b -> Check l a (Set (IType l a), b)
+withBinding :: Ground l => Name -> Check l a b -> Check l a ([IType l a], b)
 withBinding x k = do
   (as, b) <- withBindings [x] k
   pure (fromMaybe mempty (M.lookup x as), b)
@@ -268,11 +266,11 @@ withBinding x k = do
 -- -----------------------------------------------------------------------------
 -- Constraint generation
 
-generateConstraints :: Ground l => Ord a => TypeDecls l -> Expr l a -> Either [TypeError l a] (Expr l (IType l a, a), [Constraint l a])
+generateConstraints :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Expr l (IType l a, a), [Constraint l a])
 generateConstraints decls expr = do
   (fmap (second (D.toList . sConstraints)) (runCheck (generateConstraints' decls expr)))
 
-generateConstraints' :: Ground l => Ord a => TypeDecls l -> Expr l a -> Check l a (Expr l (IType l a, a))
+generateConstraints' :: Ground l => TypeDecls l -> Expr l a -> Check l a (Expr l (IType l a, a))
 generateConstraints' decls expr =
   case expr of
     ELit a v ->
@@ -292,7 +290,7 @@ generateConstraints' decls expr =
       -- Gather the assumed types of 'n', and constrain them to be the known (annotated) type.
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
-      for_ (S.toList as) (addConstraint . Equal (hoistType a ta))
+      for_ as (addConstraint . Equal (hoistType a ta))
       let ty = I (Am a (TArrowF (hoistType a ta) (extractType e')))
       pure (ELam (ty, a) n ta e')
 
@@ -354,7 +352,6 @@ generateConstraints' decls expr =
 -- | Patterns are binding sites that also introduce lots of new constraints.
 patternConstraints ::
      Ground l
-  => Ord a
   => TypeDecls l
   -> IType l a
   -> Pattern a
