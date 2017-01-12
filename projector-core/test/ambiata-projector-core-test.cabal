@@ -28,6 +28,7 @@ library
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
                      , semigroups
+                     , pretty-show
 
   exposed-modules:
                      Test.Projector.Core.Arbitrary

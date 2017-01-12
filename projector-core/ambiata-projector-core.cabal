@@ -20,6 +20,7 @@ library
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
                      , annotated-wl-pprint             == 0.7.*
+                     , union-find                      == 0.2.*
 
   ghc-options:
                        -Wall
@@ -62,6 +63,7 @@ test-suite test
                      , containers
                      , text
                      , semigroups
+                     , pretty-show
 
 benchmark bench
   type:                exitcode-stdio-1.0
@@ -79,3 +81,4 @@ benchmark bench
                      , comonad
                      , containers
                      , semigroups
+                     , pretty-show

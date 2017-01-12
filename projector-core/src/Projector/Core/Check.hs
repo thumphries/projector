@@ -1,52 +1,58 @@
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
-  -- * User interface
-    typeCheck
+  -- * Interface
+    TypeError (..)
+  , typeCheck
   , typeTree
-  , TypeError (..)
   -- * Guts
-  , Check (..)
-  , typeError
-  , typeCheck'
-  , checkPair
-  , listC
-  , pairC
-  , apC
-  -- * Reusable stuff
-  , apE
+  , generateConstraints
+  , solveConstraints
   ) where
 
 
+import           Control.Applicative.Lift (Errors, Lift (..), runErrors)
+import           Control.Monad.ST (ST, runST)
+import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.State.Strict (State, runState, gets, modify')
+
+import           Data.Char (chr, ord)
 import           Data.DList (DList)
 import qualified Data.DList as D
+import           Data.Functor.Constant (Constant(..))
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
+import           Data.STRef (STRef)
+import qualified Data.STRef as ST
+import qualified Data.Text as T
+import qualified Data.UnionFind.ST as UF
 
 import           P
 
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
+import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT)
+
 
 data TypeError l a
-  = Mismatch (Type l) (Type l) a
-  | CouldNotUnify [(Type l, a)] a
-  | ExpectedArrow (Type l) (Type l) a
-  | FreeVariable Name a
-  | FreeTypeVariable TypeName a
+  = UnificationError (Type l, a) (Type l, a)
+  | UndeclaredType TypeName a
   | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
   | BadPatternArity Constructor (Type l) Int Int a
-  | BadPatternConstructor Constructor (Type l) a
-  | NonExhaustiveCase (Expr l a) (Type l) a
+  | BadPatternConstructor Constructor a
+  | InferenceError a
 
 deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
 deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
@@ -62,211 +68,460 @@ typeTree ::
   => TypeDecls l
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
-typeTree c =
-  first D.toList . unCheck . typeCheck' c mempty
-
+typeTree decls expr = do
+  (expr', constraints) <- generateConstraints decls expr
+  subs <- solveConstraints constraints
+  let subbed = substitute expr' subs
+  sequenceErrors (fmap (\(i, a) -> fmap (,a) (first pure (lowerIType i))) subbed)
 
 -- -----------------------------------------------------------------------------
+-- Types
 
+-- | 'IType l a' is a fixpoint of 'IVar a (TypeF l)'.
+--
+-- i.e. regular types, recursively extended with annotations and an
+-- extra constructor, 'IDunno', representing fresh type/unification variables.
+newtype IType l a = I (IVar a (TypeF l (IType l a)))
+  deriving (Eq, Ord, Show)
+
+-- | 'IVar' is an open functor equivalent to an annotated 'Either Int'.
+data IVar ann a
+  = Dunno ann Int
+  | Am ann a
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+-- | Lift a known type into an 'IType', with an annotation.
+hoistType :: a -> Type l -> IType l a
+hoistType a (Type ty) =
+  I (Am a (fmap (hoistType a) ty))
+
+-- | Assert that we have a monotype. Returns 'InferenceError' if we
+-- encounter a unification variable.
+lowerIType :: IType l a -> Either (TypeError l a) (Type l)
+lowerIType (I v) =
+  case v of
+    Dunno a _ ->
+      Left (InferenceError a)
+    Am _ ty ->
+      fmap Type (traverse lowerIType ty)
+
+typeVar :: IType l a -> Maybe Int
+typeVar ty =
+  case ty of
+    I (Dunno _ x) ->
+      pure x
+    I (Am _ _) ->
+      Nothing
+
+-- Produce concrete type name for a fresh variable.
+dunnoTypeVar :: Int -> TypeName
+dunnoTypeVar x =
+  let letter j = chr (ord 'a' + j)
+  in case (x `mod` 26, x `div` 26) of
+    (i, 0) ->
+      TypeName (T.pack [letter i])
+    (m, n) ->
+      TypeName (T.pack [letter m] <> renderIntegral n)
+
+-- Produce a regular type, concretising fresh variables.
+-- This is currently used for error reporting.
+flattenIType :: IType l a -> (Type l, a)
+flattenIType i@(I v) =
+  (flattenIType' i,
+    case v of
+      Dunno a _ ->
+        a
+      Am a _ ->
+        a)
+
+flattenIType' :: IType l a -> Type l
+flattenIType' (I v) =
+  case v of
+    Dunno _ x ->
+      TVar (dunnoTypeVar x)
+
+    Am _ ty ->
+      Type (fmap flattenIType' ty)
+
+-- | Report a unification error.
+unificationError :: IType l a -> IType l a -> TypeError l a
+unificationError =
+  UnificationError `on` flattenIType
+
+-- -----------------------------------------------------------------------------
+-- Monad stack
+
+-- | 'Check' permits multiple errors via 'EitherT', lexically-scoped
+-- state via 'ReaderT', and global accumulating state via 'State'.
 newtype Check l a b = Check {
-    unCheck :: Either (DList (TypeError l a)) b
+    unCheck :: EitherT (DList (TypeError l a)) (State (SolverState l a)) b
   } deriving (Functor, Applicative, Monad)
 
--- typing context
-newtype Ctx l = Ctx { unCtx :: Map Name (Type l) }
+runCheck :: Check l a b -> Either [TypeError l a] (b, SolverState l a)
+runCheck f =
+    unCheck f
+  & runEitherT
+  & flip runState initialSolverState
+  & \(e, st) -> fmap (,st) (first D.toList e)
 
-instance Monoid (Ctx l) where
-  mempty = Ctx mempty
-  mappend (Ctx a) (Ctx b) = Ctx (mappend a b)
+data SolverState l a = SolverState {
+    sConstraints :: DList (Constraint l a)
+  , sAssumptions :: Map Name [IType l a]
+  , sSupply :: NameSupply
+  } deriving (Eq, Ord, Show)
 
-cextend :: Name -> Type l -> Ctx l -> Ctx l
-cextend n t =
-  Ctx . M.insert n t . unCtx
+initialSolverState :: SolverState l a
+initialSolverState =
+  SolverState {
+      sConstraints = mempty
+    , sAssumptions = mempty
+    , sSupply = emptyNameSupply
+    }
 
-clookup :: Name -> Ctx l -> Maybe (Type l)
-clookup n =
-  M.lookup n . unCtx
+throwError :: TypeError l a -> Check l a b
+throwError =
+  Check . left . D.singleton
 
--- As we've got an explicitly-typed calculus, typechecking is
--- straightforward and syntax-directed. All we have to do is propagate
--- our type annotations around the tree and use (==) in the right spots.
-typeCheck' ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Expr l a
-  -> Check l a (Expr l (Type l, a))
-typeCheck' tc ctx expr =
+-- -----------------------------------------------------------------------------
+-- Name supply
+
+-- | Supply of fresh unification variables.
+newtype NameSupply = NameSupply { nextVar :: Int }
+  deriving (Eq, Ord, Show)
+
+emptyNameSupply :: NameSupply
+emptyNameSupply =
+  NameSupply 0
+
+-- | Grab a fresh type variable.
+freshTypeVar :: a -> Check l a (IType l a)
+freshTypeVar a =
+  Check . lift $ do
+    v <- gets (nextVar . sSupply)
+    modify' (\s -> s { sSupply = NameSupply (v + 1) })
+    return (I (Dunno a v))
+
+-- -----------------------------------------------------------------------------
+-- Constraints
+
+data Constraint l a
+  = Equal (IType l a) (IType l a)
+  deriving (Eq, Ord, Show)
+
+-- | Record a new constraint.
+addConstraint :: Ground l => Constraint l a -> Check l a ()
+addConstraint c =
+  Check . lift $
+    modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
+
+-- -----------------------------------------------------------------------------
+-- Assumptions
+
+-- | Add an assumed type for some variable we've encountered.
+addAssumption :: Ground l => Name -> IType l a -> Check l a ()
+addAssumption n ty =
+  Check . lift $
+    modify' (\s -> s { sAssumptions = M.insertWith (<>) n [ty] (sAssumptions s)})
+
+-- | Clobber the assumption set for some variable.
+setAssumptions :: Ground l => Name -> [IType l a] -> Check l a ()
+setAssumptions n assums =
+  Check . lift $
+    modify' (\s -> s { sAssumptions = M.insert n assums (sAssumptions s)})
+
+-- | Delete all assumptions for some variable.
+--
+-- This is called when leaving the lexical scope in which the variable was bound.
+deleteAssumptions :: Ground l => Name -> Check l a ()
+deleteAssumptions n =
+  Check . lift $
+    modify' (\s -> s { sAssumptions = M.delete n (sAssumptions s)})
+
+-- | Look up all assumptions for a given name. Returns the empty set if there are none.
+lookupAssumptions :: Ground l => Name -> Check l a [IType l a]
+lookupAssumptions n =
+  Check . lift $
+    fmap (fromMaybe mempty) (gets (M.lookup n . sAssumptions))
+
+-- | Run some continuation with lexically-scoped assumptions.
+-- This is sorta like 'local', but we need to keep changes to other keys in the map.
+withBindings :: Ground l => Traversable f => f Name -> Check l a b -> Check l a (Map Name [IType l a], b)
+withBindings xs k = do
+  old <- fmap (M.fromList . toList) . for xs $ \n -> do
+    as <- lookupAssumptions n
+    deleteAssumptions n
+    pure (n, as)
+  res <- k
+  new <- fmap (M.fromList . toList) . for xs $ \n -> do
+    as <- lookupAssumptions n
+    setAssumptions n (fromMaybe mempty (M.lookup n old))
+    pure (n, as)
+  pure (new, res)
+
+withBinding :: Ground l => Name -> Check l a b -> Check l a ([IType l a], b)
+withBinding x k = do
+  (as, b) <- withBindings [x] k
+  pure (fromMaybe mempty (M.lookup x as), b)
+
+-- -----------------------------------------------------------------------------
+-- Constraint generation
+
+generateConstraints :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Expr l (IType l a, a), [Constraint l a])
+generateConstraints decls expr = do
+  (fmap (second (D.toList . sConstraints)) (runCheck (generateConstraints' decls expr)))
+
+generateConstraints' :: Ground l => TypeDecls l -> Expr l a -> Check l a (Expr l (IType l a, a))
+generateConstraints' decls expr =
   case expr of
     ELit a v ->
-      pure (ELit (TLit (typeOf v), a) v)
+      -- We know the type of literals instantly.
+      let ty = TLit (typeOf v)
+      in pure (ELit (hoistType a ty, a) v)
 
-    EVar a n ->
-      case clookup n ctx of
-        Just t ->
-          pure (EVar (t, a) n)
-        Nothing ->
-          typeError (FreeVariable n a)
+    EVar a v -> do
+      -- We introduce a new type variable representing the type of this expression.
+      -- Add it to the assumption set.
+      t <- freshTypeVar a
+      addAssumption v t
+      pure (EVar (t, a) v)
 
     ELam a n ta e -> do
-      e' <- typeCheck' tc (cextend n ta ctx) e
-      let tb = extractType e'
-      pure (ELam (TArrow ta tb, a) n ta e')
+      -- Proceed bottom-up, generating constraints for 'e'.
+      -- Gather the assumed types of 'n', and constrain them to be the known (annotated) type.
+      -- This expression's type is an arrow from the known type to the inferred type of 'e'.
+      (as, e') <- withBinding n (generateConstraints' decls e)
+      for_ as (addConstraint . Equal (hoistType a ta))
+      let ty = I (Am a (TArrowF (hoistType a ta) (extractType e')))
+      pure (ELam (ty, a) n ta e')
 
     EApp a f g -> do
-      (f', g') <- checkPair tc ctx f g
-      let tf = extractType f'
-          tg = extractType g'
-      ty <- case tf of
-        TArrow c d ->
-          if c == tg then pure d else typeError (Mismatch c tg (extractAnnotation g))
-        c ->
-          typeError (ExpectedArrow tg c (extractAnnotation f))
-      pure (EApp (ty, a) f' g')
+      -- Proceed bottom-up, generating constraints for 'f' and 'g'.
+      -- Introduce a new type variable for the result of the expression.
+      -- Constrain 'f' to be an arrow from the type of 'g' to this type.
+      f' <- generateConstraints' decls f
+      g' <- generateConstraints' decls g
+      t <- freshTypeVar a
+      addConstraint (Equal (I (Am a (TArrowF (extractType g') t))) (extractType f'))
+      pure (EApp (t, a) f' g')
+
+    EList a te es -> do
+      -- Proceed bottom-up, inferring types for each expression in the list.
+      -- Constrain each type to be the annotated 'ty'.
+      es' <- for es (generateConstraints' decls)
+      for_ es' (addConstraint . Equal (hoistType a te) . extractType)
+      let ty = I (Am a (TListF (hoistType a te)))
+      pure (EList (ty, a) te es')
 
     ECon a c tn es ->
-      case lookupType tn tc of
-        Just ty@(DVariant cs) -> do
-          -- Look up constructor name
-          ts <- maybe (typeError (BadConstructorName c tn ty a)) pure (L.lookup c cs)
-          -- Check arity
-          unless (length ts == length es) (typeError (BadConstructorArity c ty (length es) a))
-          -- Typecheck all bnds against expected
-          es' <- listC . with (L.zip ts es) $ \(t1, e) -> do
-            e' <- typeCheck' tc ctx e
-            let t2 = extractType e'
-            unless (t1 == t2) (typeError (Mismatch t1 t2 (extractAnnotation e)))
-            pure e'
-          pure (ECon (TVar tn, a) c tn es')
+      case lookupType tn decls of
+        Just ty@(DVariant cns) -> do
+          -- Look up the constructor, check its arity, and introduce
+          -- constraints for each of its subterms, for which we expect certain types.
+          ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
+          unless (length ts == length es) (throwError (BadConstructorArity c ty (length es) a))
+          es' <- for es (generateConstraints' decls)
+          for_ (L.zip (fmap (hoistType a) ts) (fmap extractType es'))
+            (\(expected, inferred) -> addConstraint (Equal expected inferred))
+          let ty' = I (Am a (TVarF tn))
+          pure (ECon (ty', a) c tn es')
 
         Nothing ->
-          typeError (FreeTypeVariable tn a)
+          throwError (UndeclaredType tn a)
 
     ECase a e pes -> do
-      e' <- typeCheck' tc ctx e
-      let te = extractType e'
-      pes' <- listC (fmap (uncurry (checkPattern tc ctx te)) pes)
-      tb <- unifyList a (typeError (NonExhaustiveCase expr te a)) (fmap (extractAnnotation . snd) pes')
-      pure (ECase (tb, a) e' pes')
-
-    EList a ty es -> do
-      es' <- listC . with es $ \e -> do
-        e' <- typeCheck' tc ctx e
-        let t = extractType e'
-        when (t /= ty) (typeError (Mismatch ty t (extractAnnotation e)))
-        pure e'
-      pure (EList (TList ty, a) ty es')
+      -- The body of the case expression should be the same type for each branch.
+      -- We introduce a new unification variable for that type.
+      -- Patterns introduce new constraints and bindings, managed in 'patternConstraints'.
+      e' <- generateConstraints' decls e
+      ty <- freshTypeVar a
+      pes' <- for pes $ \(pat, pe) -> do
+        let bnds = patternBinds pat
+        (_, res) <- withBindings (S.toList bnds) $ do
+          -- Order matters here, patCons consumes the assumptions from genCons.
+          pe' <- generateConstraints' decls pe
+          pat' <- patternConstraints decls (extractType e') pat
+          addConstraint (Equal ty (extractType pe'))
+          pure (pat', pe')
+        pure res
+      pure (ECase (ty, a) e' pes')
 
     EForeign a n ty -> do
-      pure (EForeign (ty, a) n ty)
+      -- We know the type of foreign expressions immediately, because they're annotated.
+      pure (EForeign (hoistType a ty, a) n ty)
 
--- | Check a pattern fits the type it is supposed to match,
--- then check its associated branch (if the pattern makes sense)
-checkPattern ::
+-- | Patterns are binding sites that also introduce lots of new constraints.
+patternConstraints ::
      Ground l
   => TypeDecls l
-  -> Ctx l
-  -> Type l
+  -> IType l a
   -> Pattern a
-  -> Expr l a
-  -> Check l a (Pattern (Type l, a), Expr l (Type l, a))
-checkPattern tc ctx ty pat expr = do
-  (pat', ctx') <- checkPattern' tc ctx ty pat
-  expr' <- typeCheck' tc ctx' expr
-  pure (pat', expr')
-
-checkPattern' ::
-     Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Type l
-  -> Pattern a
-  -> Check l a (Pattern (Type l, a), Ctx l)
-checkPattern' tc ctx ty pat =
+  -> Check l a (Pattern (IType l a, a))
+patternConstraints decls ty pat =
   case pat of
-    PVar a x ->
-      pure (PVar (ty, a) x, cextend x ty ctx)
+    PVar a x -> do
+      as <- lookupAssumptions x
+      for_ as (addConstraint . Equal ty)
+      pure (PVar (ty, a) x)
 
     PCon a c pats ->
-      case ty of
-        TVar tn ->
-          case lookupType tn tc of
-            Just (DVariant cs) -> do
-              -- find the constructor in the type
-              ts <- maybe (typeError (BadPatternConstructor c ty a)) pure (L.lookup c cs)
-              -- check the lists are the same length
-              unless (length ts == length pats) (typeError (BadPatternArity c ty (length ts) (length pats) a))
-              -- Check all recursive pats against type list
-              (pats', ctx') <- foldrM
-                                 (\(t', p') (pat', ctx') ->
-                                   fmap (\(p,cc) -> (p:pat', cc)) (checkPattern' tc ctx' t' p'))
-                                 ([], ctx)
-                                 (L.zip ts pats)
-              pure (PCon (ty, a) c pats', ctx')
-            Nothing ->
-              typeError (FreeTypeVariable tn a)
-        _ ->
-          typeError (BadPatternConstructor c ty a)
+      case lookupConstructor c decls of
+        Just (tn, ts) -> do
+          unless (length ts == length pats)
+            (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
+          let ty' = I (Am a (TVarF tn))
+          addConstraint (Equal ty' ty)
+          pats' <- for (L.zip (fmap (hoistType a) ts) pats) (uncurry (patternConstraints decls))
+          pure (PCon (ty', a) c pats')
 
-unifyList :: Ground l => a -> Check l a (Type l) -> [(Type l, a)] -> Check l a (Type l)
-unifyList a none es = do
-  case L.nubBy ((==) `on` fst) es of
-    (x, _):[] ->
-      pure x
-    [] ->
-      none
-    xs ->
-      typeError (CouldNotUnify xs a)
+        Nothing ->
+          throwError (BadPatternConstructor c a)
 
-extractType :: Expr l (Type l, a) -> Type l
+extractType :: Expr l (c, a) -> c
 extractType =
   fst . extractAnnotation
 
-typeError :: TypeError l a -> Check l a b
-typeError =
-  Check . Left . D.singleton
+-- -----------------------------------------------------------------------------
+-- Constraint solving
 
--- Check a pair of 'Expr', using 'apE' to accumulate the errors.
-checkPair ::
+newtype Substitutions l a
+  = Substitutions { unSubstitutions :: Map Int (IType l a) }
+  deriving (Eq, Ord, Show)
+
+substitute :: Ground l => Expr l (IType l a, a) -> Substitutions l a -> Expr l (IType l a, a)
+substitute expr subs =
+  with expr $ \(ty, a) ->
+    (substituteType subs ty, a)
+
+substituteType :: Ground l => Substitutions l a -> IType l a -> IType l a
+substituteType subs ty =
+  case ty of
+    I (Dunno _ x) ->
+      maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
+
+    I (Am a (TArrowF t1 t2)) ->
+      I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)))
+
+    I (Am a (TListF t)) ->
+      I (Am a (TListF (substituteType subs t)))
+
+    I (Am _ (TLitF _)) ->
+      ty
+
+    I (Am _ (TVarF _)) ->
+      ty
+{-# INLINE substituteType #-}
+
+newtype Points s l a = Points {
+    unPoints :: Map Int (UF.Point s (IType l a))
+  }
+
+mostGeneralUnifierST ::
      Ground l
-  => TypeDecls l
-  -> Ctx l
-  -> Expr l a
-  -> Expr l a
-  -> Check l a (Expr l (Type l, a), Expr l (Type l, a))
-checkPair tc ctx =
-  pairC `on` (typeCheck' tc ctx)
+  => STRef s (Points s l a)
+  -> IType l a
+  -> IType l a
+  -> ST s (Either (TypeError l a) ())
+mostGeneralUnifierST points t1 t2 =
+  runEitherT (mguST points t1 t2)
 
--- -----------------------------------------------------------------------------
+mguST ::
+     Ground l
+  => STRef s (Points s l a)
+  -> IType l a
+  -> IType l a
+  -> EitherT (TypeError l a) (ST s) ()
+mguST points t1 t2 =
+  case (t1, t2) of
+    (I (Dunno _ x), _) -> do
+      mty <- lift (getRepr points x)
+      case mty of
+        Just ty ->
+          if typeVar ty == Just x then lift (union points t1 t2)
+          else mguST points ty t2
+        Nothing ->
+          lift (union points t1 t2)
 
--- | Sequence errors from a list of 'Check'.
-listC :: [Check l a b] -> Check l a [b]
-listC =
-  fmap D.toList . foldl' (apC . fmap D.snoc) (pure mempty)
+    (_, I (Dunno _ x)) -> do
+      mty <- lift (getRepr points x)
+      case mty of
+        Just ty ->
+          if typeVar ty == Just x then lift (union points t2 t1)
+          else mguST points t1 ty
+        Nothing ->
+          lift (union points t2 t1)
 
--- | Sequence errors from two 'Check' functions.
-pairC :: Check l a b -> Check l a c -> Check l a (b, c)
-pairC l r =
-  apC (fmap (,) l) r
+    (I (Am _ (TVarF x)), I (Am _ (TVarF y))) ->
+      unless (x == y) (left (unificationError t1 t2))
 
--- | 'apE' lifted to 'Check'.
-apC :: Check l a (b -> c) -> Check l a b -> Check l a c
-apC l r =
-  Check $ apE (unCheck l) (unCheck r)
+    (I (Am _ (TLitF x)), I (Am _ (TLitF y))) ->
+      unless (x == y) (left (unificationError t1 t2))
 
--- -----------------------------------------------------------------------------
+    (I (Am _ (TArrowF f g)), I (Am _ (TArrowF h i))) -> do
+      mguST points f h
+      mguST points g i
 
--- A version of 'ap' that accumulates errors.
--- Useful when expressions do not relate to one another at all.
-apE :: Monoid e => Either e (a -> b) -> Either e a -> Either e b
-apE l r =
-  case (l, r) of
-    (Right f, Right a) ->
-      pure (f a)
-    (Left a, Right _) ->
-      Left a
-    (Right _, Left b) ->
-      Left b
-    (Left a, Left b) ->
-      Left (a <> b)
+    (I (Am _ (TListF a)), I (Am _ (TListF b))) ->
+      mguST points a b
 
+    (_, _) ->
+      left (unificationError t1 t2)
+
+solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
+solveConstraints constraints =
+  runST $ do
+    -- Initialise mutable state.
+    points <- ST.newSTRef (Points M.empty)
+
+    -- Solve all the constraints independently.
+    es <- fmap sequenceErrors . for constraints $ \c ->
+      case c of
+        Equal t1 t2 ->
+          fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
+
+    -- Retrieve the remaining points and produce a substitution map
+    solvedPoints <- ST.readSTRef points
+    for (first D.toList es) $ \_ -> do
+      fmap Substitutions (for (unPoints solvedPoints) (UF.descriptor <=< UF.repr))
+
+union :: STRef s (Points s l a) -> IType l a -> IType l a -> ST s ()
+union points t1 t2 = do
+  p1 <- getPoint points t1
+  p2 <- getPoint points t2
+  UF.union p1 p2
+
+-- | Fills the 'lookup' API hole in the union-find package.
+getPoint :: STRef s (Points s l a) -> IType l a -> ST s (UF.Point s (IType l a))
+getPoint mref ty =
+  case ty of
+    I (Dunno _ x) -> do
+      ps <- ST.readSTRef mref
+      case M.lookup x (unPoints ps) of
+        Just point ->
+          pure point
+        Nothing -> do
+          point <- UF.fresh ty
+          ST.modifySTRef' mref (Points . M.insert x point . unPoints)
+          pure point
+
+    I (Am _ _) ->
+      UF.fresh ty
+{-# INLINE getPoint #-}
+
+getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
+getRepr points x = do
+  ps <- ST.readSTRef points
+  for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
+
+hoistErrors :: Either e a -> Errors e a
+hoistErrors e =
+  case e of
+    Left es ->
+      Other (Constant es)
+
+    Right a ->
+      Pure a
+
+-- | Like 'sequence', but accumulating all errors in case of a 'Left'.
+sequenceErrors :: (Monoid e, Traversable f) => f (Either e a) -> Either e (f a)
+sequenceErrors =
+  runErrors . traverse hoistErrors

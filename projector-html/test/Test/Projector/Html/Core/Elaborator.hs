@@ -20,7 +20,7 @@ import           Projector.Html.Parser.QQ  (template)
 
 
 -- Input parses AND typechecks, else dump core
-elabProp :: Show a => Template a -> Property
+elabProp :: Ord a => Show a => Template a -> Property
 elabProp ast =
   let core = HE.elaborate ast
       ety = HC.typeCheck core
