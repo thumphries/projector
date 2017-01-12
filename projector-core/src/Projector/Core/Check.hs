@@ -17,6 +17,7 @@ module Projector.Core.Check (
   -- * Guts
   , generateConstraints
   , solveConstraints
+  , Substitutions (..)
   ) where
 
 
@@ -175,6 +176,14 @@ unificationError =
 lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Type l, a))
 lowerExpr =
   sequenceErrors . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
+
+typeVar :: IType l a -> Maybe Int
+typeVar ty =
+  case ty of
+    I (Dunno _ x) ->
+      pure x
+    I (Am _ _) ->
+      Nothing
 
 -- -----------------------------------------------------------------------------
 -- Monad stack
@@ -509,7 +518,9 @@ mguST points t1 t2 =
 unifyVar :: Ground l => STRef s (Points s l a) -> a -> Int -> IType l a -> EitherT (TypeError l a) (ST s) ()
 unifyVar points a x t2 = do
   mt1 <- lift (getRepr points x)
-  let safeUnion c z u2 = hoistEither (occurs c z u2) *> lift (union points (I (Dunno c z)) u2)
+  let safeUnion c z u2 =
+        unless (typeVar u2 == Just z)
+          (hoistEither (occurs c z u2) *> lift (union points (I (Dunno c z)) u2))
   case mt1 of
     -- special case if the var is its class representative
     Just t1@(I (Dunno b y)) ->
@@ -524,7 +535,6 @@ unifyVar points a x t2 = do
 -- | Check that a given unification variable isn't present inside the
 -- type it's being unified with. This is necessary for typechecking
 -- to be sound, it prevents us from constructing the infinite type.
--- FIX whoops, this needs another special case for refl
 occurs :: a -> Int -> IType l a -> Either (TypeError l a) ()
 occurs a q ity =
   go q ity
@@ -562,7 +572,12 @@ solveConstraints constraints =
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
     for (first D.toList es) $ \_ -> do
-      fmap Substitutions (for (unPoints solvedPoints) (UF.descriptor <=< UF.repr))
+      substitutionMap solvedPoints
+
+substitutionMap :: Points s l a -> ST s (Substitutions l a)
+substitutionMap points = do
+  subs <- for (unPoints points) (UF.descriptor <=< UF.repr)
+  pure (Substitutions (M.filterWithKey (\k v -> case v of I (Dunno _ x) -> k /= x; _ -> True) subs))
 
 union :: STRef s (Points s l a) -> IType l a -> IType l a -> ST s ()
 union points t1 t2 = do
