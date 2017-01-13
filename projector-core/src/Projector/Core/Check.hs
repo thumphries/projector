@@ -19,7 +19,6 @@ module Projector.Core.Check (
   ) where
 
 
-import           Control.Applicative.Lift (Errors, Lift (..), runErrors)
 import           Control.Monad.ST (ST, runST)
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.State.Strict (State, runState, gets, modify')
@@ -27,7 +26,6 @@ import           Control.Monad.Trans.State.Strict (State, runState, gets, modify
 import           Data.Char (chr, ord)
 import           Data.DList (DList)
 import qualified Data.DList as D
-import           Data.Functor.Constant (Constant(..))
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -42,7 +40,7 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT)
+import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT, sequenceEither)
 
 
 data TypeError l a
@@ -72,7 +70,7 @@ typeTree decls expr = do
   (expr', constraints) <- generateConstraints decls expr
   subs <- solveConstraints constraints
   let subbed = substitute expr' subs
-  sequenceErrors (fmap (\(i, a) -> fmap (,a) (first pure (lowerIType i))) subbed)
+  sequenceEither (fmap (\(i, a) -> fmap (,a) (first pure (lowerIType i))) subbed)
 
 -- -----------------------------------------------------------------------------
 -- Types
@@ -473,7 +471,7 @@ solveConstraints constraints =
     points <- ST.newSTRef (Points M.empty)
 
     -- Solve all the constraints independently.
-    es <- fmap sequenceErrors . for constraints $ \c ->
+    es <- fmap sequenceEither . for constraints $ \c ->
       case c of
         Equal t1 t2 ->
           fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
@@ -511,17 +509,3 @@ getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
 getRepr points x = do
   ps <- ST.readSTRef points
   for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
-
-hoistErrors :: Either e a -> Errors e a
-hoistErrors e =
-  case e of
-    Left es ->
-      Other (Constant es)
-
-    Right a ->
-      Pure a
-
--- | Like 'sequence', but accumulating all errors in case of a 'Left'.
-sequenceErrors :: (Monoid e, Traversable f) => f (Either e a) -> Either e (f a)
-sequenceErrors =
-  runErrors . traverse hoistErrors
