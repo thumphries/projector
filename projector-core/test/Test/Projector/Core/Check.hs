@@ -12,6 +12,7 @@ import           P
 
 import           Projector.Core.Check
 import           Projector.Core.Simplify (nf, whnf)
+import           Projector.Core.Syntax (extractAnnotation)
 
 import           Test.Projector.Core.Arbitrary
 
@@ -25,6 +26,13 @@ prop_welltyped =
 prop_welltyped_shrink =
   jackShrinkProp 5 genWellTypedTestExpr' $ \(ty, ctx, e) ->
     typeCheck ctx e === pure ty
+
+prop_welltyped_letrec =
+  gamble genWellTypedTestLetrec $ \(ctx, mexps) ->
+    let etypes = fmap fst mexps
+        exprs = fmap snd mexps
+        atypes = fmap (fmap (fst . extractAnnotation)) (typeCheckAll ctx exprs)
+    in atypes === pure etypes
 
 prop_illtyped =
   gamble genIllTypedTestExpr' $ \(ctx, e) ->

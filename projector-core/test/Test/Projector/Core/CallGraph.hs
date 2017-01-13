@@ -5,14 +5,11 @@
 module Test.Projector.Core.CallGraph where
 
 
-import           Data.Char  (isAsciiLower)
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import qualified Data.Text as T
 
 import           Disorder.Core
-import           Disorder.Corpus
 import           Disorder.Jack
 
 import           P
@@ -81,13 +78,6 @@ genAcycle names =
     genem x (y:ys) =
       (y, var x) : genem y ys
 
-
-genName :: Jack Name
-genName =
-  frequency [
-      (1, Name <$> elements muppets)
-    , (10, Name . T.pack <$> vectorOf 8 (arbitrary `suchThat` isAsciiLower))
-    ]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

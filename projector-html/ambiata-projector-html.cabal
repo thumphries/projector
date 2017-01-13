@@ -118,6 +118,7 @@ test-suite test
                      , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*
                      , text
+                     , containers
 
 test-suite test-io
   type:                exitcode-stdio-1.0

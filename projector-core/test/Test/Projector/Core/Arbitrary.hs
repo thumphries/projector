@@ -422,6 +422,22 @@ genWellTypedApp n ty ctx names genty genval = do
   reshrink (\x -> [whnf x]) $
     pure (app fun arg)
 
+genWellTypedLetrec ::
+     (Ground l, Ord l)
+  => Int
+  -> TypeDecls l
+  -> Jack (Type l)
+  -> (l -> Jack (Value l))
+  -> Jack (Map Name (Type l, Expr l ()))
+genWellTypedLetrec n decls genty genval = do
+    k <- chooseInt (0, n)
+    -- generate n names and types
+    ntys <- genSizedMap k genName genty
+    (_, res) <- foldM (\(ctx, acc) (na, ty) -> do
+      m <- chooseInt (0, n `div` k)
+      e <- genWellTypedExpr' m ty decls ctx genty genval
+      pure (cextend decls ctx ty na, M.insert na (ty, e) acc)) (centy, mempty) (M.toList ntys)
+    pure res
 
 -- -----------------------------------------------------------------------------
 -- Generating ill-typed expressions
@@ -543,6 +559,11 @@ genSizedSet n gen =
       e <- g `suchThat` (`S.notMember` s)
       go (k-1) g (S.insert e s)
 
+genSizedMap :: Ord k => Int -> Jack k -> Jack v -> Jack (Map k v)
+genSizedMap n gk gv = do
+  keys <- genSizedSet n gk
+  fmap M.fromList . for (S.toList keys) $ \k -> (k,) <$> gv
+
 -- | a dodgy way to test jack shrinking invariants
 jackShrinkProp :: Show a => Int -> Jack a -> (a -> Property) -> Property
 jackShrinkProp n gen prop =
@@ -609,18 +630,23 @@ genWellTypedTestLitValue t =
     TInt -> VInt <$> chooseInt (0, 100)
     TString -> VString <$> elements cooking
 
+genName :: Jack Name
+genName =
+  fmap Name (genIdent 12)
+
 genTypeName :: Jack TypeName
 genTypeName =
-  fmap (TypeName . T.toTitle) $ oneOf [
-      elements boats
-    , T.pack <$> vectorOf 8 (arbitrary `suchThat` isAsciiLower)
-    ]
+  fmap (TypeName . T.toTitle) (genIdent 8)
 
 genConstructor :: Jack Constructor
 genConstructor =
-  fmap (Constructor . T.toTitle) $ oneOf [
+  fmap (Constructor . T.toTitle) (genIdent 8)
+
+genIdent :: Int -> Jack Text
+genIdent x =
+  oneOf [
       elements waters
-    , T.pack <$> vectorOf 8 (arbitrary `suchThat` isAsciiLower)
+    , T.pack <$> vectorOf x (arbitrary `suchThat` isAsciiLower)
     ]
 
 -- -----------------------------------------------------------------------------
@@ -639,6 +665,14 @@ genWellTypedTestExpr' = do
   ctx <- genTestTypeDecls
   ty <- genTestType ctx
   (ty, ctx,) <$> genWellTypedTestExpr ctx ty
+
+genWellTypedTestLetrec :: Jack (TypeDecls TestLitT, Map Name (Type TestLitT, Expr TestLitT ()))
+genWellTypedTestLetrec =
+  sized $ \n -> do
+    k <- chooseInt (0, n)
+    ctx <- genTestTypeDecls
+    res <- genWellTypedLetrec k ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
+    pure (ctx, res)
 
 genIllTypedTestExpr :: TypeDecls TestLitT -> Jack (Expr TestLitT ())
 genIllTypedTestExpr ctx = do
