@@ -5,7 +5,6 @@
 module Test.IO.Projector.Html.Backend.Haskell where
 
 
-import qualified Data.List as L
 import qualified Data.Map.Strict as M
 
 import           Disorder.Core
@@ -14,7 +13,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import qualified Projector.Html.Core.Prim as Prim
+import           Projector.Html.Core
 import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Backend.Data
 import           Projector.Html.Backend.Haskell
@@ -22,7 +21,6 @@ import           Projector.Html.Backend.Haskell
 import           System.Process (readProcessWithExitCode)
 
 import           Test.IO.Projector.Html.Backend.Property  (processProp, fileProp, helloWorld)
-import           Test.Projector.Core.Arbitrary (freshNames)
 import           Test.Projector.Html.Arbitrary
 
 
@@ -71,13 +69,13 @@ prop_welltyped :: Property
 prop_welltyped =
   gamble genHtmlTypeDecls $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
-      gamble (vectorOf k (genWellTypedHtmlExpr decls)) $ \exprs ->
+      gamble (genWellTypedHtmlModule k decls) $ \exprs ->
         moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") $ Module {
-            moduleTypes = subtractTypes decls (Lib.types <> Prim.types)
+            moduleTypes = subtractTypes decls htmlTypes
           , moduleImports = M.fromList [
                 (htmlRuntime, OpenImport)
               ]
-          , moduleExprs = M.fromList (L.zip (freshNames "expr") exprs)
+          , moduleExprs = exprs
           }
 
 -- -----------------------------------------------------------------------------
