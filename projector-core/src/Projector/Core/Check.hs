@@ -42,7 +42,8 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT, sequenceEither)
+import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT)
+import qualified X.Control.Monad.Trans.Either as ET
 
 
 data TypeError l a
@@ -75,22 +76,21 @@ typeCheckAll ::
   -> Map Name (Expr l a)
   -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
 typeCheckAll decls exprs = do
-  -- for each declaration,
-  --   - generate constraints and assumptions
+  -- for each declaration, generate constraints and assumptions
   (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
-  --   - build up new global set of constraints from the assumptions
+  -- build up new global set of constraints from the assumptions
   let localConstraints = sConstraints sstate
       Assumptions assums = sAssumptions sstate
       types = fmap extractType annotated
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
         maybe mempty (with itys . Equal) (M.lookup n types)
       constraints = D.toList (localConstraints <> globalConstraints)
-  --   - solve them all at once
+  -- solve them all at once
   subs <- solveConstraints constraints
-  --   - substitute them all at once
+  -- substitute them all at once
   let subbed = fmap (substitute subs) annotated
-  --   - lower them all at once
-  first D.toList (sequenceErrors (fmap lowerExpr subbed))
+  -- lower them all at once
+  first D.toList (ET.sequenceEither (fmap lowerExpr subbed))
 
 typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
 typeCheck decls =
@@ -104,8 +104,8 @@ typeTree ::
 typeTree decls expr = do
   (expr', constraints, _assums) <- generateConstraints decls expr
   subs <- solveConstraints constraints
-  let subbed = substitute expr' subs
-  sequenceEither (fmap (\(i, a) -> fmap (,a) (first pure (lowerIType i))) subbed)
+  let subbed = substitute subs expr'
+  first D.toList (lowerExpr subbed)
 
 -- -----------------------------------------------------------------------------
 -- Types
@@ -175,7 +175,7 @@ unificationError =
 
 lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Type l, a))
 lowerExpr =
-  sequenceErrors . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
+  ET.sequenceEither . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
 
 typeVar :: IType l a -> Maybe Int
 typeVar ty =
@@ -225,12 +225,7 @@ throwError =
 
 sequenceCheck :: Traversable t => t (Check l a b) -> Check l a (t b)
 sequenceCheck =
-  Check . sequenceEitherT . fmap unCheck
-
-sequenceEitherT :: (Monad m, Monoid e, Traversable t) => t (EitherT e m a) -> EitherT e m (t a)
-sequenceEitherT es = do
-  es' <- lift (traverse runEitherT es)
-  hoistEither (sequenceErrors es')
+  Check . ET.sequenceEitherT . fmap unCheck
 
 -- -----------------------------------------------------------------------------
 -- Name supply
@@ -520,7 +515,7 @@ unifyVar points a x t2 = do
   mt1 <- lift (getRepr points x)
   let safeUnion c z u2 =
         unless (typeVar u2 == Just z)
-          (hoistEither (occurs c z u2) *> lift (union points (I (Dunno c z)) u2))
+          (ET.hoistEither (occurs c z u2) *> lift (union points (I (Dunno c z)) u2))
   case mt1 of
     -- special case if the var is its class representative
     Just t1@(I (Dunno b y)) ->
@@ -564,7 +559,7 @@ solveConstraints constraints =
     points <- ST.newSTRef (Points M.empty)
 
     -- Solve all the constraints independently.
-    es <- fmap sequenceEither . for constraints $ \c ->
+    es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
         Equal t1 t2 ->
           fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
