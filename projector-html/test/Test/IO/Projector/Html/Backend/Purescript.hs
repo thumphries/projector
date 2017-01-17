@@ -6,7 +6,6 @@
 module Test.IO.Projector.Html.Backend.Purescript where
 
 
-import qualified Data.List as L
 import qualified Data.Map.Strict as M
 
 import           Disorder.Core
@@ -22,7 +21,6 @@ import qualified Projector.Html.Core.Prim as Prim
 import           System.Process (CreateProcess (..), proc, readCreateProcessWithExitCode)
 
 import           Test.IO.Projector.Html.Backend.Property (fileProp, helloWorld, processProp)
-import           Test.Projector.Core.Arbitrary (freshNames)
 import           Test.Projector.Html.Arbitrary
 
 
@@ -44,7 +42,7 @@ prop_welltyped :: Property
 prop_welltyped =
   gamble genHtmlTypeDecls $ \decls ->
     gamble (chooseInt (0,  100)) $ \k ->
-      gamble (vectorOf k (genWellTypedHtmlExpr decls)) $ \exprs ->
+      gamble (genWellTypedHtmlModule k decls) $ \exprs ->
         moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ Module {
             moduleTypes = decls
           -- TODO once the runtime actually contains stuff, uncomment this
@@ -52,7 +50,7 @@ prop_welltyped =
           , moduleImports = M.fromList [
                 (ModuleName "Projector.Html.Runtime", OpenImport)
               ]
-          , moduleExprs = M.fromList (L.zip (freshNames "expr") exprs)
+          , moduleExprs = exprs
           }
 
 -- -----------------------------------------------------------------------------

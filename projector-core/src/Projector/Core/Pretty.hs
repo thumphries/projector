@@ -87,6 +87,11 @@ ppTypeError' err =
     InferenceError a ->
       -- TODO this error is really awful
       WL.annotate a (text "Could not infer a monotype for some expression.")
+    InfiniteType (t1, a) (t2, b) ->
+      WL.hang 2
+        (text "Type error (occurs check) - cannot construct the infinite type!"
+          <$$> WL.annotate a (text (ppType t1))
+          <$$> WL.annotate b (text (ppType t2)))
 
 -- -----------------------------------------------------------------------------
 

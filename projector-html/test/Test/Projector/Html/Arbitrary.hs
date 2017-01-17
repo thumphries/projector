@@ -9,6 +9,7 @@ import           Data.Generics.Aliases
 import           Data.Generics.Schemes
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import           Data.Map.Strict (Map)
 import qualified Data.Text as T
 import           Data.Text.Arbitrary ()
 
@@ -17,10 +18,11 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core (Name)
 import           Projector.Html.Data.Template
+import           Projector.Html.Core (htmlTypes)
 import           Projector.Html.Core.Prim (HtmlDecls, HtmlType, HtmlExpr, HtmlLit)
 import qualified Projector.Html.Core.Prim as Prim
-import qualified Projector.Html.Core.Library as Lib
 
 import           Test.Projector.Core.Arbitrary
 import           Test.QuickCheck.Jack hiding (listOf1)
@@ -31,15 +33,17 @@ import           Test.QuickCheck.Jack hiding (listOf1)
 
 genHtmlTypeDecls :: Jack HtmlDecls
 genHtmlTypeDecls =
-  let htmlTypes =
-        Prim.types <> Lib.types
-  in genTypeDecls htmlTypes genTypeName genConstructor genHtmlLitT
+  genTypeDecls htmlTypes genTypeName genConstructor genHtmlLitT
 
 genWellTypedHtmlExpr :: HtmlDecls -> Jack (HtmlType, HtmlExpr ())
 genWellTypedHtmlExpr ctx = do
   ty <- genHtmlType ctx
   ex <- genWellTypedExpr ctx ty (genHtmlType ctx) genWellTypedHtmlLit
   pure (ty, ex)
+
+genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Map Name (HtmlType, HtmlExpr ()))
+genWellTypedHtmlModule n decls =
+  genWellTypedLetrec n (decls <> htmlTypes) (genHtmlType decls) genWellTypedHtmlLit
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =
