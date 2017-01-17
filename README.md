@@ -59,9 +59,17 @@ backend targeting `Hydrant` would render each template accepting a
 
 This is a Haskell Hydrant runtime for `projector-html`.
 
+This runtime is largely responsible for reexporting the right set of
+primitive types, and Hydrant. If the runtime is doing serious
+rendering work, the backend is not finished.
+
 ### projector-html-runtime-purs
 
 This is a Purescript Pux runtime for `projector-html`.
+
+This runtime is largely responsible for reexporting the right set of
+primitive types, and Pux. If the runtime is doing serious rendering
+work, the backend is not finished.
 
 ## Conceptual reviewers
 
