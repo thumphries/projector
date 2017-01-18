@@ -173,9 +173,9 @@ withBind n f = do
   maybe (err (ReplUnbound n)) f mbind
 
 data Binding
-  = TBind (Template Range) HtmlType (HtmlExpr Range)
-  | TFBind FilePath (Template Range) HtmlType (HtmlExpr Range)
-  | EBind HtmlType (HtmlExpr Range)
+  = TBind (Template Range) HtmlType (HtmlExpr (HtmlType, Range))
+  | TFBind FilePath (Template Range) HtmlType (HtmlExpr (HtmlType, Range))
+  | EBind HtmlType (HtmlExpr (HtmlType, Range))
   deriving (Eq, Show)
 
 boundType :: Binding -> HtmlType
@@ -188,7 +188,7 @@ boundType b =
     EBind t _ ->
       t
 
-boundCore :: Binding -> HtmlExpr Range
+boundCore :: Binding -> HtmlExpr (HtmlType, Range)
 boundCore b =
   case b of
     TBind _ _ c ->
@@ -250,12 +250,12 @@ runReplCommand cmd =
     ExitRepl ->
       pure ReplExit
 
-loadTemplate :: FilePath -> Repl (Template Range, HtmlType, HtmlExpr Range)
+loadTemplate :: FilePath -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, Range))
 loadTemplate f = do
   t <- liftIO (T.readFile f)
   parseTemplate' f t
 
-parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr Range)
+parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, Range))
 parseTemplate' f t =
   Repl . lift . firstEitherT ReplError $ do
     ast <- hoistEither (Html.parseTemplate f t)

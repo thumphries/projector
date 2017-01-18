@@ -7,6 +7,8 @@ module Projector.Html.Core (
   , renderCoreErrorRange
   , templateToCore
   , typeCheck
+  , typeCheckAll
+  , typeCheckIncremental
   , htmlTypes
   -- * Various type aliases
   , HtmlType
@@ -17,13 +19,13 @@ module Projector.Html.Core (
   ) where
 
 
+import           Data.Map.Strict (Map)
 import qualified Data.Text as T
 
 import           P
 
 import qualified Projector.Core as PC
 import qualified Projector.Core.Pretty as PCP
-import qualified Projector.Core.Simplify as Simp
 import qualified Projector.Html.Core.Elaborator as Elab
 import qualified Projector.Html.Core.Library as Library
 import           Projector.Html.Data.Prim
@@ -46,15 +48,37 @@ renderCoreErrorRange :: CoreError Range -> Text
 renderCoreErrorRange =
   renderCoreError (\r -> (renderRange r <> ": ")) (const mempty)
 
-templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr a)
-templateToCore t =
-  let core = Elab.elaborate t
-  in fmap (, Simp.nf core) (typeCheck core)
+templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr (HtmlType, a))
+templateToCore =
+  typeTree . Elab.elaborate
 
 typeCheck :: HtmlExpr a -> Either (CoreError a) HtmlType
 typeCheck =
-  first HtmlTypeError . PC.typeCheck htmlTypes
+  fmap fst . typeTree
+
+typeTree :: HtmlExpr a -> Either (CoreError a) (HtmlType, HtmlExpr (HtmlType, a))
+typeTree =
+   first HtmlTypeError . fmap (\e -> (extractType e, e)) . PC.typeTree htmlTypes
+
+typeCheckAll ::
+     HtmlDecls
+  -> Map PC.Name (HtmlExpr a)
+  -> Either (CoreError a) (Map PC.Name (HtmlType, HtmlExpr (HtmlType, a)))
+typeCheckAll typs =
+  first HtmlTypeError . fmap (fmap (\e -> (extractType e, e))) . PC.typeCheckAll (typs <> htmlTypes)
+
+typeCheckIncremental ::
+     HtmlDecls
+  -> Map PC.Name (HtmlType, a)
+  -> Map PC.Name (HtmlExpr a)
+  -> Either (CoreError a) (Map PC.Name (HtmlType, HtmlExpr (HtmlType, a)))
+typeCheckIncremental typs known =
+  first HtmlTypeError . fmap (fmap (\e -> (extractType e, e))) . PC.typeCheckIncremental (typs <> htmlTypes) known
 
 htmlTypes :: HtmlDecls
 htmlTypes =
   Prim.types <> Library.types
+
+extractType :: HtmlExpr (HtmlType, a) -> HtmlType
+extractType =
+  fst . PC.extractAnnotation

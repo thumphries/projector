@@ -54,6 +54,8 @@ library
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
+                       Projector.Html.ModuleGraph
+
                        Projector.Html.Parser
                        Projector.Html.Parser.QQ
 
