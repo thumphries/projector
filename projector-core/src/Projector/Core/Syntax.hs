@@ -7,7 +7,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Syntax (
     Expr (..)
   , extractAnnotation
@@ -64,9 +63,9 @@ data Expr l a
   | EForeign a Name (Type l)
   deriving (Functor, Foldable, Traversable)
 
-deriving instance (Eq l, Eq (Value l), Eq a) => Eq (Expr l a)
-deriving instance (Show l, Show (Value l), Show a) => Show (Expr l a)
-deriving instance (Ord l, Ord (Value l), Ord a) => Ord (Expr l a)
+deriving instance (Ground l, Eq a) => Eq (Expr l a)
+deriving instance (Ground l, Show a) => Show (Expr l a)
+deriving instance (Ground l, Ord a) => Ord (Expr l a)
 
 extractAnnotation :: Expr l a -> a
 extractAnnotation e =
