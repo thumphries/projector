@@ -1,13 +1,11 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Projector.Core.Check (
   -- * Interface
     TypeError (..)
@@ -56,9 +54,9 @@ data TypeError l a
   | InferenceError a
   | InfiniteType (Type l, a) (Type l, a)
 
-deriving instance (Eq l, Eq (Value l), Eq a) => Eq (TypeError l a)
-deriving instance (Show l, Show (Value l), Show a) => Show (TypeError l a)
-deriving instance (Ord l, Ord (Value l), Ord a) => Ord (TypeError l a)
+deriving instance (Ground l, Eq a) => Eq (TypeError l a)
+deriving instance (Ground l, Show a) => Show (TypeError l a)
+deriving instance (Ground l, Ord a) => Ord (TypeError l a)
 
 
 -- | Typecheck an interdependent set of named expressions.

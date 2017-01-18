@@ -7,7 +7,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Projector.Core.Type (
   -- * Types
   -- ** Interface
@@ -65,7 +65,7 @@ data Decl l
   deriving (Eq, Ord, Show)
 
 -- | The class of user-supplied primitive types.
-class (Eq l, Ord l) => Ground l where
+class (Eq l, Ord l, Show l, Eq (Value l), Ord (Value l), Show (Value l)) => Ground l where
   data Value l
   typeOf :: Value l -> l
   ppGroundType :: l -> Text
