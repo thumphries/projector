@@ -27,7 +27,7 @@ import qualified Data.Tree as Tree
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend
+import           Projector.Html.Data.Module
 
 
 data GraphError

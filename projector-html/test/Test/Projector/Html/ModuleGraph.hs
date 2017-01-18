@@ -13,9 +13,9 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Syntax
-import           Projector.Html.Backend
 import           Projector.Html.Core
-import           Projector.Html.Core.Prim
+import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 import           Projector.Html.ModuleGraph
 
 import           Test.Projector.Core.Arbitrary (genName)
