@@ -5,6 +5,7 @@ module Projector.Html (
   , renderHtmlError
   , parseTemplate
   , checkTemplate
+  , checkTemplateIncremental
   , checkModule
   , checkModules
   , codeGenModule
@@ -25,6 +26,9 @@ import qualified Projector.Core as PC
 import qualified Projector.Html.Backend as HB
 import qualified Projector.Html.Core as HC
 import           Projector.Html.Core  (CoreError(..))
+import qualified Projector.Html.Core.Elaborator as Elab
+import qualified Projector.Html.Data.Backend as HB
+import qualified Projector.Html.Data.Module as HB
 import           Projector.Html.Data.Position  (Range)
 import           Projector.Html.Data.Prim
 import           Projector.Html.Data.Template  (Template)
@@ -54,6 +58,17 @@ parseTemplate f =
 checkTemplate :: Template Range -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Range))
 checkTemplate =
   first HtmlCoreError . HC.templateToCore
+
+checkTemplateIncremental ::
+     Map Text (HtmlType, Range)
+  -> Template Range
+  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Range))
+checkTemplateIncremental known ast =
+    first HtmlCoreError
+  . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
+  . HC.typeCheckIncremental mempty (M.mapKeys PC.Name known)
+  . M.singleton (PC.Name "it")
+  $ Elab.elaborate ast
 
 checkModule ::
      HtmlDecls

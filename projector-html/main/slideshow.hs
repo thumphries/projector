@@ -146,12 +146,14 @@ data ReplResponse
 
 data ReplState = ReplState {
     replBindings :: Bindings
+  , replKnown :: Map Text (HtmlType, Range)
   , replMultiline :: Bool
   } deriving (Eq, Show)
 
 defaultReplState :: ReplState
 defaultReplState = ReplState {
     replBindings = mempty
+  , replKnown = mempty
   , replMultiline = False
   }
 
@@ -164,8 +166,8 @@ bind n b (Bindings m) =
 
 bindM :: Text -> Binding -> Repl ()
 bindM n b =
-  Repl . modify' $ \(ReplState bs m) ->
-    ReplState (bind n b bs) m
+  Repl . modify' $ \(ReplState bs kn m) ->
+    ReplState (bind n b bs) (M.insert n (Core.extractAnnotation (boundCore b)) kn) m
 
 withBind :: Text -> (Binding -> Repl a) -> Repl a
 withBind n f = do
@@ -257,10 +259,12 @@ loadTemplate f = do
 
 parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, Range))
 parseTemplate' f t =
-  Repl . lift . firstEitherT ReplError $ do
-    ast <- hoistEither (Html.parseTemplate f t)
-    (ty, core) <- hoistEither (Html.checkTemplate ast)
-    pure (ast, ty, core)
+  Repl $ do
+    k <- gets replKnown
+    lift . firstEitherT ReplError $ do
+      ast <- hoistEither (Html.parseTemplate f t)
+      (ty, core) <- hoistEither (Html.checkTemplateIncremental k ast)
+      pure (ast, ty, core)
 
 err :: ReplError -> Repl a
 err =
