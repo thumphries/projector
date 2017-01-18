@@ -13,7 +13,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import qualified Projector.Html.Core.Prim as Prim
+import qualified Projector.Html.Data.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
 import           System.Directory (createDirectoryIfMissing, makeAbsolute)

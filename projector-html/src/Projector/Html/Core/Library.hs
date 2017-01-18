@@ -26,8 +26,7 @@ import qualified Data.Map.Strict as M
 import           P
 
 import           Projector.Core
-import           Projector.Html.Core.Prim (HtmlType, HtmlDecl, HtmlDecls)
-import qualified Projector.Html.Core.Prim as Prim
+import           Projector.Html.Data.Prim
 
 
 types :: HtmlDecls
@@ -54,7 +53,7 @@ tTag =
 dTag :: HtmlDecl
 dTag =
   DVariant [
-      (Constructor "Tag", [TLit Prim.TString])
+      (Constructor "Tag", [TLit TString])
     ]
 
 -- -----------------------------------------------------------------------------
@@ -86,7 +85,7 @@ tAttributeKey =
 dAttributeKey :: HtmlDecl
 dAttributeKey =
   DVariant [
-      (Constructor "AttributeKey", [TLit Prim.TString])
+      (Constructor "AttributeKey", [TLit TString])
     ]
 
 -- -----------------------------------------------------------------------------
@@ -102,7 +101,7 @@ tAttributeValue =
 dAttributeValue :: HtmlDecl
 dAttributeValue =
   DVariant [
-      (Constructor "AttributeValue", [TLit Prim.TString])
+      (Constructor "AttributeValue", [TLit TString])
     ]
 
 -- -----------------------------------------------------------------------------
@@ -137,7 +136,7 @@ dHtmlNode =
   DVariant [
       (Constructor "Element", [tTag, TList tAttribute, tHtml])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
-    , (Constructor "Comment", [TLit Prim.TString])
-    , (Constructor "Plain", [TLit Prim.TString])
+    , (Constructor "Comment", [TLit TString])
+    , (Constructor "Plain", [TLit TString])
     , (Constructor "Whitespace", [])
     ]

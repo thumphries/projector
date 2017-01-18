@@ -14,8 +14,9 @@ import           P
 
 import           Projector.Core
 
-import           Projector.Html.Backend.Data
-import           Projector.Html.Core.Prim as Prim
+import           Projector.Html.Core
+import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 
 import           System.IO  (FilePath)
 
@@ -25,7 +26,7 @@ import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module a -> (FilePath, Text)
+renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let modName = T.unwords ["module", n, "where"]
       imports = fmap (uncurry genImport) (M.toList (moduleImports m))
@@ -40,7 +41,7 @@ renderExpr :: Name -> HtmlExpr a -> Text
 renderExpr n =
   prettyUndecorated . genExpDec n
 
-genModule :: Module a -> [Doc a]
+genModule :: Module HtmlType a -> [Doc a]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->

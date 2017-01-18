@@ -9,11 +9,11 @@ module Projector.Html.Core (
   , typeCheck
   , htmlTypes
   -- * Various type aliases
-  , Prim.HtmlType
-  , Prim.HtmlDecl
-  , Prim.HtmlDecls
-  , Prim.HtmlExpr
-  , Prim.HtmlLit
+  , HtmlType
+  , HtmlDecl
+  , HtmlDecls
+  , HtmlExpr
+  , HtmlLit
   ) where
 
 
@@ -26,7 +26,7 @@ import qualified Projector.Core.Pretty as PCP
 import qualified Projector.Core.Simplify as Simp
 import qualified Projector.Html.Core.Elaborator as Elab
 import qualified Projector.Html.Core.Library as Library
-import           Projector.Html.Core.Prim
+import           Projector.Html.Data.Prim
 import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Position (Range, renderRange)
 import           Projector.Html.Data.Template (Template)
