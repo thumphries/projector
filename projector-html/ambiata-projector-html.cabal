@@ -43,12 +43,14 @@ library
                        Projector.Html.Core.Prim
 
                        Projector.Html.Backend
-                       Projector.Html.Backend.Data
                        Projector.Html.Backend.Haskell
                        Projector.Html.Backend.Haskell.TH
                        Projector.Html.Backend.Purescript
 
+                       Projector.Html.Data.Backend
+                       Projector.Html.Data.Module
                        Projector.Html.Data.Position
+                       Projector.Html.Data.Prim
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 

@@ -16,8 +16,9 @@ module Projector.Html (
 import           P
 
 import qualified Projector.Html.Core as HC
-import           Projector.Html.Core  (CoreError(..), HtmlType, HtmlExpr)
+import           Projector.Html.Core  (CoreError(..))
 import           Projector.Html.Data.Position  (Range)
+import           Projector.Html.Data.Prim
 import           Projector.Html.Data.Template  (Template)
 import           Projector.Html.Parser (ParseError (..), renderParseError, parse)
 

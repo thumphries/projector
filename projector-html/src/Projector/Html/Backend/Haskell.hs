@@ -26,16 +26,18 @@ import qualified Language.Haskell.TH as TH
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend.Data
+
+import           Projector.Html.Core
+import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 import           Projector.Html.Backend.Haskell.TH
-import           Projector.Html.Core.Prim as Prim
 
 import           System.IO (FilePath)
 
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module a -> (FilePath, Text)
+renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
@@ -68,7 +70,7 @@ genImport (ModuleName n) imports =
           "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
-genModule :: Module a -> [TH.Dec]
+genModule :: Module HtmlType a -> [TH.Dec]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->

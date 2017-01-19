@@ -13,8 +13,10 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Html.Backend (Backend (..), purescriptBackend)
-import           Projector.Html.Backend.Data
+import           Projector.Html.Backend (purescriptBackend)
+import           Projector.Html.Data.Backend
+import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 import qualified Projector.Html.Core.Library as Lib
 import qualified Projector.Html.Core.Prim as Prim
 
@@ -55,7 +57,7 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module a -> Property
+moduleProp :: ModuleName -> Module HtmlType a -> Property
 moduleProp mn =
   uncurry pscProp . renderModule purescriptBackend mn
 

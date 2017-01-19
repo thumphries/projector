@@ -19,10 +19,9 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core (Name)
+import           Projector.Html.Data.Prim as Prim
 import           Projector.Html.Data.Template
 import           Projector.Html.Core (htmlTypes)
-import           Projector.Html.Core.Prim (HtmlDecls, HtmlType, HtmlExpr, HtmlLit)
-import qualified Projector.Html.Core.Prim as Prim
 
 import           Test.Projector.Core.Arbitrary
 import           Test.QuickCheck.Jack hiding (listOf1)
@@ -49,13 +48,13 @@ genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =
   genTypeFromContext ctx genHtmlLitT
 
-genWellTypedHtmlLit :: Prim.PrimT -> Jack HtmlLit
+genWellTypedHtmlLit :: PrimT -> Jack HtmlLit
 genWellTypedHtmlLit t =
   case t of
     Prim.TString ->
       Prim.VString <$> elements boats
 
-genHtmlLitT :: Jack Prim.PrimT
+genHtmlLitT :: Jack PrimT
 genHtmlLitT =
   arbitraryBoundedEnum
 

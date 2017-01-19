@@ -10,7 +10,7 @@ import qualified Data.List.NonEmpty as NE
 import           P
 
 import           Projector.Core
-import           Projector.Html.Core.Prim
+import           Projector.Html.Data.Prim
 import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Template
 

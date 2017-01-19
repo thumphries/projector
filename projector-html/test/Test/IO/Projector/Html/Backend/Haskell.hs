@@ -13,10 +13,11 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
+import           Projector.Html.Backend (haskellBackend)
 import           Projector.Html.Core
 import qualified Projector.Html.Core.Library as Lib
-import           Projector.Html.Backend.Data
-import           Projector.Html.Backend.Haskell
+import           Projector.Html.Data.Backend
+import           Projector.Html.Data.Module
 
 import           System.Process (readProcessWithExitCode)
 
@@ -54,7 +55,7 @@ prop_hello_world =
     (=== "Hello, world!")
   where
     (name, text) =
-      renderModule (ModuleName "Main") $ Module {
+      renderModule haskellBackend (ModuleName "Main") $ Module {
           moduleTypes = mempty
         , moduleImports = M.fromList [
               (htmlRuntime, OpenImport)
@@ -80,9 +81,9 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module a -> Property
+moduleProp :: ModuleName -> Module HtmlType a -> Property
 moduleProp mn =
-  uncurry ghcProp . renderModule mn
+  uncurry ghcProp . renderModule haskellBackend mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
 ghcProp mname modl =
