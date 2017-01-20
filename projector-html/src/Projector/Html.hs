@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Projector.Html (
     HtmlError (..)
   , renderHtmlError
@@ -25,8 +26,10 @@ module Projector.Html (
   ) where
 
 
+import qualified Data.Char as Char
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 
 import           P
 
@@ -43,7 +46,10 @@ import           Projector.Html.Data.Template  (Template)
 import           Projector.Html.ModuleGraph
 import           Projector.Html.Parser (ParseError (..), renderParseError, parse)
 
+import qualified System.FilePath.Posix as FilePath
 import           System.IO  (FilePath)
+
+import           X.Control.Monad.Trans.Either (sequenceEither)
 
 
 -- -----------------------------------------------------------------------------
@@ -52,6 +58,7 @@ import           System.IO  (FilePath)
 data HtmlError
   = HtmlParseError ParseError
   | HtmlCoreError (CoreError Range)
+  | HtmlModuleGraphError GraphError
   deriving (Eq, Show)
 
 renderHtmlError :: HtmlError -> Text
@@ -61,6 +68,8 @@ renderHtmlError he =
       renderParseError e
     HtmlCoreError e ->
       HC.renderCoreErrorRange e
+    HtmlModuleGraphError e ->
+      renderGraphError e
 
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
@@ -98,6 +107,8 @@ checkModules ::
      HtmlDecls
   -> Map HB.ModuleName (HB.Module () Range)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType (HtmlType, Range)))
+  -- hmm, we actually want to be able to stream the result and write out partial results
+  -- -> [Either HtmlError (HB.ModuleName, HB.Module HtmlType (HtmlType, Range))]
 checkModules decls exprs =
   first HtmlCoreError (fmap fst (foldM fun (mempty, mempty) deps))
   where
@@ -124,15 +135,20 @@ codeGenModule backend =
 -- Build interface, i.e. things an end user should use
 
 data Build = Build {
-    buildBackend :: Maybe BackendT
+    buildBackend :: Maybe HB.BackendT
   , buildModulePrefix :: ModulePrefix
-  , buildOutputPath :: FilePath
   } deriving (Eq, Ord, Show)
 
 newtype ModulePrefix = ModulePrefix {
-    unModulePrefix :: ModuleName
+    unModulePrefix :: HB.ModuleName
   } deriving (Eq, Ord, Show)
 
+-- | A set of templates that have been read from disk, but not yet
+-- parsed or checked.
+--
+-- The generated module name will be derived from the 'FilePath'
+-- argument. Any irrelevant common prefixes should be stripped before
+-- construction.
 newtype RawTemplates = RawTemplates {
     unRawTemplates :: [(FilePath, Text)]
   } deriving (Eq, Ord, Show)
@@ -146,6 +162,78 @@ newtype BuildArtefacts = BuildArtefacts {
 --
 -- TODO pass in datatypes too.
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
-runBuild :: Build -> RawTemplates -> Either HtmlError BuildArtefacts
-runBuild =
-  undefined
+runBuild :: Build -> RawTemplates -> Either [HtmlError] BuildArtefacts
+runBuild (Build mb mp) rts = do
+  -- Build the module map
+  (mg, mmap) <- smush mp rts
+  -- Check it for cycles
+  (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
+  -- Check all modules (this can be a lazy stream)
+  -- TODO the Map forces all of this at once, remove
+  checked <- first pure (checkModules mempty mmap)
+  -- If there's a backend, codegen (this can be a lazy stream)
+  pure . BuildArtefacts $ case mb of
+    Just backend ->
+      M.elems (M.mapWithKey (codeGenModule backend) checked)
+    Nothing ->
+      []
+
+-- | Produce the initial module map from a set of template inputs.
+-- Note that:
+-- * we do one template per module right now
+-- * the expression names are derived from the filepath
+-- * the module name is also derived from the filepath
+smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () Range))
+smush (ModulePrefix prefix) (RawTemplates templates) = do
+  mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
+    ast <- first (:[]) (parseTemplate fp body)
+    let core = Elab.elaborate ast
+        modn = prefix `HB.moduleNameAppend` (filePathToModuleName fp)
+        expn = filePathToExprName fp
+    pure (modn, HB.Module {
+        HB.moduleTypes = mempty
+      , HB.moduleImports = mempty
+      , HB.moduleExprs = M.singleton expn ((), core)
+      })
+  pure (buildModuleGraph mmap, mmap)
+
+-- | Derive a module name from the relative 'FilePath'.
+--
+-- This involves turning separators into dots, ... (TODO: elaborate)
+--
+-- The first letter of the input is converted to title case, as is
+-- every subsequent letter that immediately follows a non-letter. Every
+-- letter that immediately follows another letter is converted to lower
+-- case.
+filePathToModuleName :: FilePath -> HB.ModuleName
+filePathToModuleName =
+  HB.ModuleName . T.pack . goUpper . FilePath.dropExtension
+  where
+    goUpper [] = []
+    goUpper (x:xs)
+      | Char.isAlphaNum x = Char.toUpper x : go xs
+      | otherwise = goUpper xs
+    go [] = []
+    go (x:xs)
+      | x == '/' = '.' : goUpper xs
+      | Char.isAlphaNum x = x : go xs
+      | otherwise = goUpper xs
+
+-- | Derive an expression name from the relative 'FilePath'.
+--
+-- @
+-- λ> 'filePathToExprName' "path/to/foo_bar_baz_bapGilPoilk.hsbc"
+-- Name {unName = "fooBarBazBapGilPoilk"}
+-- @
+filePathToExprName :: FilePath -> PC.Name
+filePathToExprName =
+  PC.Name . T.pack . go . FilePath.dropExtension . FilePath.takeFileName
+  where
+    go [] = []
+    go (x:xs)
+      | Char.isAlphaNum x = x : go xs
+      | otherwise = goUpper xs
+    goUpper [] = []
+    goUpper (x:xs)
+      | Char.isAlphaNum x = Char.toUpper x : go xs
+      | otherwise = goUpper xs
