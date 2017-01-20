@@ -5,7 +5,6 @@ module Projector.Core (
   ) where
 
 
-import Projector.Core.CallGraph as X
 import Projector.Core.Check as X
 import Projector.Core.Pretty as X
 import Projector.Core.Simplify as X

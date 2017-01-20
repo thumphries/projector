@@ -9,6 +9,7 @@
 module Projector.Core.Check (
   -- * Interface
     TypeError (..)
+  , typeCheckIncremental
   , typeCheckAll
   , typeCheck
   , typeTree
@@ -59,6 +60,18 @@ deriving instance (Ground l, Show a) => Show (TypeError l a)
 deriving instance (Ground l, Ord a) => Ord (TypeError l a)
 
 
+-- | Like 'typeCheckAll', but accepting a map of expressions of known
+-- type. This is appropriate for use in a left fold for incremental
+-- (dependency-ordered) typechecking.
+typeCheckIncremental ::
+     Ground l
+  => TypeDecls l
+  -> Map Name (Type l, a)
+  -> Map Name (Expr l a)
+  -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
+typeCheckIncremental decls known exprs =
+  typeCheckAll' decls (fmap (\(t,a) -> hoistType a t) known) exprs
+
 -- | Typecheck an interdependent set of named expressions.
 -- This is essentially top-level letrec.
 --
@@ -73,13 +86,22 @@ typeCheckAll ::
   => TypeDecls l
   -> Map Name (Expr l a)
   -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
-typeCheckAll decls exprs = do
+typeCheckAll decls exprs =
+  typeCheckAll' decls mempty exprs
+
+typeCheckAll' ::
+     Ground l
+  => TypeDecls l
+  -> Map Name (IType l a)
+  -> Map Name (Expr l a)
+  -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
+typeCheckAll' decls known exprs = do
   -- for each declaration, generate constraints and assumptions
   (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
   -- build up new global set of constraints from the assumptions
   let localConstraints = sConstraints sstate
       Assumptions assums = sAssumptions sstate
-      types = fmap extractType annotated
+      types = known <> fmap extractType annotated
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
         maybe mempty (with itys . Equal) (M.lookup n types)
       constraints = D.toList (localConstraints <> globalConstraints)
