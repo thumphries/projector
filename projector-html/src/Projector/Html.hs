@@ -199,12 +199,10 @@ smush (ModulePrefix prefix) (RawTemplates templates) = do
 
 -- | Derive a module name from the relative 'FilePath'.
 --
--- This involves turning separators into dots, ... (TODO: elaborate)
---
--- The first letter of the input is converted to title case, as is
--- every subsequent letter that immediately follows a non-letter. Every
--- letter that immediately follows another letter is converted to lower
--- case.
+-- @
+-- λ> filePathToModuleName "./path_to/my/favourite_Template_place.hs"
+-- ModuleName {unModuleName = "PathTo.My.FavouriteTemplatePlace"}
+-- @
 filePathToModuleName :: FilePath -> HB.ModuleName
 filePathToModuleName =
   HB.ModuleName . T.pack . goUpper . FilePath.dropExtension
