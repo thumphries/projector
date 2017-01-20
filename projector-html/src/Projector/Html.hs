@@ -11,6 +11,8 @@ module Projector.Html (
   , BuildArtefacts (..)
   , ModulePrefix (..)
   , ModuleGraph (..)
+  , HB.ModuleName (..)
+  , HB.BackendT (..)
   -- * Useful template and module utils
   , parseTemplate
   , checkTemplate

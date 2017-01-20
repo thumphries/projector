@@ -74,9 +74,15 @@ executable cinema
                      , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-html
+                     , ambiata-x-eithert
                      , ambiata-x-optparse
+                     , containers
+                     , directory                       == 1.2.*
+                     , filepath                        == 1.4.*
+                     , Glob                            == 0.7.*
                      , optparse-applicative            == 0.12.*
-                     , text
+                     , text                            == 1.2.*
+                     , transformers
 
 
 executable slideshow
