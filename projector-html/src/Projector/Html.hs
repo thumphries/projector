@@ -3,6 +3,14 @@
 module Projector.Html (
     HtmlError (..)
   , renderHtmlError
+  -- * Builds
+  , Build (..)
+  , runBuild
+  , RawTemplates (..)
+  , BuildArtefacts (..)
+  , ModulePrefix (..)
+  , ModuleGraph (..)
+  -- * Useful template and module utils
   , parseTemplate
   , checkTemplate
   , checkTemplateIncremental
@@ -38,6 +46,9 @@ import           Projector.Html.Parser (ParseError (..), renderParseError, parse
 import           System.IO  (FilePath)
 
 
+-- -----------------------------------------------------------------------------
+-- Top-level errors
+
 data HtmlError
   = HtmlParseError ParseError
   | HtmlCoreError (CoreError Range)
@@ -50,6 +61,9 @@ renderHtmlError he =
       renderParseError e
     HtmlCoreError e ->
       HC.renderCoreErrorRange e
+
+-- -----------------------------------------------------------------------------
+-- Interfaces for doing things with templates
 
 parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
 parseTemplate f =
@@ -105,3 +119,33 @@ codeGenModule ::
   -> (FilePath, Text)
 codeGenModule backend =
   HB.renderModule (HB.getBackend backend)
+
+-- -----------------------------------------------------------------------------
+-- Build interface, i.e. things an end user should use
+
+data Build = Build {
+    buildBackend :: Maybe BackendT
+  , buildModulePrefix :: ModulePrefix
+  , buildOutputPath :: FilePath
+  } deriving (Eq, Ord, Show)
+
+newtype ModulePrefix = ModulePrefix {
+    unModulePrefix :: ModuleName
+  } deriving (Eq, Ord, Show)
+
+newtype RawTemplates = RawTemplates {
+    unRawTemplates :: [(FilePath, Text)]
+  } deriving (Eq, Ord, Show)
+
+newtype BuildArtefacts = BuildArtefacts {
+    unBuildArtefacts :: [(FilePath, Text)]
+  } deriving (Eq, Ord, Show)
+
+
+-- | Run a complete build from start to finish, with no caching of artefacts.
+--
+-- TODO pass in datatypes too.
+-- TODO return partial results when we bomb out. 'These'-esque datatype.
+runBuild :: Build -> RawTemplates -> Either HtmlError BuildArtefacts
+runBuild =
+  undefined
