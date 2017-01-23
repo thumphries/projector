@@ -16,6 +16,7 @@ module Projector.Core.Type (
   , pattern TVar
   , pattern TArrow
   , pattern TList
+  , mapGroundType
   -- *** Type functor
   , TypeF (..)
   -- ** Declared types
@@ -58,6 +59,21 @@ deriving instance (Eq l, Eq a) => Eq (TypeF l a)
 deriving instance (Ord l, Ord a) => Ord (TypeF l a)
 deriving instance (Show l, Show a) => Show (TypeF l a)
 
+-- | Swap out the ground type.
+mapGroundType :: Ground l => Ground m => (l -> m) -> Type l -> Type m
+mapGroundType tmap (Type ty) =
+  Type $ case ty of
+    TLitF l ->
+      TLitF (tmap l)
+
+    TVarF tn ->
+      TVarF tn
+
+    TArrowF a b ->
+      TArrowF (mapGroundType tmap a) (mapGroundType tmap b)
+
+    TListF a ->
+      TListF (mapGroundType tmap a)
 
 -- | Declared types.
 data Decl l

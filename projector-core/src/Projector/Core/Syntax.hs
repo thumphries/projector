@@ -34,6 +34,7 @@ module Projector.Core.Syntax (
   , foldFree
   , gatherFree
   , patternBinds
+  , mapGround
   ) where
 
 
@@ -42,7 +43,7 @@ import qualified Data.Set as S
 
 import           P
 
-import           Projector.Core.Type (Type (..), TypeName (..), Ground (..), Constructor (..))
+import           Projector.Core.Type
 
 
 -- | The type of Projector expressions.
@@ -212,3 +213,37 @@ patternBinds pat =
       S.singleton x
     PCon _ _ pats ->
       foldl' (<>) mempty (fmap patternBinds pats)
+
+-- | Migrate to a different set of ground types.
+mapGround ::
+     Ground l
+  => Ground m
+  => (l -> m)
+  -> (Value l -> Value m)
+  -> Expr l a
+  -> Expr m a
+mapGround tmap vmap expr =
+  case expr of
+    ELit a v ->
+      ELit a (vmap v)
+
+    EVar a n ->
+      EVar a n
+
+    ELam a n t e ->
+      ELam a n (mapGroundType tmap t) (mapGround tmap vmap e)
+
+    EApp a f g ->
+      EApp a (mapGround tmap vmap f) (mapGround tmap vmap g)
+
+    ECon a c tn es ->
+      ECon a c tn (fmap (mapGround tmap vmap) es)
+
+    ECase a e pes ->
+      ECase a (mapGround tmap vmap e) (fmap (fmap (mapGround tmap vmap)) pes)
+
+    EList a t es ->
+      EList a (mapGroundType tmap t) (fmap (mapGround tmap vmap) es)
+
+    EForeign a n t ->
+      EForeign a n (mapGroundType tmap t)
