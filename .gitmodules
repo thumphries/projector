@@ -10,3 +10,6 @@
 [submodule "lib/umami"]
 	path = lib/umami
 	url = git@github.com:ambiata/umami
+[submodule "lib/hydrant"]
+	path = lib/hydrant
+	url = git@github.com:ambiata/hydrant

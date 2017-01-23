@@ -13,9 +13,9 @@ description:           ambiata-projector-html-runtime
 library
   build-depends:
                        base                            >= 3          && < 5
+                     , ambiata-hydrant
                      , text                            == 1.2.*
                      , bytestring                      >= 0.10.2     && < 0.11
-                     , blaze-markup                    == 0.7.*
 
   ghc-options:
                        -Wall
@@ -27,6 +27,5 @@ library
                        Paths_ambiata_projector_html_runtime
 
                        Projector.Html.Runtime
-                       Projector.Html.Runtime.Blaze
                        Projector.Html.Runtime.Library
                        Projector.Html.Runtime.Prim

@@ -3,10 +3,8 @@
 module Projector.Html.Runtime (
     module Prim
   , module Library
-  , module Blaze
   ) where
 
 
-import           Projector.Html.Runtime.Blaze as Blaze
 import           Projector.Html.Runtime.Prim as Prim
 import           Projector.Html.Runtime.Library as Library
