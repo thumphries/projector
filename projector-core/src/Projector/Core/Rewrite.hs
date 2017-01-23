@@ -59,7 +59,7 @@ rewrite rules expr =
 
 -- | Call 'rewrite' until the expression stops changing.
 -- This assumes that your rule system is terminating.
-rewriteFix :: Ground l => [RewriteRule l a] -> Expr l a -> Expr l a
+rewriteFix :: Ground l => Eq a => [RewriteRule l a] -> Expr l a -> Expr l a
 rewriteFix rules expr =
   let expr' = rewrite rules expr
-  in if fmap (const ()) expr' /= fmap (const ()) expr then rewriteFix rules expr' else expr
+  in if expr' /= expr then rewriteFix rules expr' else expr
