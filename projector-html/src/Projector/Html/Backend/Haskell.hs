@@ -38,6 +38,7 @@ import           Projector.Html.Core.Library
 import           Projector.Html.Data.Backend hiding (Backend(..))
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
+import           Projector.Html.Backend.Haskell.Rewrite
 import           Projector.Html.Backend.Haskell.TH
 
 import           System.IO (FilePath)
@@ -86,9 +87,11 @@ renderModule mn@(ModuleName n) m =
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
         ]
+      (_mn', m') = rewriteModule mn m
       modName = T.unwords ["module", n, "where"]
-      imports = fmap (uncurry genImport) (M.toList (moduleImports m))
-      decls = fmap (T.pack . TH.pprint) (genModule m)
+
+      imports = fmap (uncurry genImport) (M.toList (moduleImports m'))
+      decls = fmap (T.pack . TH.pprint) (genModule m')
 
   in (genFileName mn, T.unlines $ mconcat [
          pragmas
@@ -99,7 +102,7 @@ renderModule mn@(ModuleName n) m =
 
 renderExpr :: Name -> HtmlExpr a -> Text
 renderExpr n =
-  T.pack . TH.pprint . genExpDec n
+  T.pack . TH.pprint . genExpDec n . rewriteExpr
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =

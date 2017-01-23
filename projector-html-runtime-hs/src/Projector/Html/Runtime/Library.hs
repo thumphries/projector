@@ -9,7 +9,15 @@ module Projector.Html.Runtime.Library (
   , Hydrant.textNode
   , Hydrant.parentNode
   , Hydrant.voidNode
+  , Hydrant.comment
+  , foldHtml
   ) where
 
 
+import           Data.Foldable (fold)
 import qualified Hydrant
+
+foldHtml :: [Hydrant.Html] -> Hydrant.Html
+foldHtml =
+  fold
+{-# INLINE foldHtml #-}
