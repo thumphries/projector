@@ -194,7 +194,7 @@ smush (ModulePrefix prefix) (RawTemplates templates) = do
         expn = filePathToExprName fp
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
-      , HB.moduleImports = mempty
+      , HB.moduleImports = M.fromList [(HB.htmlRuntime, HB.OpenImport)]
       , HB.moduleExprs = M.singleton expn ((), core)
       })
   pure (buildModuleGraph mmap, mmap)
