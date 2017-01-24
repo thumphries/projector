@@ -6,17 +6,54 @@
 import           BuildInfo_ambiata_projector_html
 import           DependencyInfo_ambiata_projector_html
 
+import           Control.Monad.IO.Class (MonadIO(..))
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           Options.Applicative  (Parser)
+import           Options.Applicative (Parser, ReadM)
+import qualified Options.Applicative as O
 
 import           P
 
-import           System.IO  (IO)
+import           Projector.Html
+
+import           System.Directory
+import qualified System.FilePath.Glob as Glob
+import           System.FilePath.Posix ((</>), makeRelative, takeDirectory)
+import           System.IO  (FilePath, IO)
 import qualified System.IO as IO
 
+import           X.Control.Monad.Trans.Either
+import           X.Control.Monad.Trans.Either.Exit
 import           X.Options.Applicative (dispatch, safeCommand, RunType (..), SafeCommand (..))
+import qualified X.Options.Applicative as XO
+
+
+data CinemaError
+  = GlobError Text
+  | BuildError [HtmlError]
+  deriving (Eq, Show)
+
+renderCinemaError :: CinemaError -> Text
+renderCinemaError ce =
+  case ce of
+    GlobError t ->
+      "Invalid glob: " <> t
+    BuildError h ->
+      "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
+
+data CinemaArgs
+  = CinemaBuild Build (Maybe StripPrefix) Glob FilePath
+  deriving (Eq, Show)
+
+newtype Glob = Glob {
+    unGlob :: [Char]
+  } deriving (Eq, Show)
+
+newtype StripPrefix = StripPrefix {
+    unStripPrefix :: FilePath
+  } deriving (Eq, Show)
 
 
 main :: IO ()
@@ -34,10 +71,129 @@ main = do
     RunCommand RealRun c ->
       run c
 
-run :: () -> IO ()
-run =
-  pure
+-- -----------------------------------------------------------------------------
 
-cinemaP :: Parser ()
+run :: CinemaArgs -> IO ()
+run args =
+  orDie renderCinemaError $
+    case args of
+      CinemaBuild b msp tg out ->
+        cinemaBuild b msp tg out
+
+cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> FilePath -> EitherT CinemaError IO ()
+cinemaBuild b msp tg o = do
+  -- Load all our template files from disk
+  tfs <- globSafe tg
+  rts <- liftIO . fmap RawTemplates . for tfs $ \f -> do
+    body <- T.readFile f
+    let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
+    pure (stripPrefix, body)
+  -- Run the build
+  BuildArtefacts out <- hoistEither (first BuildError (runBuild b rts))
+  -- Write out any artefacts
+  liftIO . for_ out $ \(f, body) -> do
+    let ofile = o </> f
+    IO.putStrLn ("Generating " <> ofile)
+    createDirectoryIfMissing True (takeDirectory ofile)
+    T.writeFile ofile body
+
+-- -----------------------------------------------------------------------------
+
+-- There's some partial code in Glob, you wanna be careful with that.
+globSafe :: Glob -> EitherT CinemaError IO [FilePath]
+globSafe g = do
+  pat <- hoistEither (first (GlobError . T.pack)
+           (Glob.tryCompileWith Glob.compDefault {Glob.errorRecovery = False} (unGlob g)))
+  -- This is not Windows-safe, I believe you'd need to remove the Drive prefix.
+  cwd <- liftIO getCurrentDirectory
+  liftIO (Glob.globDir1 pat cwd)
+
+-- -----------------------------------------------------------------------------
+-- optparse
+
+-- cinema --backend haskell --prefix "Bikeshed.Projector.NWO" --data '**/*.mcn' \
+--   --templates '**/*.prj' -o "dist/build/Bikeshed/Projector/NWO/"
+-- cinema -b purescript -p "Bikeshed.Foo" -d '**/*.mcn' -t '**/*.prj' \
+--   -o "dist/purs/build/Bikeshed/Foo"
+
+cinemaP :: Parser CinemaArgs
 cinemaP =
-  pure ()
+  CinemaBuild
+    <$> buildP
+    <*> optional stripPrefixP
+    <*> templatesP
+    <*> outputP
+
+buildP :: Parser Build
+buildP =
+  Build
+    <$> optional backendP
+    <*> prefixP
+
+backendP :: Parser BackendT
+backendP =
+  O.option backendR $ fold [
+      O.short 'b'
+    , O.long "backend"
+    , O.help "The backend to use for code generation."
+    , O.metavar "BACKEND"
+    ]
+
+prefixP :: Parser ModulePrefix
+prefixP =
+  O.option modulePrefixR $ fold [
+      O.short 'p'
+    , O.long "prefix"
+    , O.help "The module prefix to use for generated code."
+    , O.metavar "MODULE_PREFIX"
+    ]
+
+modulePrefixR :: ReadM ModulePrefix
+modulePrefixR =
+  fmap (ModulePrefix . ModuleName . T.pack) O.str
+
+backendR :: ReadM BackendT
+backendR =
+  XO.eitherTextReader id $ \s ->
+    case s of
+      "haskell" ->
+        pure Haskell
+      "purescript" ->
+        pure Purescript
+      _ ->
+        Left ("Unknown backend. Please choose from: purescript, haskell")
+
+templatesP :: Parser Glob
+templatesP =
+  O.option globR $ fold [
+      O.short 't'
+    , O.long "templates"
+    , O.help "A glob pointing to your template files."
+    , O.metavar "TEMPLATES"
+    ]
+
+outputP :: Parser FilePath
+outputP =
+  O.option O.str $ fold [
+      O.short 'o'
+    , O.long "output"
+    , O.help "The destination directory for generated code."
+    , O.metavar "OUTPUT_PATH"
+    ]
+
+globR :: ReadM Glob
+globR =
+  fmap Glob O.str
+
+stripPrefixP :: Parser StripPrefix
+stripPrefixP =
+  O.option stripPrefixR $ fold [
+      O.short 's'
+    , O.long "strip-prefix"
+    , O.help "The portion of each filename to ignore when generating names."
+    , O.metavar "STRIP_PREFIX"
+    ]
+
+stripPrefixR :: ReadM StripPrefix
+stripPrefixR =
+  fmap StripPrefix O.str

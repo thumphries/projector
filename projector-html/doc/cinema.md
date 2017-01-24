@@ -25,13 +25,14 @@ usage conventions etc.
 - If no arguments are supplied, display usage (do not do work)
 - If no backend is supplied, perform type checking and then stop.
 - Default to human-readable errors to stderr
+- It is important that we do our own glob expansion, can't trust shells
 
 ```
-cinema --backend haskell --prefix "Bikeshed.Projector.NWO" --data **/*.mcn --templates **/*.prj -o "dist/build/Bikeshed/Projector/NWO/"
+cinema --backend haskell --prefix "Bikeshed.Projector.NWO" --data '**/*.mcn' --templates '**/*.prj' -o "dist/build/Bikeshed/Projector/NWO/"
 ```
 
 ```
-cinema -b purescript -p "Bikeshed.Foo" -d **/*.mcn -t **/*.prj -o "dist/purs/build/Bikeshed/Foo"
+cinema -b purescript -p "Bikeshed.Foo" -d '**/*.mcn' -t '**/*.prj' -o "dist/purs/build/Bikeshed/Foo"
 ```
 
 ### v1 features
