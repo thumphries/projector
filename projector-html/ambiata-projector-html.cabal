@@ -46,6 +46,7 @@ library
 
                        Projector.Html.Backend
                        Projector.Html.Backend.Haskell
+                       Projector.Html.Backend.Haskell.Prim
                        Projector.Html.Backend.Haskell.Rewrite
                        Projector.Html.Backend.Haskell.TH
                        Projector.Html.Backend.Purescript

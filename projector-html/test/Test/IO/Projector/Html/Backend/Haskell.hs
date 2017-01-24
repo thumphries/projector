@@ -28,17 +28,6 @@ import           Test.Projector.Html.Arbitrary
 prop_empty_module =
   once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
 
-prop_library_module =
-  once . moduleProp (ModuleName "Test.Haskell.Library") $ Module {
-      moduleTypes = Lib.types
-    , moduleImports = M.fromList [
-          (htmlRuntimePrim, OpenImport)
-        ]
-    , moduleExprs = M.fromList [
-          helloWorld
-        ]
-    }
-
 prop_library_runtime =
   once . moduleProp (ModuleName "Test.Haskell.Runtime") $ Module {
       moduleTypes = mempty
