@@ -227,7 +227,7 @@ filePathToModuleName =
 -- @
 filePathToExprName :: FilePath -> PC.Name
 filePathToExprName =
-  PC.Name . T.pack . go . FilePath.dropExtension . FilePath.takeFileName
+  PC.Name . T.pack . goLower . FilePath.dropExtension
   where
     go [] = []
     go (x:xs)
@@ -237,3 +237,7 @@ filePathToExprName =
     goUpper (x:xs)
       | Char.isAlphaNum x = Char.toUpper x : go xs
       | otherwise = goUpper xs
+    goLower [] = []
+    goLower (x:xs)
+      | Char.isAlphaNum x = Char.toLower x : go xs
+      | otherwise = goLower xs
