@@ -66,7 +66,7 @@ purescriptBackend =
 -- -----------------------------------------------------------------------------
 -- Per-backend warnings and linting
 
-checkModule :: Backend a e -> Module HtmlType a -> Either [e] ()
+checkModule :: Backend a e -> Module HtmlType PrimT a -> Either [e] ()
 checkModule b m =
   case predModule (predicates b) m of
     PredOk ->
@@ -74,7 +74,7 @@ checkModule b m =
     PredError es ->
       Left es
 
-predModule :: [Predicate a e] -> Module HtmlType a -> PredResult [e]
+predModule :: [Predicate a e] -> Module HtmlType PrimT a -> PredResult [e]
 predModule preds =
   fmap fold . predResults . fmap (runPredicates preds . snd) . M.elems . moduleExprs
 

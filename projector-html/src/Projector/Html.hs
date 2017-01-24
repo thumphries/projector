@@ -183,7 +183,7 @@ runBuild (Build mb mp) rts = do
       pure (BuildArtefacts [])
 
 -- | Run a set of backend-specific predicates.
-validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType a) -> Either [HtmlError] ()
+validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()
 validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 
@@ -192,7 +192,7 @@ validateModules backend mods =
 -- * we do one template per module right now
 -- * the expression names are derived from the filepath
 -- * the module name is also derived from the filepath
-smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () Range))
+smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Range))
 smush (ModulePrefix prefix) (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)

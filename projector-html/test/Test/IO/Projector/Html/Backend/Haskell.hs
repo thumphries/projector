@@ -40,7 +40,7 @@ prop_library_runtime =
     }
 
 prop_hello_world =
-  once $ runProp name (text <> "\nmain = putStr (renderHtml helloWorld)\n")
+  once $ runProp name (text <> "\nmain = putStr (toText helloWorld)\n")
     (=== "Hello, world!")
   where
     (name, text) =
@@ -49,15 +49,18 @@ prop_hello_world =
         , moduleImports = M.fromList [
               (htmlRuntime, OpenImport)
             , (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
+            , (ModuleName "Hydrant", OnlyImport [Name "toText"])
             ]
         , moduleExprs = M.fromList [
               helloWorld
             ]
         }
 
+-- FIX this generates case-of-HtmlNode, it shouldn't do this anymore
+--     (it's nonsensical in this bbackend now)
 prop_welltyped :: Property
 prop_welltyped =
-  gamble genHtmlTypeDecls $ \decls ->
+  gamble (genHtmlTypeDecls) $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
       gamble (genWellTypedHtmlModule k decls) $ \exprs ->
         moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") $ Module {

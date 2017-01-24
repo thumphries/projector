@@ -43,6 +43,7 @@ fileProp mname modl f g =
         dir = takeDirectory path
     createDirectoryIfMissing True dir
     T.writeFile path modl
+    T.writeFile "/tmp/out.hs" modl
     path' <- makeAbsolute path
     fmap g (f path')
 

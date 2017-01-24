@@ -6,7 +6,12 @@ module Projector.Html.Backend.Haskell.Prim (
   , Value (..)
   , toHaskellExpr
   , toHaskellModule
+  , toHaskellTypeDecls
   , HaskellType
+  , HaskellExpr
+  , HaskellModule
+  , HaskellDecl
+  , HaskellDecls
   ) where
 
 
@@ -20,6 +25,10 @@ import           Projector.Html.Data.Prim
 
 
 type HaskellType = Type HaskellPrimT
+type HaskellExpr = Expr HaskellPrimT
+type HaskellDecl = Decl HaskellPrimT
+type HaskellDecls = TypeDecls HaskellPrimT
+type HaskellModule = Module HaskellType HaskellPrimT
 
 data HaskellPrimT
   = HTextT
@@ -47,12 +56,36 @@ toHaskellExpr =
 
 toHaskellModule :: Module HtmlType PrimT a -> Module HaskellType HaskellPrimT a
 toHaskellModule (Module typs imps exps) =
-  Module typs imps (with exps (\(t, e) -> (toHaskellType t, toHaskellExpr e)))
+  Module
+    (toHaskellTypeDecls typs)
+    imps
+    (with exps (\(t, e) -> (toHaskellType t, toHaskellExpr e)))
 
 toHaskellType :: HtmlType -> HaskellType
 toHaskellType =
-  mapGroundType tmap
+  swapLibTypes . mapGroundType tmap
 {-# INLINE toHaskellType #-}
+
+toHaskellTypeDecls :: HtmlDecls -> HaskellDecls
+toHaskellTypeDecls (TypeDecls decls) =
+  TypeDecls . with decls $ \decl ->
+    case decl of
+      DVariant cts ->
+        DVariant (with cts (fmap (fmap toHaskellType)))
+
+-- if we encounter library types we also have to tweak them
+swapLibTypes :: HaskellType -> HaskellType
+swapLibTypes ty =
+  case ty of
+    TVar (TypeName "HtmlNode") ->
+      TVar (TypeName "Html")
+    TList t2 ->
+      TList (swapLibTypes t2)
+    TArrow t2 t3 ->
+      TArrow (swapLibTypes t2) (swapLibTypes t3)
+    _ ->
+      ty
+{-# INLINE swapLibTypes #-}
 
 tmap :: PrimT -> HaskellPrimT
 tmap prim =

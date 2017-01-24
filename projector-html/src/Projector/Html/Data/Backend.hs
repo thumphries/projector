@@ -32,7 +32,7 @@ data BackendT
   deriving (Eq, Ord, Show)
 
 data Backend a e = Backend {
-    renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
+    renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
   , renderExpr :: Name -> HtmlExpr a -> Text
   , predicates :: [Predicate a e]
   } deriving (Functor)
