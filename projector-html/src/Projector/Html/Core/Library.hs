@@ -139,4 +139,5 @@ dHtmlNode =
     , (Constructor "Comment", [TLit TString])
     , (Constructor "Plain", [TLit TString])
     , (Constructor "Whitespace", [])
+    , (Constructor "Nested", [tHtml])
     ]

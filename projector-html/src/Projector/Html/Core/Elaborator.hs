@@ -58,8 +58,10 @@ eNode node =
         , eAttrs a attrs
         , eHtml html
         ]
-    TExprNode _ expr ->
-      eExpr expr
+    TExprNode a expr ->
+      ECon a (Constructor "Nested") Lib.nHtmlNode [
+          eExpr expr
+        ]
 
 eTag :: TTag a -> HtmlExpr a
 eTag (TTag a t) =
