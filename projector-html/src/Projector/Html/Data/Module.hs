@@ -17,7 +17,7 @@ import qualified Data.Set as S
 
 import           P
 
-import           Projector.Core (Name)
+import           Projector.Core (Expr, Name)
 import qualified Projector.Core as PC
 import           Projector.Html.Data.Prim
 
@@ -31,13 +31,13 @@ moduleNameAppend (ModuleName a) (ModuleName b) =
 
 -- TODO might need another datatype, this bakes in a number of
 -- assumptions about the backend.
-data Module b a = Module {
+data Module b l a = Module {
     moduleTypes :: HtmlDecls
   , moduleImports :: Map ModuleName Imports
-  , moduleExprs :: Map Name (b, HtmlExpr a)
+  , moduleExprs :: Map Name (b, Expr l a)
   } deriving (Eq, Ord, Show)
 
-instance Monoid (Module b a) where
+instance Monoid (Module b l a) where
   mempty = Module mempty mempty mempty
   mappend (Module a b c) (Module d e f) = Module {
       moduleTypes = a <> d
@@ -46,12 +46,12 @@ instance Monoid (Module b a) where
     }
 
 -- | The names of all free variables referenced in this module.
-moduleFree :: Module b a -> Set Name
+moduleFree :: Module b l a -> Set Name
 moduleFree (Module _types _imports exprs) =
   foldl' (flip S.delete) (foldMap (\(_ty, ex) -> PC.gatherFree ex) exprs) (M.keys exprs)
 
 -- | The names of all variables bound/exported in this module.
-moduleBound :: Module b a -> Set Name
+moduleBound :: Module b l a -> Set Name
 moduleBound (Module _types _imports exprs) =
   S.fromList (M.keys exprs)
 

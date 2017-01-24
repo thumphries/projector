@@ -4,7 +4,9 @@
 module Projector.Html.Backend.Haskell.Prim (
     HaskellPrimT (..)
   , Value (..)
-  , toHaskellPrim
+  , toHaskellExpr
+  , toHaskellModule
+  , HaskellType
   ) where
 
 
@@ -13,8 +15,11 @@ import qualified Data.Text as T
 import           P
 
 import           Projector.Core
+import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 
+
+type HaskellType = Type HaskellPrimT
 
 data HaskellPrimT
   = HTextT
@@ -36,9 +41,18 @@ instance Ground HaskellPrimT where
       T.pack (show s)
 
 
-toHaskellPrim :: Expr PrimT a -> Expr HaskellPrimT a
-toHaskellPrim =
+toHaskellExpr :: Expr PrimT a -> Expr HaskellPrimT a
+toHaskellExpr =
   mapGround tmap vmap
+
+toHaskellModule :: Module HtmlType PrimT a -> Module HaskellType HaskellPrimT a
+toHaskellModule (Module typs imps exps) =
+  Module typs imps (with exps (\(t, e) -> (toHaskellType t, toHaskellExpr e)))
+
+toHaskellType :: HtmlType -> HaskellType
+toHaskellType =
+  mapGroundType tmap
+{-# INLINE toHaskellType #-}
 
 tmap :: PrimT -> HaskellPrimT
 tmap prim =

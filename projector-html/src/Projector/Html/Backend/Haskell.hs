@@ -81,7 +81,7 @@ htmlNodeConstructors =
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
+renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
@@ -116,7 +116,7 @@ genImport (ModuleName n) imports =
           "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
-genModule :: Module HtmlType a -> [TH.Dec]
+genModule :: Module HtmlType PrimT a -> [TH.Dec]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->

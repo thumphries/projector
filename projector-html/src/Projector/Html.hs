@@ -100,8 +100,8 @@ checkTemplateIncremental known ast =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () Range
-  -> Either HtmlError (HB.Module HtmlType (HtmlType, Range))
+  -> HB.Module () PrimT Range
+  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, Range))
 checkModule decls (HB.Module typs imps exps) = do
   exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
   pure (HB.Module typs imps exps')
@@ -110,10 +110,8 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
-  -> Map HB.ModuleName (HB.Module () Range)
-  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType (HtmlType, Range)))
-  -- hmm, we actually want to be able to stream the result and write out partial results
-  -- -> [Either HtmlError (HB.ModuleName, HB.Module HtmlType (HtmlType, Range))]
+  -> Map HB.ModuleName (HB.Module () PrimT Range)
+  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Range)))
 checkModules decls exprs =
   first HtmlCoreError (fmap fst (foldM fun (mempty, mempty) deps))
   where
@@ -131,7 +129,7 @@ checkModules decls exprs =
 codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
-  -> HB.Module HtmlType (HtmlType, Range)
+  -> HB.Module HtmlType PrimT (HtmlType, Range)
   -> (FilePath, Text)
 codeGenModule backend =
   HB.renderModule (HB.getBackend backend)

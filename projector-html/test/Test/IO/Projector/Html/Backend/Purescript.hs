@@ -57,7 +57,7 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType a -> Property
+moduleProp :: ModuleName -> Module HtmlType PrimT a -> Property
 moduleProp mn =
   uncurry pscProp . renderModule purescriptBackend mn
 

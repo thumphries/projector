@@ -15,9 +15,9 @@ import           P
 import           Projector.Core
 import           Projector.Html.Backend (haskellBackend)
 import           Projector.Html.Core
-import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 
 import           System.Process (readProcessWithExitCode)
 
@@ -70,7 +70,7 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType a -> Property
+moduleProp :: ModuleName -> Module HtmlType PrimT a -> Property
 moduleProp mn =
   uncurry ghcProp . renderModule haskellBackend mn
 
