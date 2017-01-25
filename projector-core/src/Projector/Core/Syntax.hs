@@ -35,8 +35,14 @@ module Projector.Core.Syntax (
   , gatherFree
   , patternBinds
   , mapGround
+  , foldlExprM
+  , foldlExpr
+  , foldrExprM
+  , foldrExpr
   ) where
 
+
+import           Control.Monad.Trans.Cont (cont, runCont)
 
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -247,3 +253,83 @@ mapGround tmap vmap expr =
 
     EForeign a n t ->
       EForeign a n (mapGroundType tmap t)
+
+-- | Bottom-up monadic fold.
+foldrExprM :: Monad m => (Expr l a -> b -> m b) -> b -> Expr l a -> m b
+foldrExprM f acc expr =
+  case expr of
+    ELit _ _ ->
+      f expr acc
+
+    EVar _ _ ->
+      f expr acc
+
+    ELam _ _ _ e -> do
+      acc' <- foldrExprM f acc e
+      f expr acc'
+
+    EApp _ i j -> do
+      acc' <- foldrExprM f acc j
+      acc'' <- foldrExprM f acc' i
+      f expr acc''
+
+    ECon _ _ _ es -> do
+      acc' <- foldrM (flip (foldrExprM f)) acc es
+      f expr acc'
+
+    ECase _ e pes -> do
+      acc' <- foldrM (flip (foldrExprM f)) acc (fmap snd pes)
+      acc'' <- foldrExprM f acc' e
+      f expr acc''
+
+    EList _ _ es -> do
+      acc' <- foldrM (flip (foldrExprM f)) acc es
+      f expr acc'
+
+    EForeign _ _ _ ->
+      f expr acc
+
+-- | Bottom-up strict fold.
+foldrExpr :: (Expr l a -> b -> b) -> b -> Expr l a -> b
+foldrExpr f acc expr =
+  runCont (foldrExprM (\e a -> cont (\foo -> foo (f e a))) acc expr) id
+
+-- | Top-down monadic fold.
+foldlExprM :: Monad m => (b -> Expr l a -> m b) -> b -> Expr l a -> m b
+foldlExprM f acc expr =
+  case expr of
+    ELit _ _ ->
+      f acc expr
+
+    EVar _ _ ->
+      f acc expr
+
+    EForeign _ _ _ ->
+      f acc expr
+
+    ELam _ _ _ e -> do
+      acc' <- f acc expr
+      foldlExprM f acc' e
+
+    EApp _ i j -> do
+      acc' <- f acc expr
+      acc'' <- foldlExprM f acc' i
+      foldlExprM f acc'' j
+
+    ECon _ _ _ es -> do
+      acc' <- f acc expr
+      foldM (foldlExprM f) acc' es
+
+    ECase _ e pes -> do
+      acc' <- f acc expr
+      acc'' <- foldlExprM f acc' e
+      foldM (foldlExprM f) acc'' (fmap snd pes)
+
+    EList _ _ es -> do
+      acc' <- f acc expr
+      foldM (foldlExprM f) acc' es
+
+-- | Top-down strict fold.
+foldlExpr :: (b -> Expr l a -> b) -> b -> Expr l a -> b
+foldlExpr f acc =
+  flip runCont id . foldlExprM (\a e -> cont (\foo -> foo (f a e))) acc
