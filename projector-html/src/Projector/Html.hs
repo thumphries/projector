@@ -177,11 +177,17 @@ runBuild (Build mb mp) rts = do
   -- TODO the Map forces all of this at once, remove
   checked <- first pure (checkModules mempty mmap)
   -- If there's a backend, codegen (this can be a lazy stream)
-  pure . BuildArtefacts $ case mb of
-    Just backend ->
-      M.elems (M.mapWithKey (codeGenModule backend) checked)
+  case mb of
+    Just backend -> do
+      validateModules backend checked
+      pure (BuildArtefacts (M.elems (M.mapWithKey (codeGenModule backend) checked)))
     Nothing ->
-      []
+      pure (BuildArtefacts [])
+
+-- | Run a set of backend-specific predicates.
+validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType a) -> Either [HtmlError] ()
+validateModules backend mods =
+  bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 
 -- | Produce the initial module map from a set of template inputs.
 -- Note that:
