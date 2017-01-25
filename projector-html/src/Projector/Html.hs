@@ -61,6 +61,7 @@ data HtmlError
   = HtmlParseError ParseError
   | HtmlCoreError (CoreError Range)
   | HtmlModuleGraphError GraphError
+  | HtmlBackendError HB.BackendError
   deriving (Eq, Show)
 
 renderHtmlError :: HtmlError -> Text
@@ -72,6 +73,8 @@ renderHtmlError he =
       HC.renderCoreErrorRange e
     HtmlModuleGraphError e ->
       renderGraphError e
+    HtmlBackendError e ->
+      HB.renderBackendError e
 
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
