@@ -38,7 +38,7 @@ data Backend a e = Backend {
   } deriving (Functor)
 
 newtype Predicate a e = Predicate {
-    unPredicate :: (Expr HtmlType a -> PredResult e)
+    unPredicate :: (HtmlExpr a -> PredResult e)
   } deriving (Functor)
 
 data PredResult e
