@@ -43,7 +43,6 @@ newtype Predicate a e = Predicate {
 
 data PredResult e
   = PredError e
-  | PredWarning e
   | PredOk
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 

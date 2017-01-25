@@ -55,3 +55,7 @@ purescriptBackend =
     , renderExpr = Purs.renderExpr
     , predicates = Purs.predicates
     }
+
+runPredicates :: [Predicate a e] -> Expr l a -> PredResult [e]
+runPredicates =
+  undefined
