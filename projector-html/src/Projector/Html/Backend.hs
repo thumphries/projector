@@ -75,15 +75,16 @@ checkModule b m =
 
 predModule :: [Predicate a e] -> Module HtmlType a -> PredResult [e]
 predModule preds =
-  predResults . fmap (runPredicates preds . snd) . M.elems . moduleExprs
+  fmap fold . predResults . fmap (runPredicates preds . snd) . M.elems . moduleExprs
 
-runPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult e
-runPredicates preds =
-  foldrExpr (\e r -> runPredicate r (applyPredicates preds e)) (const id) PredOk
-
-applyPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult e
-applyPredicates preds expr =
-  foldl' (\r p -> runPredicate r ((unPredicate p) expr)) PredOk preds
+runPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult [e]
+runPredicates preds expr =
+  predResults . with preds $ \pred ->
+    case pred of
+      ExprPredicate p ->
+        foldrExpr (runPredicate . p) (const id) PredOk expr
+      PatPredicate p ->
+        foldrExpr (const id) (runPredicate . p) PredOk expr
 
 runPredicate :: PredResult e -> PredResult e -> PredResult e
 runPredicate r k =

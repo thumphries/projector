@@ -37,9 +37,10 @@ data Backend a e = Backend {
   , predicates :: [Predicate a e]
   } deriving (Functor)
 
-newtype Predicate a e = Predicate {
-    unPredicate :: (HtmlExpr a -> PredResult e)
-  } deriving (Functor)
+data Predicate a e
+  = ExprPredicate (HtmlExpr a -> PredResult e)
+  | PatPredicate (Pattern a -> PredResult e)
+  deriving (Functor)
 
 data PredResult e
   = PredError e
