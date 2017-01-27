@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Runtime.Prim (
     Bool (..)
-  , String
+  , Text
   ) where
 
 
-import           Data.String  (String)
+import           Data.Text  (Text)
 
 import           Prelude  (Bool(..))

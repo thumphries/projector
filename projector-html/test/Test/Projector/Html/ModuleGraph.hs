@@ -72,7 +72,7 @@ partition i xs =
     let (y, ys) = L.splitAt k xs
     fmap (y:) (partition i ys)
 
-buildSingletonModules :: Map Name (HtmlExpr ()) -> Map ModuleName (Module () ())
+buildSingletonModules :: Map Name (HtmlExpr ()) -> Map ModuleName (Module () PrimT ())
 buildSingletonModules mapp =
   M.mapKeys (ModuleName . unName) . flip M.mapWithKey mapp $ \n e ->
     Module {
@@ -110,7 +110,7 @@ genAcycle names =
 prop_unit_simple_cycle =
   once (isLeft (detectCycles (buildModuleGraph testModuleSet)))
 
-testModuleSet :: Map ModuleName (Module () ())
+testModuleSet :: Map ModuleName (Module () PrimT ())
 testModuleSet =
   M.fromList [
       (ModuleName "Module.Foo", Module {

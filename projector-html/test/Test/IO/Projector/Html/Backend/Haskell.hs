@@ -13,11 +13,11 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend (haskellBackend)
+import           Projector.Html.Backend (checkModule, haskellBackend)
 import           Projector.Html.Core
-import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
+import           Projector.Html.Data.Prim
 
 import           System.Process (readProcessWithExitCode)
 
@@ -27,17 +27,6 @@ import           Test.Projector.Html.Arbitrary
 
 prop_empty_module =
   once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
-
-prop_library_module =
-  once . moduleProp (ModuleName "Test.Haskell.Library") $ Module {
-      moduleTypes = Lib.types
-    , moduleImports = M.fromList [
-          (htmlRuntimePrim, OpenImport)
-        ]
-    , moduleExprs = M.fromList [
-          helloWorld
-        ]
-    }
 
 prop_library_runtime =
   once . moduleProp (ModuleName "Test.Haskell.Runtime") $ Module {
@@ -51,7 +40,7 @@ prop_library_runtime =
     }
 
 prop_hello_world =
-  once $ runProp name (text <> "\nmain = putStr (renderHtml helloWorld)\n")
+  once $ runProp name (text <> "\nmain = putStr (toText helloWorld)\n")
     (=== "Hello, world!")
   where
     (name, text) =
@@ -60,6 +49,7 @@ prop_hello_world =
         , moduleImports = M.fromList [
               (htmlRuntime, OpenImport)
             , (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
+            , (ModuleName "Hydrant", OnlyImport [Name "toText"])
             ]
         , moduleExprs = M.fromList [
               helloWorld
@@ -68,20 +58,14 @@ prop_hello_world =
 
 prop_welltyped :: Property
 prop_welltyped =
-  gamble genHtmlTypeDecls $ \decls ->
+  gamble (genHtmlTypeDecls) $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
-      gamble (genWellTypedHtmlModule k decls) $ \exprs ->
-        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") $ Module {
-            moduleTypes = subtractTypes decls htmlTypes
-          , moduleImports = M.fromList [
-                (htmlRuntime, OpenImport)
-              ]
-          , moduleExprs = exprs
-          }
+      gamble (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule haskellBackend)) $ \modl ->
+        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") modl
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType a -> Property
+moduleProp :: ModuleName -> Module HtmlType PrimT a -> Property
 moduleProp mn =
   uncurry ghcProp . renderModule haskellBackend mn
 

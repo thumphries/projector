@@ -100,8 +100,8 @@ checkTemplateIncremental known ast =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () Range
-  -> Either HtmlError (HB.Module HtmlType (HtmlType, Range))
+  -> HB.Module () PrimT Range
+  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, Range))
 checkModule decls (HB.Module typs imps exps) = do
   exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
   pure (HB.Module typs imps exps')
@@ -110,10 +110,8 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
-  -> Map HB.ModuleName (HB.Module () Range)
-  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType (HtmlType, Range)))
-  -- hmm, we actually want to be able to stream the result and write out partial results
-  -- -> [Either HtmlError (HB.ModuleName, HB.Module HtmlType (HtmlType, Range))]
+  -> Map HB.ModuleName (HB.Module () PrimT Range)
+  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Range)))
 checkModules decls exprs =
   first HtmlCoreError (fmap fst (foldM fun (mempty, mempty) deps))
   where
@@ -131,7 +129,7 @@ checkModules decls exprs =
 codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
-  -> HB.Module HtmlType (HtmlType, Range)
+  -> HB.Module HtmlType PrimT (HtmlType, Range)
   -> (FilePath, Text)
 codeGenModule backend =
   HB.renderModule (HB.getBackend backend)
@@ -185,7 +183,7 @@ runBuild (Build mb mp) rts = do
       pure (BuildArtefacts [])
 
 -- | Run a set of backend-specific predicates.
-validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType a) -> Either [HtmlError] ()
+validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()
 validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 
@@ -194,7 +192,7 @@ validateModules backend mods =
 -- * we do one template per module right now
 -- * the expression names are derived from the filepath
 -- * the module name is also derived from the filepath
-smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () Range))
+smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Range))
 smush (ModulePrefix prefix) (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)

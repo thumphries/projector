@@ -47,7 +47,7 @@ predicates = [
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
+renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let modName = T.unwords ["module", n, "where"]
       imports = fmap (uncurry genImport) (M.toList (moduleImports m))
@@ -62,7 +62,7 @@ renderExpr :: Name -> HtmlExpr a -> Text
 renderExpr n =
   prettyUndecorated . genExpDec n
 
-genModule :: Module HtmlType a -> [Doc a]
+genModule :: Module HtmlType PrimT a -> [Doc a]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->

@@ -1,27 +1,23 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Runtime.Library (
-    Html (..)
-  , HtmlNode (..)
-  , Tag (..)
-  , Attribute (..)
-  , AttributeKey (..)
-  , AttributeValue (..)
+    Hydrant.Html
+  , Hydrant.Tag (..)
+  , Hydrant.Attribute (..)
+  , Hydrant.AttributeKey (..)
+  , Hydrant.AttributeValue (..)
+  , Hydrant.textNode
+  , Hydrant.parentNode
+  , Hydrant.voidNode
+  , Hydrant.comment
+  , foldHtml
   ) where
 
 
-import           Data.String  (String)
+import           Data.Foldable (fold)
+import qualified Hydrant
 
-
--- This needs to be kept in sync with Projector.Html.Core.Library.
-data Attribute = Attribute !AttributeKey !AttributeValue
-data AttributeKey = AttributeKey !String
-data AttributeValue = AttributeValue !String
-data Html = Html !([HtmlNode])
-data HtmlNode
-    = Element !Tag !([Attribute]) !Html
-    | VoidElement !Tag !([Attribute])
-    | Comment !String
-    | Plain !String
-    | Whitespace
-data Tag = Tag !String
+foldHtml :: [Hydrant.Html] -> Hydrant.Html
+foldHtml =
+  fold
+{-# INLINE foldHtml #-}

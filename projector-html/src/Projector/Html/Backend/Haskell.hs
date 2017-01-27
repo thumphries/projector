@@ -38,6 +38,8 @@ import           Projector.Html.Core.Library
 import           Projector.Html.Data.Backend hiding (Backend(..))
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
+import           Projector.Html.Backend.Haskell.Prim
+import           Projector.Html.Backend.Haskell.Rewrite
 import           Projector.Html.Backend.Haskell.TH
 
 import           System.IO (FilePath)
@@ -80,15 +82,17 @@ htmlNodeConstructors =
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType a -> (FilePath, Text)
+renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
 renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
         ]
+      (_mn', m') = second toHaskellModule (rewriteModule mn m)
       modName = T.unwords ["module", n, "where"]
-      imports = fmap (uncurry genImport) (M.toList (moduleImports m))
-      decls = fmap (T.pack . TH.pprint) (genModule m)
+
+      imports = fmap (uncurry genImport) (M.toList (moduleImports m'))
+      decls = fmap (T.pack . TH.pprint) (genModule m')
 
   in (genFileName mn, T.unlines $ mconcat [
          pragmas
@@ -99,7 +103,7 @@ renderModule mn@(ModuleName n) m =
 
 renderExpr :: Name -> HtmlExpr a -> Text
 renderExpr n =
-  T.pack . TH.pprint . genExpDec n
+  T.pack . TH.pprint . genExpDec n . toHaskellExpr . rewriteExpr
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =
@@ -113,7 +117,7 @@ genImport (ModuleName n) imports =
           "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
-genModule :: Module HtmlType a -> [TH.Dec]
+genModule :: HaskellModule a -> [TH.Dec]
 genModule (Module ts _ es) =
      genTypeDecs ts
   <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->
@@ -124,36 +128,28 @@ genFileName (ModuleName n) =
   T.unpack (T.replace "." "/" n) <> ".hs"
 
 -- -----------------------------------------------------------------------------
-
-genTypeDecs :: HtmlDecls -> [TH.Dec]
-genTypeDecs =
-  fmap (uncurry genTypeDec) . M.toList . unTypeDecls
-
 -- | Type declarations.
 --
 -- This should be done via Machinator eventually.
-genTypeDec :: TypeName -> HtmlDecl -> TH.Dec
+-- They shouldn't even be a field in 'Module'.
+
+genTypeDecs :: HaskellDecls -> [TH.Dec]
+genTypeDecs =
+  fmap (uncurry genTypeDec) . M.toList . unTypeDecls
+
+genTypeDec :: TypeName -> HaskellDecl -> TH.Dec
 genTypeDec (TypeName n) ty =
   case ty of
     DVariant cts ->
       data_ (mkName_ n) [] (fmap (uncurry genCon) cts)
 
--- | Expression declarations.
-genExpDec :: Name -> HtmlExpr a -> TH.Dec
-genExpDec (Name n) expr =
-  val_ (varP (mkName_ n)) (genExp expr)
-
-genTypeSig :: Name -> HtmlType -> TH.Dec
-genTypeSig (Name n) ty =
-  sig (mkName_ n) (genType ty)
-
 -- | Constructor declarations.
-genCon :: Constructor -> [HtmlType] -> TH.Con
+genCon :: Constructor -> [HaskellType] -> TH.Con
 genCon (Constructor n) ts =
   normalC_' (mkName_ n) (fmap genType ts)
 
 -- | Types.
-genType :: HtmlType -> TH.Type
+genType :: HaskellType -> TH.Type
 genType (Type ty) =
   case ty of
     TLitF l ->
@@ -168,8 +164,20 @@ genType (Type ty) =
     TListF t ->
       listT_ (genType t)
 
+-- -----------------------------------------------------------------------------
+
+-- | Expression declarations.
+genExpDec :: Name -> HaskellExpr a -> TH.Dec
+genExpDec (Name n) expr =
+  val_ (varP (mkName_ n)) (genExp expr)
+
+genTypeSig :: Name -> HaskellType -> TH.Dec
+genTypeSig (Name n) ty =
+  sig (mkName_ n) (genType ty)
+
+
 -- | Expressions.
-genExp :: HtmlExpr a -> TH.Exp
+genExp :: HaskellExpr a -> TH.Exp
 genExp expr =
   case expr of
     ELit _ v ->
@@ -197,7 +205,7 @@ genExp expr =
       varE (mkName_ x)
 
 -- | Case alternatives.
-genMatch :: Pattern a -> HtmlExpr a -> TH.Match
+genMatch :: Pattern a -> HaskellExpr a -> TH.Match
 genMatch p e =
   match_ (genPat p) (genExp e)
 
@@ -211,8 +219,8 @@ genPat p = case p of
     conP (mkName_ n) (fmap genPat ps)
 
 -- | Literals.
-genLit :: Value PrimT -> TH.Lit
+genLit :: Value HaskellPrimT -> TH.Lit
 genLit v =
   case v of
-    VString x ->
+    HTextV x ->
       stringL_ x
