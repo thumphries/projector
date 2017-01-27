@@ -9,7 +9,7 @@ import           Data.Generics.Aliases
 import           Data.Generics.Schemes
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.Text.Arbitrary ()
 
@@ -18,7 +18,9 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core (Name)
+import           Projector.Core
+import           Projector.Html.Data.Backend
+import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim as Prim
 import           Projector.Html.Data.Template
 import           Projector.Html.Core (htmlTypes)
@@ -40,9 +42,12 @@ genWellTypedHtmlExpr ctx = do
   ex <- genWellTypedExpr ctx ty (genHtmlType ctx) genWellTypedHtmlLit
   pure (ty, ex)
 
-genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Map Name (HtmlType, HtmlExpr ()))
+genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT ())
 genWellTypedHtmlModule n decls =
-  genWellTypedLetrec n (decls <> htmlTypes) (genHtmlType decls) genWellTypedHtmlLit
+  Module
+    <$> pure (subtractTypes decls htmlTypes)
+    <*> pure (M.fromList [(htmlRuntime, OpenImport)])
+    <*> genWellTypedLetrec n (decls <> htmlTypes) (genHtmlType decls) genWellTypedHtmlLit
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =

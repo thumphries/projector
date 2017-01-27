@@ -44,15 +44,10 @@ prop_welltyped :: Property
 prop_welltyped =
   gamble genHtmlTypeDecls $ \decls ->
     gamble (chooseInt (0,  100)) $ \k ->
-      gamble (genWellTypedHtmlModule k decls) $ \exprs ->
-        moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ Module {
+      gamble (genWellTypedHtmlModule k decls) $ \modl ->
+        moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
+            -- TODO once the backend actually does something, remove this setter
             moduleTypes = decls
-          -- TODO once the runtime actually contains stuff, uncomment this
-          -- moduleTypes = subtractTypes decls (Lib.types <> Prim.types)
-          , moduleImports = M.fromList [
-                (ModuleName "Projector.Html.Runtime", OpenImport)
-              ]
-          , moduleExprs = exprs
           }
 
 -- -----------------------------------------------------------------------------

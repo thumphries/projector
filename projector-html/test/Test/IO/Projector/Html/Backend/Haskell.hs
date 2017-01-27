@@ -13,7 +13,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend (haskellBackend)
+import           Projector.Html.Backend (checkModule, haskellBackend)
 import           Projector.Html.Core
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
@@ -56,20 +56,12 @@ prop_hello_world =
             ]
         }
 
--- FIX this generates case-of-HtmlNode, it shouldn't do this anymore
---     (it's nonsensical in this bbackend now)
 prop_welltyped :: Property
 prop_welltyped =
   gamble (genHtmlTypeDecls) $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
-      gamble (genWellTypedHtmlModule k decls) $ \exprs ->
-        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") $ Module {
-            moduleTypes = subtractTypes decls htmlTypes
-          , moduleImports = M.fromList [
-                (htmlRuntime, OpenImport)
-              ]
-          , moduleExprs = exprs
-          }
+      gamble (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule haskellBackend)) $ \modl ->
+        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") modl
 
 -- -----------------------------------------------------------------------------
 
