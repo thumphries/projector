@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -22,6 +23,8 @@ module Projector.Html.Backend.Haskell (
 
 
 import qualified Data.Map.Strict as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import qualified Language.Haskell.TH as TH
@@ -31,6 +34,7 @@ import           P
 import           Projector.Core
 
 import           Projector.Html.Core
+import           Projector.Html.Core.Library
 import           Projector.Html.Data.Backend hiding (Backend(..))
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
@@ -42,7 +46,7 @@ import           System.IO (FilePath)
 -- -----------------------------------------------------------------------------
 
 data HaskellError
-  = HtmlCase -- FIX
+  = HtmlCase -- TODO should really return decorated parameterised error here
   deriving (Eq, Ord, Show)
 
 renderHaskellError :: HaskellError -> Text
@@ -53,7 +57,26 @@ renderHaskellError e =
 
 predicates :: [Predicate a HaskellError]
 predicates = [
+    PatPredicate $ \case
+      PCon _ c _ ->
+        if S.member c htmlConstructors || S.member c htmlNodeConstructors
+          then PredError HtmlCase
+          else PredOk
+      _ ->
+        PredOk
   ]
+
+htmlConstructors :: Set Constructor
+htmlConstructors =
+  case dHtml of
+    DVariant cts ->
+      S.fromList (fmap fst cts)
+
+htmlNodeConstructors :: Set Constructor
+htmlNodeConstructors =
+  case dHtmlNode of
+    DVariant cts ->
+      S.fromList (fmap fst cts)
 
 -- -----------------------------------------------------------------------------
 
