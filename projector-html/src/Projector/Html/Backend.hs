@@ -79,7 +79,7 @@ predModule preds =
 
 runPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult e
 runPredicates preds =
-  foldrExpr (\e r -> runPredicate r (applyPredicates preds e)) PredOk
+  foldrExpr (\e r -> runPredicate r (applyPredicates preds e)) (const id) PredOk
 
 applyPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult e
 applyPredicates preds expr =
