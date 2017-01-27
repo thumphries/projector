@@ -3,6 +3,9 @@
 module Projector.Html.Backend.Purescript (
     renderModule
   , renderExpr
+  , predicates
+  , PurescriptError
+  , renderPurescriptError
   ) where
 
 
@@ -15,6 +18,7 @@ import           P
 import           Projector.Core
 
 import           Projector.Html.Core
+import           Projector.Html.Data.Backend hiding (Backend (..))
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 
@@ -23,6 +27,23 @@ import           System.IO  (FilePath)
 import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>), (<$$>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
+
+-- -----------------------------------------------------------------------------
+
+-- TODO there aren't any errors possible right now
+data PurescriptError
+  = PurescriptError
+  deriving (Eq, Ord, Show)
+
+renderPurescriptError :: PurescriptError -> Text
+renderPurescriptError e =
+  case e of
+    PurescriptError ->
+      "Are you sure about that?"
+
+predicates :: [Predicate a PurescriptError]
+predicates = [
+  ]
 
 -- -----------------------------------------------------------------------------
 

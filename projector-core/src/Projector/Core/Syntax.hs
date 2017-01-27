@@ -12,6 +12,7 @@ module Projector.Core.Syntax (
   , extractAnnotation
   , Name (..)
   , Pattern (..)
+  , extractPatternAnnotation
   -- * Smart/lazy constructors
   , lit
   , lam
@@ -35,8 +36,16 @@ module Projector.Core.Syntax (
   , gatherFree
   , patternBinds
   , mapGround
+  , foldlExprM
+  , foldlExpr
+  , foldlPatternM
+  , foldrExprM
+  , foldrExpr
+  , foldrPatternM
   ) where
 
+
+import           Control.Monad.Trans.Cont (cont, runCont)
 
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -87,6 +96,7 @@ extractAnnotation e =
       a
     EForeign a _ _ ->
       a
+{-# INLINE extractAnnotation #-}
 
 newtype Name = Name { unName :: Text }
   deriving (Eq, Ord, Show)
@@ -96,6 +106,15 @@ data Pattern a
   = PVar a Name
   | PCon a Constructor [Pattern a]
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+extractPatternAnnotation :: Pattern a -> a
+extractPatternAnnotation p =
+  case p of
+    PVar a _ ->
+      a
+    PCon a _ _ ->
+      a
+{-# INLINE extractPatternAnnotation #-}
 
 -- lazy exprs
 lit :: Value l -> Expr l ()
@@ -247,3 +266,120 @@ mapGround tmap vmap expr =
 
     EForeign a n t ->
       EForeign a n (mapGroundType tmap t)
+
+-- | Bottom-up monadic fold.
+foldrExprM ::
+     Monad m
+  => (Expr l a -> b -> m b) -- ^ eliminator for exprs
+  -> (Pattern a -> b -> m b) -- ^ eliminator for patterns
+  -> b
+  -> Expr l a
+  -> m b
+foldrExprM fx fp acc expr =
+  case expr of
+    ELit _ _ ->
+      fx expr acc
+    EVar _ _ ->
+      fx expr acc
+    ELam _ _ _ e -> do
+      acc' <- foldrExprM fx fp acc e
+      fx expr acc'
+    EApp _ i j -> do
+      acc' <- foldrExprM fx fp acc j
+      acc'' <- foldrExprM fx fp acc' i
+      fx expr acc''
+    ECon _ _ _ es -> do
+      acc' <- foldrM (flip (foldrExprM fx fp)) acc es
+      fx expr acc'
+    ECase _ e pes -> do
+      acc' <-
+        foldrM
+          (\(pat, ex) a -> foldrExprM fx fp a ex >>= \a' -> foldrPatternM fp a' pat)
+          acc
+          pes
+      acc'' <- foldrExprM fx fp acc' e
+      fx expr acc''
+    EList _ _ es -> do
+      acc' <- foldrM (flip (foldrExprM fx fp)) acc es
+      fx expr acc'
+    EForeign _ _ _ ->
+      fx expr acc
+
+-- | Bottom-up monadic fold over a pattern.
+foldrPatternM :: Monad m => (Pattern a -> b -> m b) -> b -> Pattern a -> m b
+foldrPatternM fp acc p =
+  case p of
+    PVar _ _ ->
+      fp p acc
+
+    PCon _ _ ps -> do
+      acc' <- foldrM (flip (foldrPatternM fp)) acc ps
+      fp p acc'
+
+-- | Bottom-up strict fold.
+foldrExpr :: (Expr l a -> b -> b) -> (Pattern a -> b -> b) -> b -> Expr l a -> b
+foldrExpr fx fp acc expr =
+  runCont
+    (foldrExprM
+       (\e a -> cont (\k -> k (fx e a)))
+       (\p a -> cont (\k -> k (fp p a)))
+       acc
+       expr)
+    id
+
+-- | Top-down monadic fold.
+foldlExprM ::
+     Monad m
+  => (b -> Expr l a -> m b)
+  -> (b -> Pattern a -> m b)
+  -> b
+  -> Expr l a
+  -> m b
+foldlExprM fx fp acc expr =
+  case expr of
+    ELit _ _ ->
+      fx acc expr
+    EVar _ _ ->
+      fx acc expr
+    EForeign _ _ _ ->
+      fx acc expr
+    ELam _ _ _ e -> do
+      acc' <- fx acc expr
+      foldlExprM fx fp acc' e
+    EApp _ i j -> do
+      acc' <- fx acc expr
+      acc'' <- foldlExprM fx fp acc' i
+      foldlExprM fx fp acc'' j
+    ECon _ _ _ es -> do
+      acc' <- fx acc expr
+      foldM (foldlExprM fx fp) acc' es
+    ECase _ e pes -> do
+      acc' <- fx acc expr
+      acc'' <- foldlExprM fx fp acc' e
+      foldlM
+        (\a (pat, ex) -> foldlPatternM fp a pat >>= \a' -> foldlExprM fx fp a' ex)
+        acc''
+        pes
+    EList _ _ es -> do
+      acc' <- fx acc expr
+      foldM (foldlExprM fx fp) acc' es
+
+-- | Top-down monadic fold of a pattern.
+foldlPatternM :: Monad m => (b -> Pattern a -> m b) -> b -> Pattern a -> m b
+foldlPatternM fp acc p =
+  case p of
+    PVar _ _ ->
+      fp acc p
+
+    PCon _ _ ps -> do
+      acc' <- fp acc p
+      foldlM (foldlPatternM fp) acc' ps
+
+-- | Top-down strict fold.
+foldlExpr :: (b -> Expr l a -> b) -> (b -> Pattern a -> b) -> b -> Expr l a -> b
+foldlExpr fx fp acc =
+  flip runCont id .
+  foldlExprM
+    (\a e -> cont (\k -> k (fx a e)))
+    (\a p -> cont (\k -> k (fp a p)))
+    acc

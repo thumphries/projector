@@ -5,6 +5,9 @@
 module Projector.Html.Backend.Haskell (
     renderModule
   , renderExpr
+  , predicates
+  , HaskellError (..)
+  , renderHaskellError
   -- * guts
   , genModule
   , genTypeDecs
@@ -28,12 +31,29 @@ import           P
 import           Projector.Core
 
 import           Projector.Html.Core
+import           Projector.Html.Data.Backend hiding (Backend(..))
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 import           Projector.Html.Backend.Haskell.TH
 
 import           System.IO (FilePath)
 
+
+-- -----------------------------------------------------------------------------
+
+data HaskellError
+  = HtmlCase -- FIX
+  deriving (Eq, Ord, Show)
+
+renderHaskellError :: HaskellError -> Text
+renderHaskellError e =
+  case e of
+    HtmlCase ->
+      "Don't case on Html or HtmlNode, pal!"
+
+predicates :: [Predicate a HaskellError]
+predicates = [
+  ]
 
 -- -----------------------------------------------------------------------------
 

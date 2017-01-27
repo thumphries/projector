@@ -63,6 +63,7 @@ test-suite test
                      , mtl
                      , containers
                      , text
+                     , transformers
                      , semigroups
                      , pretty-show
 
