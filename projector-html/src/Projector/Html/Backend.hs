@@ -9,6 +9,7 @@ module Projector.Html.Backend (
   , haskellBackend
   , purescriptBackend
   , checkModule
+  , runPredicates
   ) where
 
 
