@@ -130,7 +130,11 @@ typeTree ::
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
 typeTree decls expr = do
-  (expr', constraints, _assums) <- generateConstraints decls expr
+  (expr', constraints, Assumptions assums) <- generateConstraints decls expr
+  -- Any unresolved assumptions are from free variables
+  () <- if M.keys assums == mempty
+          then pure ()
+          else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
   subs <- solveConstraints constraints
   let subbed = substitute subs expr'
   first D.toList (lowerExpr subbed)

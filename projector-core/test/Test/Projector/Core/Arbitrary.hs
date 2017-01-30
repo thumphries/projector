@@ -542,10 +542,19 @@ genIllTypedExpr' n ctx names genty genval =
               nty <- genty `suchThat` (/= t)
               genWellTypedExpr' (n `div` (max 2 (length xs))) nty ctx names genty genval
 
+      freeVar = do
+        -- Create some lambda
+        ty <- genty
+        bnd <- genty
+        fun <- genWellTypedLam (n `div` 2) bnd ty ctx names genty genval
+        -- apply it to an unbound variable
+        varn <- fmap (var . Name) (elements simpsons)
+        pure (app fun varn)
+
   in oneOf
        (if (unTypeDecls ctx == mempty)
-         then [badApp] -- most of these need at least one variant in scope
-         else [badApp, badCase1, badCase2, badCon])
+         then [badApp, freeVar] -- most of these need at least one variant in scope
+         else [badApp, freeVar, badCase1, badCase2, badCon])
 
 
 
