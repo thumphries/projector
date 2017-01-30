@@ -361,14 +361,15 @@ generateConstraints' decls expr =
       addAssumption v t
       pure (EVar (t, a) v)
 
-    ELam a n ta e -> do
+    ELam a n mta e -> do
       -- Proceed bottom-up, generating constraints for 'e'.
       -- Gather the assumed types of 'n', and constrain them to be the known (annotated) type.
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
-      for_ as (addConstraint . Equal (hoistType a ta))
-      let ty = I (Am a (TArrowF (hoistType a ta) (extractType e')))
-      pure (ELam (ty, a) n ta e')
+      ta <- maybe (freshTypeVar a) (pure . hoistType a) mta
+      for_ as (addConstraint . Equal ta)
+      let ty = I (Am a (TArrowF ta (extractType e')))
+      pure (ELam (ty, a) n mta e')
 
     EApp a f g -> do
       -- Proceed bottom-up, generating constraints for 'f' and 'g'.

@@ -161,10 +161,10 @@ ppExpr' types e =
           gg = ppExpr' types g
       in WL.annotate a (WL.hang 2 (WL.parens (ff </> gg)))
 
-    ELam a (Name n) t f ->
+    ELam a (Name n) mt f ->
       WL.annotate a $
         WL.hang 2
-              ((text ("\\" <> n <> typeMay t <> "."))
+              ((text ("\\" <> n <> maybe mempty typeMay mt <> "."))
           <$$> (ppExpr' types f))
 
     ECon a (Constructor c) _ es ->

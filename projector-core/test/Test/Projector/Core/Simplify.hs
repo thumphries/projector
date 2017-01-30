@@ -61,23 +61,23 @@ church =
 
 zero :: Expr TestLitT ()
 zero =
-  lam_ "f" (TArrow unit unit)
-    (lam_ "x" unit (var_ "x"))
+  lam_ "f" (Just (TArrow unit unit))
+    (lam_ "x" (Just unit) (var_ "x"))
 
 succ :: Expr TestLitT ()
 succ =
-  lam_ "n" church
-    (lam_ "f" (TArrow unit unit)
-      (lam_ "x" unit
+  lam_ "n" (Just church)
+    (lam_ "f" (Just (TArrow unit unit))
+      (lam_ "x" (Just unit)
         (app
           (var_ "f")
           (app (app (var_ "n") (var_ "f")) (var_ "x")))))
 
 mult :: Expr TestLitT ()
 mult =
-  lam_ "m" church
-    (lam_ "n" church
-      (lam_ "f" (TArrow unit unit)
+  lam_ "m" (Just church)
+    (lam_ "n" (Just church)
+      (lam_ "f" (Just (TArrow unit unit))
         (app
           (var_ "m")
           (app (var_ "n") (var_ "f")))))
