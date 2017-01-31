@@ -107,7 +107,7 @@ typeCheckAll' decls known exprs = do
         maybe mempty (with itys . Equal) (M.lookup n types)
       constraints = D.toList (localConstraints <> globalConstraints)
       bound = S.fromList (M.keys known <> M.keys exprs)
-      used = S.fromList (M.keys assums)
+      used = S.fromList (M.keys (M.filter (not . null) assums))
       free = used `S.difference` bound
       freeAt = foldMap (\n -> maybe [] (fmap ((n,) . snd . flattenIType)) (M.lookup n assums)) (toList free)
   -- catch any free variables
@@ -132,7 +132,7 @@ typeTree ::
 typeTree decls expr = do
   (expr', constraints, Assumptions assums) <- generateConstraints decls expr
   -- Any unresolved assumptions are from free variables
-  () <- if M.keys assums == mempty
+  () <- if M.keys (M.filter (not . null) assums) == mempty
           then pure ()
           else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
   subs <- solveConstraints constraints
