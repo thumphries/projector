@@ -17,6 +17,7 @@ module Projector.Core.Syntax (
   , lit
   , lam
   , lam_
+  , lam__
   , var
   , var_
   , app
@@ -65,7 +66,7 @@ import           Projector.Core.Type
 data Expr l a
   = ELit a (Value l)
   | EVar a Name
-  | ELam a Name (Type l) (Expr l a)
+  | ELam a Name (Maybe (Type l)) (Expr l a)
   | EApp a (Expr l a) (Expr l a)
   | ECon a Constructor TypeName [Expr l a]
   | ECase a (Expr l a) [(Pattern a, Expr l a)]
@@ -121,13 +122,17 @@ lit :: Value l -> Expr l ()
 lit =
   ELit ()
 
-lam :: Name -> Type l -> Expr l () -> Expr l ()
+lam :: Name -> Maybe (Type l) -> Expr l () -> Expr l ()
 lam =
   ELam ()
 
-lam_ :: Text -> Type l -> Expr l () -> Expr l ()
+lam_ :: Text -> Maybe (Type l) -> Expr l () -> Expr l ()
 lam_ n =
   lam (Name n)
+
+lam__ :: Text -> Expr l () -> Expr l ()
+lam__ n =
+  lam_ n Nothing
 
 var :: Name -> Expr l ()
 var =
@@ -250,7 +255,7 @@ mapGround tmap vmap expr =
       EVar a n
 
     ELam a n t e ->
-      ELam a n (mapGroundType tmap t) (mapGround tmap vmap e)
+      ELam a n (fmap (mapGroundType tmap) t) (mapGround tmap vmap e)
 
     EApp a f g ->
       EApp a (mapGround tmap vmap f) (mapGround tmap vmap g)

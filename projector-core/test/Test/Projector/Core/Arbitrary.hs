@@ -107,8 +107,10 @@ genLam n t v = do
   typ <- t
   -- Make it likely that we'll actually use the bound name
   let n' = oneOf [pure nam, n]
+  -- Randomly drop the type annotation
+  typ' <- elements [Just typ, empty]
   bdy <- genExpr n' t v
-  pure (lam nam typ bdy)
+  pure (lam nam typ' bdy)
 
 genCon :: Jack TypeName -> Jack (Expr l ()) -> Jack (Expr l ())
 genCon t v =
@@ -404,7 +406,7 @@ genWellTypedLam ::
 genWellTypedLam n bnd ty ctx names genty genval = do
   name <- fmap Name (elements muppets)
   bdy <- genWellTypedExpr' (n `div` 2) ty ctx (cextend ctx names bnd name) genty genval
-  pure (lam name bnd bdy)
+  pure (lam name (Just bnd) bdy)
 
 genWellTypedApp ::
      (Ground l, Ord l)
@@ -418,9 +420,16 @@ genWellTypedApp ::
 genWellTypedApp n ty ctx names genty genval = do
   bnd <- genty
   fun <- genWellTypedLam (n `div` 2) bnd ty ctx names genty genval
+  fun' <- case fun of
+    ELam a nn (Just bt) eexp -> do
+      -- Erase the type annotation randomly
+      bt' <- elements [pure bt, empty]
+      pure (ELam a nn bt' eexp)
+    _ ->
+      pure fun
   arg <- genWellTypedExpr' (n `div` 2) bnd ctx names genty genval
   reshrink (\x -> [whnf x]) $
-    pure (app fun arg)
+    pure (app fun' arg)
 
 genWellTypedLetrec ::
      (Ground l, Ord l)
@@ -494,7 +503,7 @@ genIllTypedExpr' n ctx names genty genval =
         pes <- genAlternatives ctx names' (\c t -> genWellTypedExpr' k t ctx c genty genval) cts bty
 
         -- put a different thing in the e
-        pure (lam nn nty (case_ (var nn) pes))
+        pure (lam nn (Just nty) (case_ (var nn) pes))
 
       badCase2 = do
         -- Create a valid case statement, then swap one of the
@@ -514,7 +523,7 @@ genIllTypedExpr' n ctx names genty genval =
         bat <- genWellTypedExpr' k nety ctx names' genty genval
         let pes' = (pvar_ "x", bat) : pes
 
-        pure (lam nn (TVar tn) (case_ (var nn) pes'))
+        pure (lam nn (Just (TVar tn)) (case_ (var nn) pes'))
 
       badCon = do
         -- grab some variant

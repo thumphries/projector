@@ -24,7 +24,7 @@ import           Test.Projector.Core.Simplify (mul, nth)
 buildExpr :: Int -> Expr TestLitT ()
 buildExpr n = case n of
   0 -> var_ "billy"
-  m -> app (lam_ "billy" (TLit TBool) (buildExpr (m - 1))) (lit (VBool True))
+  m -> app (lam_ "billy" (Just (TLit TBool)) (buildExpr (m - 1))) (lit (VBool True))
 
 -- big case
 

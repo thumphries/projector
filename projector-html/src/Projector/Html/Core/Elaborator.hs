@@ -22,7 +22,7 @@ elaborate (Template _ mts html) =
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr a -> HtmlExpr a)
 eTypeSigs msigs =
   mcase msigs id $ \(TTypeSig a sigs) ->
-    foldl' (\f (TId x, ty) -> f . ELam a (Name x) (eType ty)) id sigs
+    foldl' (\f (TId x, ty) -> f . ELam a (Name x) (Just (eType ty))) id sigs
 
 eType :: TType a -> HtmlType
 eType ty =
