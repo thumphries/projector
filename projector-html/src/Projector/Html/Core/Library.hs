@@ -3,7 +3,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Library (
+  -- * Collections
     types
+  , exprs
+  -- * Types
   , tTag
   , nTag
   , tAttribute
@@ -18,9 +21,14 @@ module Projector.Html.Core.Library (
   , tHtmlNode
   , nHtmlNode
   , dHtmlNode
+  -- * Expressions
+  , nHtmlText
+  , tHtmlText
+  , eHtmlText
   ) where
 
 
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
 import           P
@@ -38,6 +46,12 @@ types =
     , (nAttributeValue, dAttributeValue)
     , (nHtml, dHtml)
     , (nHtmlNode, dHtmlNode)
+    ]
+
+exprs :: Map Name (HtmlType, HtmlExpr ())
+exprs =
+  M.fromList [
+      (nHtmlText, (tHtmlText, eHtmlText))
     ]
 
 -- -----------------------------------------------------------------------------
@@ -141,3 +155,19 @@ dHtmlNode =
     , (Constructor "Whitespace", [])
     , (Constructor "Nested", [tHtml])
     ]
+
+-- -----------------------------------------------------------------------------
+
+nHtmlText :: Name
+nHtmlText =
+  Name "text"
+
+tHtmlText :: HtmlType
+tHtmlText =
+  TArrow (TLit TString) tHtml
+
+eHtmlText :: HtmlExpr ()
+eHtmlText =
+  ELam () (Name "t") (Just (TLit TString))
+    (ECon () (Constructor "Html") nHtml
+      [(ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")])])
