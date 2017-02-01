@@ -35,7 +35,7 @@ prop_library_module =
   once . moduleProp (ModuleName "Test.Purescript.Library") $ Module {
       moduleTypes = Lib.types <> Prim.types
     , moduleImports = mempty
-    , moduleExprs = M.fromList [
+    , moduleExprs = Lib.exprs <> M.fromList [
           helloWorld
         ]
     }
@@ -48,6 +48,7 @@ prop_welltyped =
         moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
             -- TODO once the backend actually does something, remove this setter
             moduleTypes = decls
+          , moduleExprs = Lib.exprs <> moduleExprs modl
           }
 
 -- -----------------------------------------------------------------------------

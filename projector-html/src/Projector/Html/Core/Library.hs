@@ -170,4 +170,4 @@ eHtmlText :: HtmlExpr ()
 eHtmlText =
   ELam () (Name "t") (Just (TLit TString))
     (ECon () (Constructor "Html") nHtml
-      [(ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")])])
+      [EList () tHtmlNode [ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")]]])
