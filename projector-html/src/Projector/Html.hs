@@ -95,7 +95,7 @@ checkTemplateIncremental ::
 checkTemplateIncremental known ast =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
-  . HC.typeCheckIncremental mempty (M.mapKeys PC.Name known)
+  . HC.typeCheckIncremental mempty (libraryExprs <> (M.mapKeys PC.Name known))
   . M.singleton (PC.Name "it")
   $ Elab.elaborate ast
 
@@ -111,10 +111,11 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
+  -> Map PC.Name (HtmlType, Annotation)
   -> Map HB.ModuleName (HB.Module () PrimT Annotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Annotation)))
-checkModules decls exprs =
-  first HtmlCoreError (fmap fst (foldM fun (mempty, mempty) deps))
+checkModules decls known exprs =
+  first HtmlCoreError (fmap fst (foldM fun (mempty, known) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
     --
@@ -174,7 +175,7 @@ runBuild (Build mb mp) rts = do
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  checked <- first pure (checkModules mempty mmap)
+  checked <- first pure (checkModules mempty libraryExprs mmap)
   -- If there's a backend, codegen (this can be a lazy stream)
   case mb of
     Just backend -> do
@@ -182,6 +183,11 @@ runBuild (Build mb mp) rts = do
       pure (BuildArtefacts (M.elems (M.mapWithKey (codeGenModule backend) checked)))
     Nothing ->
       pure (BuildArtefacts [])
+
+-- TODO hmm is this a compilation detail we should hide in HC?
+libraryExprs :: Map PC.Name (HtmlType, Annotation)
+libraryExprs =
+  M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
 validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()

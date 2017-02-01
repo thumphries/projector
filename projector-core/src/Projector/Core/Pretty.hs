@@ -40,8 +40,8 @@ ppTypeError' err =
     UnificationError (t1, a) (t2, b) ->
       WL.hang 2
         (text "Type error. The differing types are:"
-          <$$> WL.annotate a (text (ppType t1))
-          <$$> WL.annotate b (text (ppType t2)))
+          <$$> annNL a (text (ppType t1))
+          <$$> annNL b (text (ppType t2)))
     FreeVariable (Name n) a ->
       WL.annotate a $
         text ("Not in scope: " <> n)
@@ -93,8 +93,12 @@ ppTypeError' err =
     InfiniteType (t1, a) (t2, b) ->
       WL.hang 2
         (text "Type error (occurs check) - cannot construct the infinite type!"
-          <$$> WL.annotate a (text (ppType t1))
-          <$$> WL.annotate b (text (ppType t2)))
+          <$$> annNL a (text (ppType t1))
+          <$$> annNL b (text (ppType t2)))
+
+annNL :: a -> Doc a -> Doc a
+annNL a val =
+  WL.hang 2 ((WL.annotate a (WL.empty)) <$$> val)
 
 -- -----------------------------------------------------------------------------
 

@@ -31,4 +31,4 @@ renderAnnotation ann =
     SourceAnnotation r ->
       renderRange r
     LibraryFunction (Name n) ->
-      "In a library function '" <> n <> "'"
+      "In the standard library function '" <> n <> "'"
