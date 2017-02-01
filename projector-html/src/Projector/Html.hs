@@ -95,7 +95,7 @@ checkTemplateIncremental ::
 checkTemplateIncremental known ast =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
-  . HC.typeCheckIncremental mempty (M.mapKeys PC.Name known)
+  . HC.typeCheckIncremental mempty (libraryExprs <> (M.mapKeys PC.Name known))
   . M.singleton (PC.Name "it")
   $ Elab.elaborate ast
 
@@ -184,10 +184,10 @@ runBuild (Build mb mp) rts = do
     Nothing ->
       pure (BuildArtefacts [])
 
-libraryExprs :: Map PC.Name (HtmlType, Range)
+-- TODO hmm is this a compilation detail we should hide in HC?
+libraryExprs :: Map PC.Name (HtmlType, Annotation)
 libraryExprs =
-  -- TODO this mempty is not acceptable
-  fmap (fmap (const mempty)) HC.libraryExprs
+  M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
 validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()
