@@ -19,6 +19,7 @@ import           P hiding (bind)
 import qualified Projector.Core as Core
 import           Projector.Html
 import qualified Projector.Html as Html
+import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Backend.Haskell as Haskell
 import qualified Projector.Html.Backend.Purescript as Purescript
 import qualified Projector.Html.Pretty as HP
@@ -146,7 +147,7 @@ data ReplResponse
 
 data ReplState = ReplState {
     replBindings :: Bindings
-  , replKnown :: Map Text (HtmlType, Range)
+  , replKnown :: Map Text (HtmlType, Annotation)
   , replMultiline :: Bool
   } deriving (Eq, Show)
 
@@ -175,9 +176,9 @@ withBind n f = do
   maybe (err (ReplUnbound n)) f mbind
 
 data Binding
-  = TBind (Template Range) HtmlType (HtmlExpr (HtmlType, Range))
-  | TFBind FilePath (Template Range) HtmlType (HtmlExpr (HtmlType, Range))
-  | EBind HtmlType (HtmlExpr (HtmlType, Range))
+  = TBind (Template Annotation) HtmlType (HtmlExpr (HtmlType, Annotation))
+  | TFBind FilePath (Template Annotation) HtmlType (HtmlExpr (HtmlType, Annotation))
+  | EBind HtmlType (HtmlExpr (HtmlType, Annotation))
   deriving (Eq, Show)
 
 boundType :: Binding -> HtmlType
@@ -190,7 +191,7 @@ boundType b =
     EBind t _ ->
       t
 
-boundCore :: Binding -> HtmlExpr (HtmlType, Range)
+boundCore :: Binding -> HtmlExpr (HtmlType, Annotation)
 boundCore b =
   case b of
     TBind _ _ c ->
@@ -200,7 +201,7 @@ boundCore b =
     EBind _ c ->
       c
 
-boundTemplate :: Binding -> Maybe (Template Range)
+boundTemplate :: Binding -> Maybe (Template Annotation)
 boundTemplate b =
   case b of
     TBind t _ _ ->
@@ -252,12 +253,12 @@ runReplCommand cmd =
     ExitRepl ->
       pure ReplExit
 
-loadTemplate :: FilePath -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, Range))
+loadTemplate :: FilePath -> Repl (Template Annotation, HtmlType, HtmlExpr (HtmlType, Annotation))
 loadTemplate f = do
   t <- liftIO (T.readFile f)
   parseTemplate' f t
 
-parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, Range))
+parseTemplate' :: FilePath -> Text -> Repl (Template Annotation, HtmlType, HtmlExpr (HtmlType, Annotation))
 parseTemplate' f t =
   Repl $ do
     k <- gets replKnown

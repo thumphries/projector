@@ -40,6 +40,7 @@ import qualified Projector.Html.Backend as HB
 import qualified Projector.Html.Core as HC
 import           Projector.Html.Core  (CoreError(..))
 import qualified Projector.Html.Core.Elaborator as Elab
+import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Data.Backend as HB
 import qualified Projector.Html.Data.Module as HB
 import           Projector.Html.Data.Position  (Range)
@@ -59,7 +60,7 @@ import           X.Control.Monad.Trans.Either (sequenceEither)
 
 data HtmlError
   = HtmlParseError ParseError
-  | HtmlCoreError (CoreError Range)
+  | HtmlCoreError (CoreError Annotation)
   | HtmlModuleGraphError GraphError
   | HtmlBackendError HB.BackendError
   deriving (Eq, Show)
@@ -70,7 +71,7 @@ renderHtmlError he =
     HtmlParseError e ->
       renderParseError e
     HtmlCoreError e ->
-      HC.renderCoreErrorRange e
+      HC.renderCoreErrorAnnotation e
     HtmlModuleGraphError e ->
       renderGraphError e
     HtmlBackendError e ->
@@ -79,18 +80,18 @@ renderHtmlError he =
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
 
-parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
+parseTemplate :: FilePath -> Text -> Either HtmlError (Template Annotation)
 parseTemplate f =
-  first HtmlParseError . parse f
+  bimap HtmlParseError annotateTemplate . parse f
 
-checkTemplate :: Template Range -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Range))
+checkTemplate :: Template Annotation -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Annotation))
 checkTemplate =
   first HtmlCoreError . HC.templateToCore
 
 checkTemplateIncremental ::
-     Map Text (HtmlType, Range)
-  -> Template Range
-  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Range))
+     Map Text (HtmlType, Annotation)
+  -> Template Annotation
+  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Annotation))
 checkTemplateIncremental known ast =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
@@ -100,8 +101,8 @@ checkTemplateIncremental known ast =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () PrimT Range
-  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, Range))
+  -> HB.Module () PrimT Annotation
+  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, Annotation))
 checkModule decls (HB.Module typs imps exps) = do
   exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
   pure (HB.Module typs imps exps')
@@ -110,8 +111,8 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
-  -> Map HB.ModuleName (HB.Module () PrimT Range)
-  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Range)))
+  -> Map HB.ModuleName (HB.Module () PrimT Annotation)
+  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Annotation)))
 checkModules decls exprs =
   first HtmlCoreError (fmap fst (foldM fun (mempty, mempty) deps))
   where
@@ -129,7 +130,7 @@ checkModules decls exprs =
 codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
-  -> HB.Module HtmlType PrimT (HtmlType, Range)
+  -> HB.Module HtmlType PrimT (HtmlType, Annotation)
   -> (FilePath, Text)
 codeGenModule backend =
   HB.renderModule (HB.getBackend backend)
@@ -192,7 +193,7 @@ validateModules backend mods =
 -- * we do one template per module right now
 -- * the expression names are derived from the filepath
 -- * the module name is also derived from the filepath
-smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Range))
+smush :: ModulePrefix -> RawTemplates -> Either [HtmlError] (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Annotation))
 smush (ModulePrefix prefix) (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)
