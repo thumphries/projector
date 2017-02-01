@@ -51,6 +51,7 @@ library
                        Projector.Html.Backend.Haskell.TH
                        Projector.Html.Backend.Purescript
 
+                       Projector.Html.Data.Annotation
                        Projector.Html.Data.Backend
                        Projector.Html.Data.Module
                        Projector.Html.Data.Position

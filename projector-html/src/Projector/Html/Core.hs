@@ -4,7 +4,7 @@
 module Projector.Html.Core (
     CoreError (..)
   , renderCoreError
-  , renderCoreErrorRange
+  , renderCoreErrorAnnotation
   , templateToCore
   , typeCheck
   , typeCheckAll
@@ -28,9 +28,9 @@ import qualified Projector.Core as PC
 import qualified Projector.Core.Pretty as PCP
 import qualified Projector.Html.Core.Elaborator as Elab
 import qualified Projector.Html.Core.Library as Library
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 import qualified Projector.Html.Core.Prim as Prim
-import           Projector.Html.Data.Position (Range, renderRange)
 import           Projector.Html.Data.Template (Template)
 
 
@@ -44,9 +44,9 @@ renderCoreError start end err =
     HtmlTypeError tes ->
       T.unlines (fmap (PCP.ppTypeErrorDecorated start end) tes)
 
-renderCoreErrorRange :: CoreError Range -> Text
-renderCoreErrorRange =
-  renderCoreError (\r -> (renderRange r <> ": ")) (const mempty)
+renderCoreErrorAnnotation :: CoreError Annotation -> Text
+renderCoreErrorAnnotation =
+  renderCoreError (\r -> (renderAnnotation r <> ": ")) (const mempty)
 
 templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr (HtmlType, a))
 templateToCore =
