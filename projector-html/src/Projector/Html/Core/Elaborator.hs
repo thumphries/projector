@@ -5,6 +5,7 @@ module Projector.Html.Core.Elaborator (
   ) where
 
 
+import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 
 import           P
@@ -104,10 +105,17 @@ eExpr expr =
   case expr of
     TEVar a (TId x) ->
       EVar a (Name x)
+    TELam a bnds bdy ->
+      funX a (fmap (Name . unTId) bnds) (eExpr bdy)
     TEApp a f g ->
       EApp a (eExpr f) (eExpr g)
     TECase a e alts ->
       ECase a (eExpr e) (NE.toList (fmap eAlt alts))
+
+-- curried function
+funX :: a -> NonEmpty Name -> HtmlExpr a -> HtmlExpr a
+funX a bnds bdy =
+  foldr (\n expr -> ELam a n Nothing expr) bdy bnds
 
 eAlt :: TAlt a -> (Pattern a, HtmlExpr a)
 eAlt (TAlt _ pat body) =

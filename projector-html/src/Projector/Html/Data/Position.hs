@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -55,7 +57,7 @@ instance Monoid Range where
 -- | A functor for positioned tokens.
 data Positioned a
   = !a :@ !Range
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 extractPositioned :: Positioned a -> a
 extractPositioned (a :@ _) =

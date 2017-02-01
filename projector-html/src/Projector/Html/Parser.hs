@@ -309,6 +309,7 @@ expr' =
   label "expression" $ do
         P.try ecase_
     <|> P.try eappParen
+    <|> P.try elam
     <|> P.try evar
 
 evar :: Parser (TExpr Range)
@@ -342,6 +343,15 @@ eapp =
     let r = maybe (extract f) (uncurry (<>)) (listRange (g:gs))
     pure (eappAssoc r f (g :| gs))
 
+elam :: Parser (TExpr Range)
+elam =
+  label "anonymous function" . eOptionalParens $ do
+    _ :@ a <- lexemeRN (token LamStart)
+    ids <- fmap (fmap (\(t:@_) -> TId t)) (some' (P.try (lexemeRN exprId)))
+    _ :@ _ <- lexemeRN (token LamBody)
+    e <- lexemeRN expr
+    pure (TELam (a <> (extract e)) ids e)
+
 eappParen :: Parser (TExpr Range)
 eappParen =
   eParens $ do
@@ -362,7 +372,7 @@ eParens p =
 
 eOptionalParens :: Parser a -> Parser a
 eOptionalParens p =
-  eParens p <|> p
+  P.try (eParens p) <|> p
 
 alt :: Parser (TAlt Range)
 alt =

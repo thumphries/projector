@@ -53,6 +53,8 @@ uglyPrintTemplate =
           " "
         AltSep ->
           " "
+        LamBody ->
+          " "
         PatId _ ->
           " "
         PatLParen ->
@@ -66,6 +68,8 @@ uglyPrintTemplate =
         TypeSigsSep ->
           "\n"
         ExprStart ->
+          " "
+        LamStart ->
           " "
         _ ->
           mempty
@@ -197,6 +201,14 @@ exprTokens expr =
   case expr of
     TEVar _ (TId x) ->
       [ExprIdent x]
+    TELam _ ids e ->
+      mconcat [
+          [ExprLParen, LamStart]
+        , (fmap (\(TId x) -> ExprIdent x) (D.fromList (toList ids)))
+        , [LamBody]
+        , exprTokens e
+        , [ExprRParen]
+        ]
     TEApp _ f g ->
       mconcat [
           [ExprLParen]

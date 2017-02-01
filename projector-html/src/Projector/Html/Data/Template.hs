@@ -177,6 +177,7 @@ instance Comonad TAttrValue where
 
 data TExpr a
   = TEVar a TId
+  | TELam a (NonEmpty TId) (TExpr a)
   | TEApp a (TExpr a) (TExpr a)
   | TECase a (TExpr a) (NonEmpty (TAlt a))
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
@@ -186,6 +187,8 @@ instance Comonad TExpr where
     case expr of
       TEVar a _ ->
         a
+      TELam a _ _ ->
+        a
       TEApp a _ _ ->
         a
       TECase a _ _ ->
@@ -194,6 +197,8 @@ instance Comonad TExpr where
     case expr of
       TEVar _ a ->
         TEVar (f expr) a
+      TELam _ ids e ->
+        TELam (f expr) ids (extend f e)
       TEApp _ e1 e2 ->
         TEApp (f expr) (extend f e1) (extend f e2)
       TECase _ e alts ->

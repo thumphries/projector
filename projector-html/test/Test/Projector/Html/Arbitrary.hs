@@ -190,6 +190,7 @@ genTemplateExpr k =
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
         , TECase () <$> genTemplateExpr j <*> genTemplateAlts j
+        , TELam () <$> (listOf1 (TId <$> elements simpsons)) <*> genTemplateExpr j
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
 

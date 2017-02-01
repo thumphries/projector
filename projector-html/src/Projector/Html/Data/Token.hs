@@ -47,6 +47,8 @@ data Token
   | CaseOf          -- of
   | CaseSep         -- ;
   | AltSep          -- ->
+  | LamStart        -- \
+  | LamBody         -- ->
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
@@ -91,6 +93,8 @@ renderToken tok =
     CaseOf          -> "of"
     CaseSep         -> ";"
     AltSep          -> "->"
+    LamStart        -> "\\"
+    LamBody         -> "->"
 
     PatCon t        -> t
     PatId t         -> t
