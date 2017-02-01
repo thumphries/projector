@@ -47,6 +47,7 @@ import qualified X.Control.Monad.Trans.Either as ET
 
 data TypeError l a
   = UnificationError (Type l, a) (Type l, a)
+  | FreeVariable Name a
   | UndeclaredType TypeName a
   | BadConstructorName Constructor TypeName (Decl l) a
   | BadConstructorArity Constructor (Decl l) Int a
@@ -105,6 +106,13 @@ typeCheckAll' decls known exprs = do
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
         maybe mempty (with itys . Equal) (M.lookup n types)
       constraints = D.toList (localConstraints <> globalConstraints)
+      bound = S.fromList (M.keys known <> M.keys exprs)
+      used = S.fromList (M.keys (M.filter (not . null) assums))
+      free = used `S.difference` bound
+      freeAt = foldMap (\n -> maybe [] (fmap ((n,) . snd . flattenIType)) (M.lookup n assums)) (toList free)
+  -- catch any free variables
+  if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
+
   -- solve them all at once
   subs <- solveConstraints constraints
   -- substitute them all at once
@@ -122,7 +130,11 @@ typeTree ::
   -> Expr l a
   -> Either [TypeError l a] (Expr l (Type l, a))
 typeTree decls expr = do
-  (expr', constraints, _assums) <- generateConstraints decls expr
+  (expr', constraints, Assumptions assums) <- generateConstraints decls expr
+  -- Any unresolved assumptions are from free variables
+  if M.keys (M.filter (not . null) assums) == mempty
+    then pure ()
+    else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
   subs <- solveConstraints constraints
   let subbed = substitute subs expr'
   first D.toList (lowerExpr subbed)

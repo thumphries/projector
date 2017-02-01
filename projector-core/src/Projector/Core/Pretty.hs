@@ -42,6 +42,9 @@ ppTypeError' err =
         (text "Type error. The differing types are:"
           <$$> WL.annotate a (text (ppType t1))
           <$$> WL.annotate b (text (ppType t2)))
+    FreeVariable (Name n) a ->
+      WL.annotate a $
+        text ("Not in scope: " <> n)
     BadConstructorName (Constructor c) (TypeName tn) d a ->
       case d of
         DVariant cts ->
