@@ -111,7 +111,7 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
-  -> Map Name (HtmlType, Annotation)
+  -> Map PC.Name (HtmlType, Annotation)
   -> Map HB.ModuleName (HB.Module () PrimT Annotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Annotation)))
 checkModules decls known exprs =
@@ -175,7 +175,7 @@ runBuild (Build mb mp) rts = do
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  checked <- first pure (checkModules mempty _ mmap)
+  checked <- first pure (checkModules mempty libraryExprs mmap)
   -- If there's a backend, codegen (this can be a lazy stream)
   case mb of
     Just backend -> do
@@ -184,9 +184,10 @@ runBuild (Build mb mp) rts = do
     Nothing ->
       pure (BuildArtefacts [])
 
-libraryExprs :: Map Name (HtmlType, Range)
+libraryExprs :: Map PC.Name (HtmlType, Range)
 libraryExprs =
-  undefined
+  -- TODO this mempty is not acceptable
+  fmap (fmap (const mempty)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
 validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()

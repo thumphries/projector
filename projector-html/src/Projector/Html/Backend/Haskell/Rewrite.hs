@@ -11,7 +11,7 @@ module Projector.Html.Backend.Haskell.Rewrite (
 import           P
 
 import           Projector.Core
-import           Projector.Html.Core.Library
+import qualified Projector.Html.Core.Library as CL
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 
@@ -67,23 +67,23 @@ rules =
 
 textNode :: a -> Expr PrimT a
 textNode a =
-  EForeign a (Name "textNode") (TArrow (TLit TString) tHtml)
+  EForeign a (Name "textNode") (TArrow (TLit TString) CL.tHtml)
 
 parentNode :: a -> Expr PrimT a
 parentNode a =
-  EForeign a (Name "parentNode") (TArrow tTag (TArrow (TList tAttribute) (TArrow tHtml tHtml)))
+  EForeign a (Name "parentNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
 
 voidNode :: a -> Expr PrimT a
 voidNode a =
-  EForeign a (Name "voidNode") (TArrow tTag (TArrow (TList tAttribute) tHtml))
+  EForeign a (Name "voidNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
 
 comment :: a -> Expr PrimT a
 comment a =
-  EForeign a (Name "comment") (TArrow (TLit TString) tHtml)
+  EForeign a (Name "comment") (TArrow (TLit TString) CL.tHtml)
 
 foldHtml :: a -> Expr PrimT a
 foldHtml a =
-  EForeign a (Name "foldHtml") (TArrow (TList tHtml) tHtml)
+  EForeign a (Name "foldHtml") (TArrow (TList CL.tHtml) CL.tHtml)
 
 -- build an application chain
 apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
