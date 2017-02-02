@@ -36,7 +36,6 @@ library
                        Projector.Core.Check
                        Projector.Core.Pretty
                        Projector.Core.Rewrite
-                       Projector.Core.Simplify
                        Projector.Core.Syntax
                        Projector.Core.Type
 
