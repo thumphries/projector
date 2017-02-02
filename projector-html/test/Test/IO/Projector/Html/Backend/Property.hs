@@ -66,5 +66,6 @@ helloWorld =
                   ]
               , con (Constructor "Html") Lib.nHtml [list Lib.tHtmlNode [con (Constructor "Whitespace") Lib.nHtmlNode []]]
               ]
+          , con (Constructor "Nested") Lib.nHtmlNode [var Lib.nHtmlBlank]
           ]
       ]))

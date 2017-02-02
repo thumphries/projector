@@ -28,6 +28,9 @@ module Projector.Html.Core.Library (
   , nHtmlAttrValue
   , tHtmlAttrValue
   , eHtmlAttrValue
+  , nHtmlBlank
+  , tHtmlBlank
+  , eHtmlBlank
   ) where
 
 
@@ -56,6 +59,7 @@ exprs =
   M.fromList [
       (nHtmlText, (tHtmlText, eHtmlText))
     , (nHtmlAttrValue, (tHtmlAttrValue, eHtmlAttrValue))
+    , (nHtmlBlank, (tHtmlBlank, eHtmlBlank))
     ]
 
 -- -----------------------------------------------------------------------------
@@ -188,3 +192,16 @@ eHtmlAttrValue :: HtmlExpr ()
 eHtmlAttrValue =
   lam (Name "t") (Just (TLit TString))
     (con (Constructor "AttributeValue") nAttributeValue [var (Name "t")])
+
+nHtmlBlank :: Name
+nHtmlBlank =
+  Name "blank"
+
+tHtmlBlank :: HtmlType
+tHtmlBlank =
+  tHtml
+
+eHtmlBlank :: HtmlExpr ()
+eHtmlBlank =
+  con (Constructor "Html") nHtml
+    [list tHtmlNode []]

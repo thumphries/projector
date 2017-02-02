@@ -14,11 +14,13 @@ module Projector.Html.Runtime.Library (
   , text
   , fmap
   , attrValue
+  , blank
   ) where
 
 
 import           Data.Foldable (fold)
 import           Data.Functor (fmap)
+import           Data.Monoid (mempty)
 import qualified Hydrant
 import           Projector.Html.Runtime.Prim
 
@@ -38,3 +40,9 @@ attrValue :: Text -> Hydrant.AttributeValue
 attrValue =
   Hydrant.AttributeValue
 {-# INLINE attrValue #-}
+
+-- TODO this only exists until we start inlining library functions
+blank :: Hydrant.Html
+blank =
+  mempty
+{-# INLINE blank #-}
