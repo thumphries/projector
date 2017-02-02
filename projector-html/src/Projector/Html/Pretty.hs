@@ -224,6 +224,14 @@ exprTokens expr =
         , altsTokens alts
         , [ExprRParen]
         ]
+    TELit _ l ->
+      litTokens l
+
+litTokens :: TLit a -> DList (Token)
+litTokens l =
+  case l of
+    TLString _ s ->
+      [LitString s]
 
 altsTokens :: NonEmpty (TAlt a) -> DList (Token)
 altsTokens =

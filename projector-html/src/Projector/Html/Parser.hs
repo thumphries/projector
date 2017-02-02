@@ -202,6 +202,16 @@ esc echar = do
     else
       if S.member c breakers then empty else pure c
 
+esc' :: (Char -> Parser Char) -> Char -> Parser Char
+esc' f echar = do
+  c <- P.anyChar
+  if c == echar
+    then do
+      d <- optional P.anyChar
+      maybe empty f d
+    else
+      pure c
+
 element :: Parser (TNode Range)
 element =
   label "element" $ do
@@ -311,6 +321,7 @@ expr' =
     <|> P.try eappParen
     <|> P.try elam
     <|> P.try evar
+    <|> P.try elit
 
 evar :: Parser (TExpr Range)
 evar =
@@ -373,6 +384,25 @@ eParens p =
 eOptionalParens :: Parser a -> Parser a
 eOptionalParens p =
   P.try (eParens p) <|> p
+
+elit :: Parser (TExpr Range)
+elit =
+  label "literal" $ do
+    t :@ a <- withPosition . lexeme $ do
+      void (P.char '"')
+      let
+        escF c =
+          if c == 'n'then
+            pure '\n'
+          else if c == 'r' then
+            pure '\r'
+          else if c == '\\' || c == '"' then
+            pure c
+          else
+            empty
+      t <- P.try $ P.manyTill (esc' escF '\\') (P.char '"')
+      pure (T.pack t)
+    pure (TELit a (TLString a t))
 
 alt :: Parser (TAlt Range)
 alt =

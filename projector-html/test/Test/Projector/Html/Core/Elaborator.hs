@@ -50,6 +50,8 @@ prop_foo_bar =
   bar : AttributeValue ->
 <marquee wild={ bar }>{ foo }! {foo} !</marquee>|]
 
+prop_foo_literal =
+  once $ elabProp [template| { text "test" }|]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

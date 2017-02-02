@@ -186,6 +186,7 @@ genTemplateExpr k =
   let j = k `div` 2
       nonrec = [
           TEVar () <$> (TId <$> elements muppets)
+        , TELit () <$> genLit
         ]
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
@@ -193,6 +194,12 @@ genTemplateExpr k =
         , TELam () <$> (listOf1 (TId <$> elements simpsons)) <*> genTemplateExpr j
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
+
+genLit :: Jack (TLit ())
+genLit =
+  oneof [
+      TLString () <$> arbitrary
+    ]
 
 genTemplateAlts :: Int -> Jack (NonEmpty (TAlt ()))
 genTemplateAlts j = do
