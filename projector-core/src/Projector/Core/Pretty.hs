@@ -190,6 +190,11 @@ ppExpr' types e =
     EList a _ es ->
       WL.annotate a $ WL.hang 2 (WL.list (fmap (ppExpr' types) es))
 
+    EMap a f g ->
+      let ff = ppExpr' types f
+          gg = ppExpr' types g
+      in WL.annotate a (WL.hang 2 (WL.parens ((text "map#") </> ff </> gg)))
+
     EForeign a (Name n) ty ->
       WL.annotate a $ WL.parens (text n WL.<> text "#" WL.<> text (typeMay ty))
   where typeMay t = if types then " : " <> ppType t else T.empty
