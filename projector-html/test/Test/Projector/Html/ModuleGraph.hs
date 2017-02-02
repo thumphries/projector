@@ -6,8 +6,9 @@ module Test.Projector.Html.ModuleGraph where
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 
-import           Disorder.Core
+import           Disorder.Core hiding (vectorOfUnique)
 import           Disorder.Jack
 
 import           P
@@ -39,8 +40,8 @@ prop_dependencies =
 genCyclicExprs :: Jack (Map Name (HtmlExpr ()))
 genCyclicExprs =
   sized $ \n -> do
-    k <- chooseInt (2, n + 2)
-    names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
+    k <- chooseInt (2, n+2)
+    names <- vectorOfUnique k genName
     -- take partitions of at least two
     sets <- partition 2 names
     pure (fold (fmap genCycle sets))
@@ -50,7 +51,7 @@ genAcyclicExprs :: Jack (Map Name (HtmlExpr ()))
 genAcyclicExprs =
   sized $ \n -> do
     k <- chooseInt (0, n)
-    names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
+    names <- vectorOfUnique k genName
     sets <- partition 1 names
     pure (fold (fmap genAcycle sets))
 
@@ -60,9 +61,17 @@ genAcyclicSet :: Jack (Map Name (HtmlExpr ()), [Name])
 genAcyclicSet =
   sized $ \n -> do
     k <- chooseInt (0, n)
-    names <- (L.nub <$> vectorOf k genName) `suchThat` ((== k) . L.length)
+    names <- vectorOfUnique k genName
     pure (genAcycle names, names)
 
+vectorOfUnique :: (Eq a, Ord a) => Int -> Jack a -> Jack [a]
+vectorOfUnique k gen =
+  go k gen mempty
+  where
+    go 0 _ set = pure (toList set)
+    go n g set = do
+      a <- g `suchThat` (\b -> not (S.member b set))
+      go (n-1) g (S.insert a set)
 
 partition :: Int -> [a] -> Jack [[a]]
 partition _ [] = pure []
@@ -108,7 +117,7 @@ genAcycle names =
 
 
 prop_unit_simple_cycle =
-  once (isLeft (detectCycles (buildModuleGraph testModuleSet)))
+  once (isLeft (detectCycles (buildModuleGraph (deriveImports testModuleSet))))
 
 testModuleSet :: Map ModuleName (Module () PrimT ())
 testModuleSet =
