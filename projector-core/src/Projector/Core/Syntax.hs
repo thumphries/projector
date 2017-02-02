@@ -71,6 +71,7 @@ data Expr l a
   | ECon a Constructor TypeName [Expr l a]
   | ECase a (Expr l a) [(Pattern a, Expr l a)]
   | EList a (Type l) [Expr l a]
+  | EMap a (Expr l a) (Expr l a)
   | EForeign a Name (Type l)
   deriving (Functor, Foldable, Traversable)
 
@@ -94,6 +95,8 @@ extractAnnotation e =
     ECase a _ _ ->
       a
     EList a _ _ ->
+      a
+    EMap a _ _ ->
       a
     EForeign a _ _ ->
       a
@@ -221,6 +224,9 @@ foldFree f acc expr =
         EList _ _ es ->
           foldl' (\a e -> go f' e bound a) acc' es
 
+        EMap _ a b ->
+          go f' b bound $! go f' a bound acc'
+
         EForeign _ x _ ->
           if (S.member x bound) then acc' else f' acc' $! x
 
@@ -269,6 +275,9 @@ mapGround tmap vmap expr =
     EList a t es ->
       EList a (mapGroundType tmap t) (fmap (mapGround tmap vmap) es)
 
+    EMap a f g ->
+      EMap a (mapGround tmap vmap f) (mapGround tmap vmap g)
+
     EForeign a n t ->
       EForeign a n (mapGroundType tmap t)
 
@@ -307,6 +316,10 @@ foldrExprM fx fp acc expr =
     EList _ _ es -> do
       acc' <- foldrM (flip (foldrExprM fx fp)) acc es
       fx expr acc'
+    EMap _ i j -> do
+      acc' <- foldrExprM fx fp acc j
+      acc'' <- foldrExprM fx fp acc' i
+      fx expr acc''
     EForeign _ _ _ ->
       fx expr acc
 
@@ -368,6 +381,10 @@ foldlExprM fx fp acc expr =
     EList _ _ es -> do
       acc' <- fx acc expr
       foldM (foldlExprM fx fp) acc' es
+    EMap _ i j -> do
+      acc' <- fx acc expr
+      acc'' <- foldlExprM fx fp acc' i
+      foldlExprM fx fp acc'' j
 
 -- | Top-down monadic fold of a pattern.
 foldlPatternM :: Monad m => (b -> Pattern a -> m b) -> b -> Pattern a -> m b
