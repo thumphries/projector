@@ -18,6 +18,7 @@ module Projector.Html.Data.Template (
   , TAttrValue (..)
   -- ** Expressions
   , TExpr (..)
+  , TLit (..)
   , TAlt (..)
   , TAltBody (..)
   , TPattern (..)
@@ -180,6 +181,7 @@ data TExpr a
   | TELam a (NonEmpty TId) (TExpr a)
   | TEApp a (TExpr a) (TExpr a)
   | TECase a (TExpr a) (NonEmpty (TAlt a))
+  | TELit a (TLit a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TExpr where
@@ -193,6 +195,8 @@ instance Comonad TExpr where
         a
       TECase a _ _ ->
         a
+      TELit a _ ->
+        a
   extend f expr =
     case expr of
       TEVar _ a ->
@@ -203,6 +207,18 @@ instance Comonad TExpr where
         TEApp (f expr) (extend f e1) (extend f e2)
       TECase _ e alts ->
         TECase (f expr) (extend f e) (fmap (extend (const (f expr))) alts)
+      TELit _ a ->
+        TELit (f expr) (extend (const (f expr)) a)
+
+data TLit a
+  = TLString a Text
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+instance Comonad TLit where
+  extract (TLString a _) =
+    a
+  extend f a@(TLString _ s) =
+    TLString (f a) s
 
 data TAlt a
   = TAlt a (TPattern a) (TAltBody a)

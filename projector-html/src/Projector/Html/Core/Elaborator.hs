@@ -111,6 +111,14 @@ eExpr expr =
       EApp a (eExpr f) (eExpr g)
     TECase a e alts ->
       ECase a (eExpr e) (NE.toList (fmap eAlt alts))
+    TELit _ l ->
+      eLit l
+
+eLit :: TLit a -> HtmlExpr a
+eLit l =
+  case l of
+    TLString a s ->
+      ELit a $ VString s
 
 -- curried function
 funX :: a -> NonEmpty Name -> HtmlExpr a -> HtmlExpr a
