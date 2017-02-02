@@ -13,6 +13,7 @@ module Projector.Html.Runtime.Library (
   , foldHtml
   , text
   , fmap
+  , attrValue
   ) where
 
 
@@ -31,3 +32,9 @@ text :: Text -> Hydrant.Html
 text =
   Hydrant.textNode
 {-# INLINE text #-}
+
+-- TODO this only exists until we start inlining library functions
+attrValue :: Text -> Hydrant.AttributeValue
+attrValue =
+  Hydrant.AttributeValue
+{-# INLINE attrValue #-}

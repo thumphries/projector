@@ -25,6 +25,9 @@ module Projector.Html.Core.Library (
   , nHtmlText
   , tHtmlText
   , eHtmlText
+  , nHtmlAttrValue
+  , tHtmlAttrValue
+  , eHtmlAttrValue
   ) where
 
 
@@ -52,6 +55,7 @@ exprs :: Map Name (HtmlType, HtmlExpr ())
 exprs =
   M.fromList [
       (nHtmlText, (tHtmlText, eHtmlText))
+    , (nHtmlAttrValue, (tHtmlAttrValue, eHtmlAttrValue))
     ]
 
 -- -----------------------------------------------------------------------------
@@ -171,3 +175,16 @@ eHtmlText =
   ELam () (Name "t") (Just (TLit TString))
     (ECon () (Constructor "Html") nHtml
       [EList () tHtmlNode [ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")]]])
+
+nHtmlAttrValue :: Name
+nHtmlAttrValue =
+  Name "attrValue"
+
+tHtmlAttrValue :: HtmlType
+tHtmlAttrValue =
+  TArrow (TLit TString) tAttributeValue
+
+eHtmlAttrValue :: HtmlExpr ()
+eHtmlAttrValue =
+  lam (Name "t") (Just (TLit TString))
+    (con (Constructor "AttributeValue") nAttributeValue [var (Name "t")])

@@ -56,5 +56,15 @@ helloWorld =
             con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello,")]
           , con (Constructor "Whitespace") Lib.nHtmlNode []
           , con (Constructor "Nested") Lib.nHtmlNode [app (var nHtmlText) (lit (Prim.VString "world!"))]
+          , con (Constructor "Element") Lib.nHtmlNode [
+                con (Constructor "Tag") Lib.nTag [lit (Prim.VString "div")]
+              , list Lib.tAttribute [
+                    con (Constructor "Attribute") Lib.nAttribute [
+                      con (Constructor "AttributeKey") Lib.nAttributeKey [lit (Prim.VString "class")]
+                    , app (var nHtmlAttrValue) (lit (Prim.VString "table"))
+                    ]
+                  ]
+              , con (Constructor "Html") Lib.nHtml [list Lib.tHtmlNode [con (Constructor "Whitespace") Lib.nHtmlNode []]]
+              ]
           ]
       ]))
