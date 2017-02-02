@@ -37,17 +37,17 @@ prop_hello =
   once (elabProp [template|Hello, world!|])
 
 prop_foo_element =
-  once (elabProp [template|\foo : HtmlNode ->
+  once (elabProp [template|\foo : Html ->
       <blink>{ foo }</blink>
   |])
 
 prop_foo_element_neg =
-  once . neg $ elabProp [template|\foo : HtmlNode ->
+  once . neg $ elabProp [template|\foo : Html ->
     <blink enabled={ foo }>Bad attribute!</blink>
   |]
 
 prop_foo_bar =
-  once $ elabProp [template|\ foo : HtmlNode
+  once $ elabProp [template|\ foo : Html
   bar : AttributeValue ->
 <marquee wild={ bar }>{ foo }! {foo} !</marquee>|]
 
