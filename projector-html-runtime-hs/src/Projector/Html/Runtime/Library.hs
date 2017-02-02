@@ -12,10 +12,12 @@ module Projector.Html.Runtime.Library (
   , Hydrant.comment
   , foldHtml
   , text
+  , fmap
   ) where
 
 
 import           Data.Foldable (fold)
+import           Data.Functor (fmap)
 import qualified Hydrant
 import           Projector.Html.Runtime.Prim
 

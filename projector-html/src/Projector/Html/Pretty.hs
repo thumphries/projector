@@ -224,6 +224,13 @@ exprTokens expr =
         , altsTokens alts
         , [ExprRParen]
         ]
+    TEEach _ f g ->
+      mconcat [
+          [ExprLParen, Each]
+        , exprTokens f
+        , exprTokens g
+        , [ExprRParen]
+        ]
     TELit _ l ->
       litTokens l
 

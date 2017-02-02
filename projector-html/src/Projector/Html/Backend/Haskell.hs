@@ -204,6 +204,9 @@ genExp expr =
     EForeign _ (Name x) _ ->
       varE (mkName_ x)
 
+    EMap _ f g ->
+      applyE (varE (mkName_ "fmap")) [genExp f, genExp g]
+
 -- | Case alternatives.
 genMatch :: Pattern a -> HaskellExpr a -> TH.Match
 genMatch p e =

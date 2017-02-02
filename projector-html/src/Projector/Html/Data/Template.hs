@@ -182,6 +182,7 @@ data TExpr a
   | TEApp a (TExpr a) (TExpr a)
   | TECase a (TExpr a) (NonEmpty (TAlt a))
   | TELit a (TLit a)
+  | TEEach a (TExpr a) (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TExpr where
@@ -197,6 +198,8 @@ instance Comonad TExpr where
         a
       TELit a _ ->
         a
+      TEEach a _ _ ->
+        a
   extend f expr =
     case expr of
       TEVar _ a ->
@@ -209,6 +212,8 @@ instance Comonad TExpr where
         TECase (f expr) (extend f e) (fmap (extend (const (f expr))) alts)
       TELit _ a ->
         TELit (f expr) (extend (const (f expr)) a)
+      TEEach _ e1 e2 ->
+        TEEach (f expr) (extend f e1) (extend f e2)
 
 data TLit a
   = TLString a Text

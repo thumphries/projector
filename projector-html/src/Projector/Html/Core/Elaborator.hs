@@ -113,6 +113,8 @@ eExpr expr =
       ECase a (eExpr e) (NE.toList (fmap eAlt alts))
     TELit _ l ->
       eLit l
+    TEEach a f g ->
+      EMap a (eExpr f) (eExpr g)
 
 eLit :: TLit a -> HtmlExpr a
 eLit l =

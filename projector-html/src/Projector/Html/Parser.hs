@@ -311,13 +311,15 @@ attrValueExpr =
 expr :: Parser (TExpr Range)
 expr =
   label "expression" $
-        P.try eapp
+        P.try eeach
+    <|> P.try eapp
     <|> P.try expr'
 
 expr' :: Parser (TExpr Range)
 expr' =
   label "expression" $ do
         P.try ecase_
+    <|> P.try eeach
     <|> P.try eappParen
     <|> P.try elam
     <|> P.try evar
@@ -328,6 +330,14 @@ evar =
   label "variable" . eOptionalParens $ do
     x :@ a <- exprId
     pure (TEVar a (TId x))
+
+eeach :: Parser (TExpr Range)
+eeach =
+  label "each" . eOptionalParens $ do
+    _ :@ a <- lexemeRN (token Each)
+    f <- lexemeRN expr'
+    g <- lexemeRN expr'
+    pure (TEEach (a <> extract g) f g)
 
 ecase_ :: Parser (TExpr Range)
 ecase_ =
