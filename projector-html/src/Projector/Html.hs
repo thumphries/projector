@@ -86,7 +86,7 @@ parseTemplate f =
 
 checkTemplate :: Template Annotation -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Annotation))
 checkTemplate =
-  first HtmlCoreError . HC.templateToCore
+  checkTemplateIncremental mempty
 
 checkTemplateIncremental ::
      Map Text (HtmlType, Annotation)

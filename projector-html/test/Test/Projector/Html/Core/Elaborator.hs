@@ -13,18 +13,17 @@ import           Disorder.Jack
 
 import           P
 
-import qualified Projector.Html.Core as HC
-import qualified Projector.Html.Core.Elaborator as HE
-import           Projector.Html.Data.Template  (Template)
+import           Projector.Html
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Parser.QQ  (template)
 
 
--- Input parses AND typechecks, else dump core
-elabProp :: Ord a => Show a => Template a -> Property
+elabProp :: Template Range -> Property
 elabProp ast =
-  let core = HE.elaborate ast
-      ety = HC.typeCheck core
-  in either (\e -> counterexample (show e) (property False)) (const (property True)) ety
+  either
+    (\e -> counterexample (show e) (property False))
+    (const (property True))
+    (checkTemplate (annotateTemplate ast))
 
 tshow :: Show a => a -> Text
 tshow =
