@@ -212,6 +212,11 @@ esc' f echar = do
     else
       pure c
 
+elementExpr :: Parser (TExpr Range)
+elementExpr = do
+  e <- P.choice [P.try element, voidElement]
+  pure $ TENode (extract e) e
+
 element :: Parser (TNode Range)
 element =
   label "element" $ do
@@ -324,6 +329,7 @@ expr' =
     <|> P.try elam
     <|> P.try evar
     <|> P.try elit
+    <|> P.try elementExpr
 
 evar :: Parser (TExpr Range)
 evar =
@@ -420,20 +426,12 @@ alt =
     _pos <- L.indentLevel -- TODO use
     p <- lexemeRN pattern
     _ <- lexemeRN (token AltSep)
-    lexemeRN (P.try (altExpr p) <|> altHtml p)
+    lexemeRN (altExpr p)
 
 altExpr :: TPattern Range -> Parser (TAlt Range)
 altExpr p = do
   e <- expr
-  pure (TAlt (extract p <> extract e) p (TAltExpr (extract e) e))
-
-altHtml :: TPattern Range -> Parser (TAlt Range)
-altHtml p = do
-  h :| hs <- some' (P.try element <|> P.try voidElement <|> P.try htmlComment)
-  let hr = maybe (extract h) (uncurry (<>)) (listRange (h:hs))
-      ht = THtml hr (h:hs)
-  pure (TAlt (extract p <> extract ht) p (TAltHtml (extract ht) ht))
-
+  pure (TAlt (extract p <> extract e) p e)
 
 pattern :: Parser (TPattern Range)
 pattern =

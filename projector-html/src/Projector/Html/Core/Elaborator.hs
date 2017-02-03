@@ -115,6 +115,10 @@ eExpr expr =
       eLit l
     TEEach a f g ->
       EMap a (eExpr f) (eExpr g)
+    TENode a e ->
+      ECon a (Constructor "Html") Lib.nHtml [
+          EList a Lib.tHtmlNode [eNode e]
+        ]
 
 eLit :: TLit a -> HtmlExpr a
 eLit l =
@@ -129,7 +133,7 @@ funX a bnds bdy =
 
 eAlt :: TAlt a -> (Pattern a, HtmlExpr a)
 eAlt (TAlt _ pat body) =
-  (ePat pat, eAltBody body)
+  (ePat pat, eExpr body)
 
 ePat :: TPattern a -> Pattern a
 ePat pat =
@@ -139,14 +143,6 @@ ePat pat =
       PVar a (Name x)
     TPCon a (TConstructor x) pats ->
       PCon a (Constructor x) (fmap ePat pats)
-
-eAltBody :: TAltBody a -> HtmlExpr a
-eAltBody body =
-  case body of
-    TAltExpr _ expr ->
-      eExpr expr
-    TAltHtml _ html ->
-      eHtml html
 
 stringLit :: a -> Text -> HtmlExpr a
 stringLit a =

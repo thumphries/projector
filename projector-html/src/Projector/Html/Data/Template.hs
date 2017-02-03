@@ -20,7 +20,6 @@ module Projector.Html.Data.Template (
   , TExpr (..)
   , TLit (..)
   , TAlt (..)
-  , TAltBody (..)
   , TPattern (..)
   -- ** Strings
   , TId (..)
@@ -183,6 +182,7 @@ data TExpr a
   | TECase a (TExpr a) (NonEmpty (TAlt a))
   | TELit a (TLit a)
   | TEEach a (TExpr a) (TExpr a)
+  | TENode a (TNode a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TExpr where
@@ -200,6 +200,8 @@ instance Comonad TExpr where
         a
       TEEach a _ _ ->
         a
+      TENode a _ ->
+        a
   extend f expr =
     case expr of
       TEVar _ a ->
@@ -214,6 +216,8 @@ instance Comonad TExpr where
         TELit (f expr) (extend (const (f expr)) a)
       TEEach _ e1 e2 ->
         TEEach (f expr) (extend f e1) (extend f e2)
+      TENode _ a ->
+        TENode (f expr) (extend (const (f expr)) a)
 
 data TLit a
   = TLString a Text
@@ -226,7 +230,7 @@ instance Comonad TLit where
     TLString (f a) s
 
 data TAlt a
-  = TAlt a (TPattern a) (TAltBody a)
+  = TAlt a (TPattern a) (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TAlt where
@@ -234,29 +238,6 @@ instance Comonad TAlt where
     a
   extend f a@(TAlt _ p b) =
     TAlt (f a) (extend (const (f a)) p) (extend (const (f a)) b)
-
--- FIX only Element / VoidElements are valid here
--- should make this correct by construction
-data TAltBody a
-  = TAltExpr a (TExpr a)
---  | TAltElement a TTag [TAttribute a] (THtml a)
---  | TAltVoidElement a TTag [TAttribute a]
-  | TAltHtml a (THtml a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
-
-instance Comonad TAltBody where
-  extract body =
-    case body of
-      TAltExpr a _ ->
-        a
-      TAltHtml a _ ->
-        a
-  extend f body =
-    case body of
-      TAltExpr _ e ->
-        TAltExpr (f body) (extend (const (f body)) e)
-      TAltHtml _ h ->
-        TAltHtml (f body) (extend (const (f body)) h)
 
 data TPattern a
   = TPVar a TId

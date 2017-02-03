@@ -210,14 +210,7 @@ genTemplateAlts j = do
 genTemplateAlt :: Int -> Jack (TAlt ())
 genTemplateAlt k =
   let j = k `div` 2 in
-  TAlt () <$> genTemplatePattern j <*> genTemplateAltBody j
-
-genTemplateAltBody :: Int -> Jack (TAltBody ())
-genTemplateAltBody k =
-  oneOf [
-      TAltExpr () <$> genTemplateExpr k
-    , TAltHtml () <$> (THtml () <$> listOfN 1 (max 1 k) (oneOf [genElement k, genVoidElement k])) -- need to fix AST
-    ]
+  TAlt () <$> genTemplatePattern j <*> genTemplateExpr j
 
 genTemplatePattern :: Int -> Jack (TPattern ())
 genTemplatePattern k =

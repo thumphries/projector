@@ -42,6 +42,9 @@ AttrName, UnquotedAttrValue, Space.
 \alt <WhiteSpace>
 \alt `{' <Expr> `}'
 
+<ExprNode> ::= <Element>
+\alt <VoidElement>
+
 <Element> ::= `<' Tag <Attributes> `>' <HTML> `</' Tag `>'
 
 <VoidElement> ::= `<' Tag <Attributes> `/>'
@@ -71,6 +74,10 @@ AttrName, UnquotedAttrValue, Space.
 <Expr> ::= <Variable>
 \alt <Application>
 \alt <Case>
+\alt <Literal>
+\alt <ExprNode>
+
+<Literal> ::= `"' PlainText `"'
 
 <Variable> ::= ID
 
@@ -83,10 +90,7 @@ AttrName, UnquotedAttrValue, Space.
 <Alts'> ::= `;' <Alt> <Alts'>
 \alt $\varepsilon$
 
-<Alt> ::= <Pattern> `->' <AltBody>
-
-<AltBody> ::= <Expr>
-\alt <HTML>
+<Alt> ::= <Pattern> `->' <ExprNode>
 
 <Pattern> ::= ID
 \alt Constructor <Patterns>

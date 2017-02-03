@@ -90,7 +90,7 @@ testTemplate =
       , TExprNode () (TEApp () (TEVar () (TId "foo")) (TEVar () (TId "bar")))
       , TExprNode () (TECase () (TEVar () (TId "foo")) (
           (TAlt () (TPCon () (TConstructor "Foo") [TPVar () (TId "x")])
-                   (TAltExpr () (TEVar () (TId "x"))))
+                   (TEVar () (TId "x")))
           :| []))
       ])
 
@@ -233,6 +233,8 @@ exprTokens expr =
         ]
     TELit _ l ->
       litTokens l
+    TENode _ n ->
+      nodeTokens n
 
 litTokens :: TLit a -> DList (Token)
 litTokens l =
@@ -249,7 +251,7 @@ altTokens (TAlt _ pat body) =
   mconcat [
       patTokens pat
     , [AltSep]
-    , altBodyTokens body
+    , exprTokens body
     ]
 
 patTokens :: TPattern a -> DList (Token)
@@ -264,12 +266,3 @@ patTokens pat =
         , mconcat (fmap patTokens pats)
         , [PatRParen]
         ]
-
-altBodyTokens :: TAltBody a -> DList (Token)
-altBodyTokens body =
-  case body of
-    TAltExpr _ expr ->
-      exprTokens expr
-
-    TAltHtml _ html ->
-      htmlTokens html
