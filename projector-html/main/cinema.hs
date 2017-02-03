@@ -14,6 +14,8 @@ import qualified Data.Text.IO as T
 import           Options.Applicative (Parser, ReadM)
 import qualified Options.Applicative as O
 
+import qualified Machinator.Core as MC
+
 import           P
 
 import           Projector.Html
@@ -33,6 +35,7 @@ import qualified X.Options.Applicative as XO
 data CinemaError
   = GlobError Text
   | BuildError [HtmlError]
+  | DataError Text -- MC.MachinatorError FIX
   deriving (Eq, Show)
 
 renderCinemaError :: CinemaError -> Text
@@ -42,6 +45,8 @@ renderCinemaError ce =
       "Invalid glob: " <> t
     BuildError h ->
       "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
+    DataError me ->
+      "Data errors:\n" <> me -- FIX
 
 data CinemaArgs = CinemaArgs {
     caBuild :: Build
@@ -80,15 +85,18 @@ main = do
 run :: CinemaArgs -> IO ()
 run args =
   orDie renderCinemaError $
-    case args of
-      CinemaArgs b msp tg dg out ->
-        cinemaBuild b msp tg dg out
+    cinemaBuild
+      (caBuild args)
+      (caStripPrefix args)
+      (caTemplateGlob args)
+      (caDataGlob args)
+      (caOutputPath args)
 
 cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> Maybe Glob -> FilePath -> EitherT CinemaError IO ()
 cinemaBuild b msp tg mdg o = do
   -- Load all our datatypes from disk
   dfs <- maybe (pure []) globSafe mdg
-  udts <- pure (UserDataTypes undefined)
+  udts <- parseDataFiles dfs
   -- Load all our template files from disk
   tfs <- globSafe tg
   rts <- liftIO . fmap RawTemplates . for tfs $ \f -> do
@@ -103,6 +111,14 @@ cinemaBuild b msp tg mdg o = do
     IO.putStrLn ("Generating " <> ofile)
     createDirectoryIfMissing True (takeDirectory ofile)
     T.writeFile ofile body
+
+-- | Parse machinator files, discard version info.
+parseDataFiles :: [FilePath] -> EitherT CinemaError IO UserDataTypes
+parseDataFiles fps =
+  fmap (UserDataTypes . fold) . for fps $ \f -> do
+    m <- liftIO (T.readFile f)
+    MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
+    pure defs
 
 -- -----------------------------------------------------------------------------
 
