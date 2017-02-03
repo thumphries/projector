@@ -1,7 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Machinator (
-    fromMachinator
+    machinatorDecls
+  , fromMachinator
   ) where
 
 
@@ -13,6 +14,13 @@ import           P
 import           Projector.Core
 import           Projector.Html.Data.Prim
 
+
+-- | Convert a set of Machinator definitions to a Projector
+-- declaration set.
+machinatorDecls :: Foldable f => f Definition -> HtmlDecls
+machinatorDecls =
+  foldl' (\decls def -> uncurry declareType (fromMachinator def) decls) mempty
+{-# SPECIALIZE machinatorDecls :: [Definition] -> HtmlDecls #-}
 
 -- | Convert a Machinator definition to a Projector definition.
 fromMachinator :: Definition -> (TypeName, HtmlDecl)
