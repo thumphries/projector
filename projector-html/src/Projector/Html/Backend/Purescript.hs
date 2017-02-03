@@ -158,6 +158,9 @@ genExp expr =
     EList a _ es ->
       WL.annotate a (WL.hang 2 (WL.list (fmap genExp es)))
 
+    EMap a f g ->
+      genExp (EApp a (EApp a (EVar a (Name "map")) f) g)
+
     EForeign a (Name n) _ ->
       WL.annotate a (text n)
 

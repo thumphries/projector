@@ -70,3 +70,7 @@ rewriteT rules expr =
     EList a t es -> do
       es' <- traverse (rewriteT rules) es
       applyRules (EList a t es') rules
+    EMap a e1 e2 -> do
+      e1' <- rewriteT rules e1
+      e2' <- rewriteT rules e2
+      applyRules (EMap a e1' e2') rules

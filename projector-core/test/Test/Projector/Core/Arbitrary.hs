@@ -24,7 +24,6 @@ import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Simplify
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
@@ -83,6 +82,9 @@ genExpr n t v =
         EList _ _ es ->
           es
 
+        EMap _ f g ->
+          [f, g]
+
         EForeign _ _ _ ->
           []
 
@@ -98,6 +100,7 @@ genExpr n t v =
         , genCon (fmap (TypeName . unName) n) (genExpr n t v)
         , genCase (genExpr n t v) (genPattern genConstructor n)
         , list <$> t <*> listOf (genExpr n t v)
+        , EMap () <$> genExpr n t v <*> genExpr n t v
         ]
  in reshrink shrink (oneOfRec nonrec recc)
 
@@ -428,8 +431,9 @@ genWellTypedApp n ty ctx names genty genval = do
     _ ->
       pure fun
   arg <- genWellTypedExpr' (n `div` 2) bnd ctx names genty genval
-  reshrink (\x -> [whnf x]) $
-    pure (app fun' arg)
+  -- TODO reinstate the good shrink when evaluator is back
+  -- reshrink (\x -> [whnf x]) $
+  pure (app fun' arg)
 
 genWellTypedLetrec ::
      (Ground l, Ord l)
@@ -708,10 +712,3 @@ genTestTypeDecls
 genTestType :: TypeDecls TestLitT -> Jack (Type TestLitT)
 genTestType tc =
   genTypeFromContext tc genTestLitT
-
--- equal up to alpha
--- TODO would be nice to bring the Eq along for free
-(=@@=) ::
-     (Eq (Value l), Show l, Show (Value l), Ground l)
-  => Expr l () -> Expr l () -> Property
-(=@@=) = (===) `on` alphaNf

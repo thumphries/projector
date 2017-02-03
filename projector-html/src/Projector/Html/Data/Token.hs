@@ -50,6 +50,7 @@ data Token
   | AltSep          -- ->
   | LamStart        -- \
   | LamBody         -- ->
+  | Each            -- "each"
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
@@ -97,6 +98,7 @@ renderToken tok =
     AltSep          -> "->"
     LamStart        -> "\\"
     LamBody         -> "->"
+    Each            -> "each"
 
     PatCon t        -> t
     PatId t         -> t

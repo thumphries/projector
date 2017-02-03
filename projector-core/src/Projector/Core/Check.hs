@@ -401,6 +401,17 @@ generateConstraints' decls expr =
       let ty = I (Am a (TListF (hoistType a te)))
       pure (EList (ty, a) te es')
 
+    EMap a f g -> do
+      -- Special case polymorphic map. g must be List a, f must be (a -> b)
+      f' <- generateConstraints' decls f
+      g' <- generateConstraints' decls g
+      ta <- freshTypeVar a
+      tb <- freshTypeVar a
+      addConstraint (Equal (I (Am a (TArrowF ta tb))) (extractType f'))
+      addConstraint (Equal (I (Am a (TListF ta))) (extractType g'))
+      let ty = I (Am a (TListF tb))
+      pure (EMap (ty, a) f' g')
+
     ECon a c tn es ->
       case lookupType tn decls of
         Just ty@(DVariant cns) -> do
