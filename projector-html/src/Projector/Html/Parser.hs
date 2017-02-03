@@ -103,7 +103,7 @@ failWith err =
 template :: Parser (Template Range)
 template =
   label "template" $ do
-    sig <- optional typeSigs
+    sig <- optional (P.try typeSigs)
     hs <- optional newline *> html
     let rang = maybe (extract hs) ((<> extract hs) . extract) sig
     pure (Template rang sig hs)
