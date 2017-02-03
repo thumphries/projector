@@ -55,6 +55,6 @@ helloWorld =
         list Lib.tHtmlNode [
             con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello,")]
           , con (Constructor "Whitespace") Lib.nHtmlNode []
-          , con (Constructor "Nested") Lib.nHtmlNode [app (var_ "text") (lit (Prim.VString "world!"))]
+          , con (Constructor "Nested") Lib.nHtmlNode [app (var nHtmlText) (lit (Prim.VString "world!"))]
           ]
       ]))
