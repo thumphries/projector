@@ -43,9 +43,13 @@ renderCinemaError ce =
     BuildError h ->
       "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
 
-data CinemaArgs
-  = CinemaBuild Build (Maybe StripPrefix) Glob FilePath
-  deriving (Eq, Show)
+data CinemaArgs = CinemaArgs {
+    caBuild :: Build
+  , caStripPrefix :: Maybe StripPrefix
+  , caTemplateGlob :: Glob
+  , caDataGlob :: Maybe Glob
+  , caOutputPath :: FilePath
+  } deriving (Eq, Show)
 
 newtype Glob = Glob {
     unGlob :: [Char]
@@ -77,11 +81,14 @@ run :: CinemaArgs -> IO ()
 run args =
   orDie renderCinemaError $
     case args of
-      CinemaBuild b msp tg out ->
-        cinemaBuild b msp tg out
+      CinemaArgs b msp tg dg out ->
+        cinemaBuild b msp tg dg out
 
-cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> FilePath -> EitherT CinemaError IO ()
-cinemaBuild b msp tg o = do
+cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> Maybe Glob -> FilePath -> EitherT CinemaError IO ()
+cinemaBuild b msp tg mdg o = do
+  -- Load all our datatypes from disk
+  dfs <- maybe (pure []) globSafe mdg
+  udts <- pure (UserDataTypes undefined)
   -- Load all our template files from disk
   tfs <- globSafe tg
   rts <- liftIO . fmap RawTemplates . for tfs $ \f -> do
@@ -89,7 +96,7 @@ cinemaBuild b msp tg o = do
     let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
     pure (stripPrefix, body)
   -- Run the build
-  BuildArtefacts out <- hoistEither (first BuildError (runBuild b rts))
+  BuildArtefacts out <- hoistEither (first BuildError (runBuild b udts rts))
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
@@ -118,10 +125,11 @@ globSafe g = do
 
 cinemaP :: Parser CinemaArgs
 cinemaP =
-  CinemaBuild
+  CinemaArgs
     <$> buildP
     <*> optional stripPrefixP
     <*> templatesP
+    <*> optional dataP
     <*> outputP
 
 buildP :: Parser Build
@@ -129,6 +137,7 @@ buildP =
   Build
     <$> optional backendP
     <*> prefixP
+    <*> optional dataModuleNameP
 
 backendP :: Parser BackendT
 backendP =
@@ -152,6 +161,19 @@ modulePrefixR :: ReadM ModulePrefix
 modulePrefixR =
   fmap (ModulePrefix . ModuleName . T.pack) O.str
 
+dataModuleNameP :: Parser DataModuleName
+dataModuleNameP =
+  O.option dataModuleNameR $ fold [
+      O.short 'i'
+    , O.long "import"
+    , O.help "The module name containing your datatypes, to be imported."
+    , O.metavar "DATA_MODULE_NAME"
+    ]
+
+dataModuleNameR :: ReadM DataModuleName
+dataModuleNameR =
+  fmap (DataModuleName . ModuleName . T.pack) O.str
+
 backendR :: ReadM BackendT
 backendR =
   XO.eitherTextReader id $ \s ->
@@ -170,6 +192,15 @@ templatesP =
     , O.long "templates"
     , O.help "A glob pointing to your template files."
     , O.metavar "TEMPLATES"
+    ]
+
+dataP :: Parser Glob
+dataP =
+  O.option globR $ fold [
+      O.short 'd'
+    , O.long "data"
+    , O.help "A glob to your Machinator-format data files"
+    , O.metavar "DATATYPES"
     ]
 
 outputP :: Parser FilePath
