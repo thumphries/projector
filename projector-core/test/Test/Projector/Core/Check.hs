@@ -46,15 +46,6 @@ prop_illtyped_shrink =
   jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
     property (isLeft (typeCheck ctx e))
 
--- TODO reinstate when nf/whnf rewritten
---prop_nf_consistent =
---  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
---    typeCheck ctx (nf e) === pure ty
--- 
---prop_whnf_consistent =
---  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
---    typeCheck ctx (whnf e) === pure ty
-
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

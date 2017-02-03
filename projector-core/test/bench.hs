@@ -16,7 +16,6 @@ import           Projector.Core
 import           System.IO (IO)
 
 import           Test.Projector.Core.Arbitrary
--- import           Test.Projector.Core.Simplify (mul, nth)
 
 
 -- big lambda billy
