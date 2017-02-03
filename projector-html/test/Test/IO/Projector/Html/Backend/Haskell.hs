@@ -41,7 +41,7 @@ prop_library_runtime =
 
 prop_hello_world =
   once $ runProp name (text <> "\nmain = putStr (toText helloWorld)\n")
-    (=== "Hello, world!")
+    (=== "Hello, world!<div class=\"table\"> </div>")
   where
     (name, text) =
       renderModule haskellBackend (ModuleName "Main") $ Module {
