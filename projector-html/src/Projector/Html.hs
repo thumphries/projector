@@ -148,7 +148,7 @@ codeGenModule backend =
 data Build = Build {
     buildBackend :: Maybe HB.BackendT -- ^ The type of code to generate.
   , buildModulePrefix :: ModulePrefix -- ^ A prefix to be prepended to generated module names.
-  , buildDataModule :: DataModuleName -- ^ The module containing user datatypes.
+  , buildDataModule :: Maybe DataModuleName -- ^ The module containing user datatypes.
   } deriving (Eq, Ord, Show)
 
 newtype ModulePrefix = ModulePrefix {
@@ -181,9 +181,9 @@ newtype UserDataTypes = UserDataTypes {
 --
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
 runBuild :: Build -> UserDataTypes -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuild (Build mb mp dm) (UserDataTypes dfs) rts = do
+runBuild (Build mb mp mdm) (UserDataTypes dfs) rts = do
   -- Build the module map
-  (mg, mmap) <- smush dm mp rts
+  (mg, mmap) <- smush mdm mp rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
@@ -214,13 +214,13 @@ validateModules backend mods =
 -- * the module name is also derived from the filepath
 -- * we expect all user datatypes to be exported from a single module
 smush ::
-     DataModuleName
+     Maybe DataModuleName
   -> ModulePrefix
   -> RawTemplates
   -> Either
        [HtmlError]
        (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Annotation))
-smush (DataModuleName dm) (ModulePrefix prefix) (RawTemplates templates) = do
+smush mdm (ModulePrefix prefix) (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)
     let core = Elab.elaborate ast
@@ -228,10 +228,8 @@ smush (DataModuleName dm) (ModulePrefix prefix) (RawTemplates templates) = do
         expn = filePathToExprName fp
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
-      , HB.moduleImports = M.fromList [
-            (HB.htmlRuntime, HB.OpenImport)
-          , (dm, HB.OpenImport)
-          ]
+      , HB.moduleImports = M.fromList $
+          (HB.htmlRuntime, HB.OpenImport) : maybe [] (\(DataModuleName dm) -> [(dm, HB.OpenImport)]) mdm
       , HB.moduleExprs = M.singleton expn ((), core)
       })
   pure (buildModuleGraph mmap, mmap)
