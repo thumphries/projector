@@ -15,6 +15,7 @@ library
                        base                            >= 3          && < 5
                      , ambiata-p
                      , ambiata-projector-core
+                     , ambiata-machinator-core
                      , ambiata-x-eithert
                      , ambiata-x-templatehaskell
                      , annotated-wl-pprint             == 0.7.*
@@ -42,6 +43,7 @@ library
                        Projector.Html.Core
                        Projector.Html.Core.Elaborator
                        Projector.Html.Core.Library
+                       Projector.Html.Core.Machinator
                        Projector.Html.Core.Prim
 
                        Projector.Html.Backend

@@ -1,0 +1,41 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+module Projector.Html.Core.Machinator (
+    fromMachinator
+  ) where
+
+
+import           Machinator.Core (Definition (..))
+import qualified Machinator.Core.Data.Definition as MC
+
+import           P
+
+import           Projector.Core
+import           Projector.Html.Data.Prim
+
+
+-- | Convert a Machinator definition to a Projector definition.
+fromMachinator :: Definition -> (TypeName, HtmlDecl)
+fromMachinator (Definition (MC.Name n) dt) =
+  (TypeName n, fromMachinatorDT dt)
+
+fromMachinatorDT :: MC.DataType -> HtmlDecl
+fromMachinatorDT dt =
+  case dt of
+    MC.Variant nts ->
+      DVariant . toList . with nts $ \(MC.Name n, ts) ->
+        (Constructor n, fmap fromMachinatorT ts)
+
+fromMachinatorT :: MC.Type -> HtmlType
+fromMachinatorT mt =
+  case mt of
+    MC.Variable (MC.Name n) ->
+      TVar (TypeName n)
+    MC.GroundT g ->
+      fromMachinatorGT g
+
+fromMachinatorGT :: MC.Ground -> HtmlType
+fromMachinatorGT g =
+  case g of
+    MC.StringT ->
+      TLit TString
