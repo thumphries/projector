@@ -79,6 +79,7 @@ executable cinema
                      , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-html
+                     , ambiata-machinator-core
                      , ambiata-x-eithert
                      , ambiata-x-optparse
                      , containers

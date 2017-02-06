@@ -14,6 +14,8 @@ import qualified Data.Text.IO as T
 import           Options.Applicative (Parser, ReadM)
 import qualified Options.Applicative as O
 
+import qualified Machinator.Core as MC
+
 import           P
 
 import           Projector.Html
@@ -33,6 +35,7 @@ import qualified X.Options.Applicative as XO
 data CinemaError
   = GlobError Text
   | BuildError [HtmlError]
+  | DataError Text -- MC.MachinatorError FIX
   deriving (Eq, Show)
 
 renderCinemaError :: CinemaError -> Text
@@ -42,10 +45,16 @@ renderCinemaError ce =
       "Invalid glob: " <> t
     BuildError h ->
       "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
+    DataError me ->
+      "Data errors:\n" <> me -- FIX
 
-data CinemaArgs
-  = CinemaBuild Build (Maybe StripPrefix) Glob FilePath
-  deriving (Eq, Show)
+data CinemaArgs = CinemaArgs {
+    caBuild :: Build
+  , caStripPrefix :: Maybe StripPrefix
+  , caTemplateGlob :: Glob
+  , caDataGlob :: Maybe Glob
+  , caOutputPath :: FilePath
+  } deriving (Eq, Show)
 
 newtype Glob = Glob {
     unGlob :: [Char]
@@ -76,12 +85,18 @@ main = do
 run :: CinemaArgs -> IO ()
 run args =
   orDie renderCinemaError $
-    case args of
-      CinemaBuild b msp tg out ->
-        cinemaBuild b msp tg out
+    cinemaBuild
+      (caBuild args)
+      (caStripPrefix args)
+      (caTemplateGlob args)
+      (caDataGlob args)
+      (caOutputPath args)
 
-cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> FilePath -> EitherT CinemaError IO ()
-cinemaBuild b msp tg o = do
+cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> Maybe Glob -> FilePath -> EitherT CinemaError IO ()
+cinemaBuild b msp tg mdg o = do
+  -- Load all our datatypes from disk
+  dfs <- maybe (pure []) globSafe mdg
+  udts <- parseDataFiles dfs
   -- Load all our template files from disk
   tfs <- globSafe tg
   rts <- liftIO . fmap RawTemplates . for tfs $ \f -> do
@@ -89,13 +104,21 @@ cinemaBuild b msp tg o = do
     let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
     pure (stripPrefix, body)
   -- Run the build
-  BuildArtefacts out <- hoistEither (first BuildError (runBuild b rts))
+  BuildArtefacts out <- hoistEither (first BuildError (runBuild b udts rts))
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
     IO.putStrLn ("Generating " <> ofile)
     createDirectoryIfMissing True (takeDirectory ofile)
     T.writeFile ofile body
+
+-- | Parse machinator files, discard version info.
+parseDataFiles :: [FilePath] -> EitherT CinemaError IO UserDataTypes
+parseDataFiles fps =
+  fmap (UserDataTypes . fold) . for fps $ \f -> do
+    m <- liftIO (T.readFile f)
+    MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
+    pure defs
 
 -- -----------------------------------------------------------------------------
 
@@ -118,10 +141,11 @@ globSafe g = do
 
 cinemaP :: Parser CinemaArgs
 cinemaP =
-  CinemaBuild
+  CinemaArgs
     <$> buildP
     <*> optional stripPrefixP
     <*> templatesP
+    <*> optional dataP
     <*> outputP
 
 buildP :: Parser Build
@@ -129,6 +153,7 @@ buildP =
   Build
     <$> optional backendP
     <*> prefixP
+    <*> optional dataModuleNameP
 
 backendP :: Parser BackendT
 backendP =
@@ -152,6 +177,19 @@ modulePrefixR :: ReadM ModulePrefix
 modulePrefixR =
   fmap (ModulePrefix . ModuleName . T.pack) O.str
 
+dataModuleNameP :: Parser DataModuleName
+dataModuleNameP =
+  O.option dataModuleNameR $ fold [
+      O.short 'i'
+    , O.long "import"
+    , O.help "The module name containing your datatypes, to be imported."
+    , O.metavar "DATA_MODULE_NAME"
+    ]
+
+dataModuleNameR :: ReadM DataModuleName
+dataModuleNameR =
+  fmap (DataModuleName . ModuleName . T.pack) O.str
+
 backendR :: ReadM BackendT
 backendR =
   XO.eitherTextReader id $ \s ->
@@ -170,6 +208,15 @@ templatesP =
     , O.long "templates"
     , O.help "A glob pointing to your template files."
     , O.metavar "TEMPLATES"
+    ]
+
+dataP :: Parser Glob
+dataP =
+  O.option globR $ fold [
+      O.short 'd'
+    , O.long "data"
+    , O.help "A glob to your Machinator-format data files"
+    , O.metavar "DATATYPES"
     ]
 
 outputP :: Parser FilePath
