@@ -213,9 +213,10 @@ esc' f echar = do
       pure c
 
 elementExpr :: Parser (TExpr Range)
-elementExpr = do
-  e <- P.choice [P.try element, voidElement]
-  pure $ TENode (extract e) e
+elementExpr =
+  eOptionalParens $ do
+    e <- P.choice [P.try element, voidElement]
+    pure $ TENode (extract e) e
 
 element :: Parser (TNode Range)
 element =
@@ -395,7 +396,7 @@ eappAssoc r f (g :| gs) =
 
 eParens :: Parser a -> Parser a
 eParens p =
-  P.between (P.try (lexeme (token ExprLParen))) (token ExprRParen) p
+  P.between (P.try (lexemeRN (token ExprLParen))) (token ExprRParen) p
 
 eOptionalParens :: Parser a -> Parser a
 eOptionalParens p =
