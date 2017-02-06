@@ -29,7 +29,11 @@ eType :: TType a -> HtmlType
 eType ty =
   case ty of
     TTVar _ (TId x) ->
-      TVar (TypeName x)
+      case parsePrimT x of
+        Just p ->
+          TLit p
+        _ ->
+          TVar (TypeName x)
 
 --    TTList _ t ->
 --      TList (eType t)
