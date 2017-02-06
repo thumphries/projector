@@ -9,9 +9,11 @@ module Projector.Html.Data.Prim (
   , HtmlDecls
   , HtmlExpr
   , HtmlLit
+  , parsePrimT
   ) where
 
 
+import qualified Data.Map as M
 import qualified Data.Text as T
 
 import           P
@@ -43,3 +45,12 @@ instance Ground PrimT where
   ppGroundValue v = case v of
     VString s ->
       T.pack (show s)
+
+primTLookup :: M.Map Text PrimT
+primTLookup =
+  M.fromList . with [minBound..maxBound] $ \v ->
+    (ppGroundType v, v)
+
+parsePrimT :: Text -> Maybe PrimT
+parsePrimT =
+  flip M.lookup primTLookup
