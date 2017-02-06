@@ -121,7 +121,8 @@ checkModules ::
   -> Map HB.ModuleName (HB.Module () PrimT Annotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Annotation)))
 checkModules decls known exprs =
-  first HtmlCoreError (fmap fst (foldM fun (mempty, known) deps))
+  -- FIX Check for duplicate function names
+  first HtmlCoreError (fmap fst (foldM fun (mempty, HC.constructorFunctions decls <> known) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
     --

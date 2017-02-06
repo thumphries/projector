@@ -17,10 +17,12 @@ module Projector.Html.Core (
   , HtmlDecls
   , HtmlExpr
   , HtmlLit
+  , constructorFunctions
   ) where
 
 
 import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
 import           P
@@ -87,3 +89,11 @@ libraryExprs =
 extractType :: HtmlExpr (HtmlType, a) -> HtmlType
 extractType =
   fst . PC.extractAnnotation
+
+constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation)
+constructorFunctions (PC.TypeDecls m) =
+  M.fromList $ M.toList m >>= \(tn, decl) ->
+    case decl of
+      PC.DVariant cts ->
+        with cts $ \(c@(PC.Constructor cn), ts) ->
+          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, DataConstructor c tn))

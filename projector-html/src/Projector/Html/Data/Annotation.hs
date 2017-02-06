@@ -18,6 +18,7 @@ data Annotation
   -- TODO we want to swap SourceAnnotation for something a little more specific
   = SourceAnnotation Range
   | LibraryFunction Name
+  | DataConstructor Constructor TypeName
   deriving (Eq, Ord, Show)
 
 annotateTemplate :: Template Range -> Template Annotation
@@ -32,3 +33,5 @@ renderAnnotation ann =
       renderRange r
     LibraryFunction (Name n) ->
       "In the standard library function '" <> n <> "'"
+    DataConstructor (Constructor c) (TypeName tn) ->
+      "In the data constructor '" <> c <> "' for type '" <> tn <> "'"

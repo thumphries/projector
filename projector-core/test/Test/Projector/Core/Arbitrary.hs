@@ -439,17 +439,20 @@ genWellTypedLetrec ::
      (Ground l, Ord l)
   => Int
   -> TypeDecls l
+  -> Map Name (Type l)
   -> Jack (Type l)
   -> (l -> Jack (Value l))
   -> Jack (Map Name (Type l, Expr l ()))
-genWellTypedLetrec n decls genty genval = do
+genWellTypedLetrec n decls known genty genval = do
     k <- chooseInt (0, n)
     -- generate n names and types
     ntys <- genSizedMap k genName genty
+    let
+      ctxi = M.foldrWithKey (\n t c -> cextend decls c t n) centy known
     (_, res) <- foldM (\(ctx, acc) (na, ty) -> do
       m <- chooseInt (0, n `div` k)
       e <- genWellTypedExpr' m ty decls ctx genty genval
-      pure (cextend decls ctx ty na, M.insert na (ty, e) acc)) (centy, mempty) (M.toList ntys)
+      pure (cextend decls ctx ty na, M.insert na (ty, e) acc)) (ctxi, mempty) (M.toList ntys)
     pure res
 
 -- -----------------------------------------------------------------------------
@@ -693,7 +696,7 @@ genWellTypedTestLetrec =
   sized $ \n -> do
     k <- chooseInt (0, n)
     ctx <- genTestTypeDecls
-    res <- genWellTypedLetrec k ctx (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
+    res <- genWellTypedLetrec k ctx mempty (genTypeFromContext ctx genTestLitT) genWellTypedTestLitValue
     pure (ctx, res)
 
 genIllTypedTestExpr :: TypeDecls TestLitT -> Jack (Expr TestLitT ())
