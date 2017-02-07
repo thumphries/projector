@@ -41,6 +41,8 @@ fromMachinatorT mt =
       TVar (TypeName n)
     MC.GroundT g ->
       fromMachinatorGT g
+    MC.ListT t ->
+      TList (fromMachinatorT t)
 
 fromMachinatorGT :: MC.Ground -> HtmlType
 fromMachinatorGT g =
