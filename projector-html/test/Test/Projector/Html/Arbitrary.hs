@@ -23,7 +23,7 @@ import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim as Prim
 import           Projector.Html.Data.Template
-import           Projector.Html.Core (htmlTypes)
+import           Projector.Html.Core (constructorFunctions, htmlTypes)
 
 import           Test.Projector.Core.Arbitrary
 import           Test.QuickCheck.Jack hiding (listOf1)
@@ -44,10 +44,11 @@ genWellTypedHtmlExpr ctx = do
 
 genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT ())
 genWellTypedHtmlModule n decls =
+  let ourDecls = subtractTypes decls htmlTypes in
   Module
-    <$> pure (subtractTypes decls htmlTypes)
+    <$> pure ourDecls
     <*> pure (M.fromList [(htmlRuntime, OpenImport)])
-    <*> genWellTypedLetrec n (decls <> htmlTypes) (genHtmlType decls) genWellTypedHtmlLit
+    <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions ourDecls) (genHtmlType decls) genWellTypedHtmlLit
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =
