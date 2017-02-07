@@ -47,9 +47,9 @@ renderCoreError start end err =
     HtmlTypeError tes ->
       T.unlines (fmap (PCP.ppTypeErrorDecorated start end) tes)
 
-renderCoreErrorAnnotation :: CoreError Annotation -> Text
-renderCoreErrorAnnotation =
-  renderCoreError (\r -> (renderAnnotation r <> ": ")) (const mempty)
+renderCoreErrorAnnotation :: (a -> Text) -> CoreError (Annotation a) -> Text
+renderCoreErrorAnnotation f =
+  renderCoreError (\r -> (renderAnnotation f r <> ": ")) (const mempty)
 
 templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr (HtmlType, a))
 templateToCore =
@@ -90,7 +90,7 @@ extractType :: HtmlExpr (HtmlType, a) -> HtmlType
 extractType =
   fst . PC.extractAnnotation
 
-constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation)
+constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation b)
 constructorFunctions (PC.TypeDecls m) =
   M.fromList $ M.toList m >>= \(tn, decl) ->
     case decl of

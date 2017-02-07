@@ -49,7 +49,7 @@ import qualified Projector.Html.Core.Machinator as CM
 import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Data.Backend as HB
 import qualified Projector.Html.Data.Module as HB
-import           Projector.Html.Data.Position  (Range)
+import           Projector.Html.Data.Position  (Range, renderRange)
 import           Projector.Html.Data.Prim
 import           Projector.Html.Data.Template  (Template)
 import           Projector.Html.ModuleGraph
@@ -66,7 +66,7 @@ import           X.Control.Monad.Trans.Either (sequenceEither)
 
 data HtmlError
   = HtmlParseError ParseError
-  | HtmlCoreError (CoreError Annotation)
+  | HtmlCoreError (CoreError SrcAnnotation)
   | HtmlModuleGraphError GraphError
   | HtmlBackendError HB.BackendError
   deriving (Eq, Show)
@@ -77,7 +77,7 @@ renderHtmlError he =
     HtmlParseError e ->
       renderParseError e
     HtmlCoreError e ->
-      HC.renderCoreErrorAnnotation e
+      HC.renderCoreErrorAnnotation renderRange e
     HtmlModuleGraphError e ->
       renderGraphError e
     HtmlBackendError e ->
@@ -86,18 +86,18 @@ renderHtmlError he =
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
 
-parseTemplate :: FilePath -> Text -> Either HtmlError (Template Annotation)
+parseTemplate :: FilePath -> Text -> Either HtmlError (Template SrcAnnotation)
 parseTemplate f =
   bimap HtmlParseError annotateTemplate . parse f
 
-checkTemplate :: Template Annotation -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Annotation))
+checkTemplate :: Template SrcAnnotation -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkTemplate =
   checkTemplateIncremental mempty
 
 checkTemplateIncremental ::
-     Map Text (HtmlType, Annotation)
-  -> Template Annotation
-  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, Annotation))
+     Map Text (HtmlType, SrcAnnotation)
+  -> Template SrcAnnotation
+  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkTemplateIncremental known ast =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
@@ -107,8 +107,8 @@ checkTemplateIncremental known ast =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () PrimT Annotation
-  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, Annotation))
+  -> HB.Module () PrimT SrcAnnotation
+  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 checkModule decls (HB.Module typs imps exps) = do
   exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
   pure (HB.Module typs imps exps')
@@ -117,9 +117,9 @@ checkModule decls (HB.Module typs imps exps) = do
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
-  -> Map PC.Name (HtmlType, Annotation)
-  -> Map HB.ModuleName (HB.Module () PrimT Annotation)
-  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, Annotation)))
+  -> Map PC.Name (HtmlType, SrcAnnotation)
+  -> Map HB.ModuleName (HB.Module () PrimT SrcAnnotation)
+  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names
   first HtmlCoreError (fmap fst (foldM fun (mempty, HC.constructorFunctions decls <> known) deps))
@@ -138,7 +138,7 @@ checkModules decls known exprs =
 codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
-  -> HB.Module HtmlType PrimT (HtmlType, Annotation)
+  -> HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)
   -> (FilePath, Text)
 codeGenModule backend =
   HB.renderModule (HB.getBackend backend)
@@ -199,7 +199,7 @@ runBuild (Build mb mp mdm) (UserDataTypes dfs) rts = do
       pure (BuildArtefacts [])
 
 -- TODO hmm is this a compilation detail we should hide in HC?
-libraryExprs :: Map PC.Name (HtmlType, Annotation)
+libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
 libraryExprs =
   M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
@@ -220,7 +220,7 @@ smush ::
   -> RawTemplates
   -> Either
        [HtmlError]
-       (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT Annotation))
+       (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
 smush mdm (ModulePrefix prefix) (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)

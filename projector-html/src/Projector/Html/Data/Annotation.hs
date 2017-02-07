@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Annotation (
     Annotation (..)
+  , SrcAnnotation
   , annotateTemplate
   , renderAnnotation
   ) where
@@ -14,23 +15,25 @@ import           Projector.Html.Data.Position
 import           Projector.Html.Data.Template
 
 
-data Annotation
+data Annotation a
   -- TODO we want to swap SourceAnnotation for something a little more specific
-  = SourceAnnotation Range
+  = SourceAnnotation a
   | LibraryFunction Name
   | DataConstructor Constructor TypeName
   deriving (Eq, Ord, Show)
 
-annotateTemplate :: Template Range -> Template Annotation
+type SrcAnnotation = Annotation Range
+
+annotateTemplate :: Template Range -> Template (Annotation Range)
 annotateTemplate temp =
   -- TODO more specific
   fmap SourceAnnotation temp
 
-renderAnnotation :: Annotation -> Text
-renderAnnotation ann =
+renderAnnotation :: (a -> Text) -> Annotation a -> Text
+renderAnnotation f ann =
   case ann of
     SourceAnnotation r ->
-      renderRange r
+      f r
     LibraryFunction (Name n) ->
       "In the standard library function '" <> n <> "'"
     DataConstructor (Constructor c) (TypeName tn) ->
