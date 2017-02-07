@@ -24,7 +24,7 @@ elaborate (Template _ mts html) =
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
 eTypeSigs msigs =
   mcase msigs id $ \(TTypeSig a sigs) ->
-    foldl' (\f (TId x, ty) -> f . ELam (SourceAnnotation a) (Name x) (Just (eType ty))) id sigs
+    foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id sigs
 
 eType :: TType a -> HtmlType
 eType ty =
@@ -42,7 +42,7 @@ eType ty =
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml (THtml a nodes) =
-  ECon (SourceAnnotation a) (Constructor "Html") Lib.nHtml [EList (SourceAnnotation a) Lib.tHtmlNode (fmap eNode nodes)]
+  ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [EList (SourceAnnotation a) Lib.tHtmlNode (fmap eNode nodes)]
 
 eNode :: TNode a -> HtmlExpr (Annotation a)
 eNode node =
@@ -65,7 +65,7 @@ eNode node =
         , eHtml html
         ]
     TExprNode a expr ->
-      ECon (SourceAnnotation a) (Constructor "Nested") Lib.nHtmlNode [
+      ECon (HtmlExpression a) (Constructor "Nested") Lib.nHtmlNode [
           eExpr expr
         ]
 
@@ -98,7 +98,7 @@ eAttrKey a (TAttrName n) =
 eAttrVal :: TAttrValue a -> HtmlExpr (Annotation a)
 eAttrVal aval =
   let mkVal a t =
-        ECon  (SourceAnnotation a) (Constructor "AttributeValue") Lib.nAttributeValue [t]
+        ECon  (AttributeExpression a) (Constructor "AttributeValue") Lib.nAttributeValue [t]
   in case aval of
        TQuotedAttrValue a (TPlainText t) ->
          mkVal a (stringLit a t)
@@ -109,13 +109,13 @@ eExpr :: TExpr a -> HtmlExpr (Annotation a)
 eExpr expr =
   case expr of
     TEVar a (TId x) ->
-      EVar (SourceAnnotation a) (Name x)
+      EVar (Variable (Name x) a) (Name x)
     TELam a bnds bdy ->
       funX a (fmap (Name . unTId) bnds) (eExpr bdy)
     TEApp a f g ->
-      EApp (SourceAnnotation a) (eExpr f) (eExpr g)
+      EApp (FunctionApplication a) (eExpr f) (eExpr g)
     TECase a e alts ->
-      ECase (SourceAnnotation a) (eExpr e) (NE.toList (fmap eAlt alts))
+      ECase (CaseExpression a) (eExpr e) (NE.toList (fmap eAlt alts))
     TELit _ l ->
       eLit l
     TEEach a f g ->
@@ -127,20 +127,20 @@ eExpr expr =
             )
           (eExpr f)
     TENode a e ->
-      ECon (SourceAnnotation a) (Constructor "Html") Lib.nHtml [
-          EList (SourceAnnotation a) Lib.tHtmlNode [eNode e]
+      ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [
+          EList (HtmlBlock a) Lib.tHtmlNode [eNode e]
         ]
 
 eLit :: TLit a -> HtmlExpr (Annotation a)
 eLit l =
   case l of
     TLString a s ->
-      ELit (SourceAnnotation a) $ VString s
+      ELit (StringLiteral a) $ VString s
 
 -- curried function
 funX :: a -> NonEmpty Name -> HtmlExpr (Annotation a) -> HtmlExpr (Annotation a)
 funX a bnds bdy =
-  foldr (\n expr -> ELam (SourceAnnotation a) n Nothing expr) bdy bnds
+  foldr (\n expr -> ELam (InlineFunction n a) n Nothing expr) bdy bnds
 
 eAlt :: TAlt a -> (Pattern (Annotation a), HtmlExpr (Annotation a))
 eAlt (TAlt _ pat body) =
@@ -151,9 +151,9 @@ ePat pat =
   -- TODO find something we can do with these annotations
   case pat of
     TPVar a (TId x) ->
-      PVar (SourceAnnotation a) (Name x)
+      PVar (PatternVar (Name x) a) (Name x)
     TPCon a (TConstructor x) pats ->
-      PCon (SourceAnnotation a) (Constructor x) (fmap ePat pats)
+      PCon (PatternCon (Name x) a) (Constructor x) (fmap ePat pats)
 
 stringLit :: a -> Text -> HtmlExpr (Annotation a)
 stringLit a =
