@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Annotation (
     Annotation (..)
-  , annotateTemplate
+  , SrcAnnotation
   , renderAnnotation
   ) where
 
@@ -11,27 +11,56 @@ import           P
 
 import           Projector.Core
 import           Projector.Html.Data.Position
-import           Projector.Html.Data.Template
 
 
-data Annotation
+data Annotation a
   -- TODO we want to swap SourceAnnotation for something a little more specific
-  = SourceAnnotation Range
+  = SourceAnnotation a
   | LibraryFunction Name
   | DataConstructor Constructor TypeName
+  | TypeSignature a
+  | Variable Name a
+  | CaseExpression a
+  | InlineFunction Name a
+  | FunctionApplication a
+  | HtmlExpression a
+  | PatternVar Name a
+  | PatternCon Name a
+  | StringLiteral a
+  | HtmlBlock a
+  | AttributeExpression a
   deriving (Eq, Ord, Show)
 
-annotateTemplate :: Template Range -> Template Annotation
-annotateTemplate temp =
-  -- TODO more specific
-  fmap SourceAnnotation temp
+type SrcAnnotation = Annotation Range
 
-renderAnnotation :: Annotation -> Text
-renderAnnotation ann =
+renderAnnotation :: (a -> Text) -> Annotation a -> Text
+renderAnnotation f ann =
   case ann of
     SourceAnnotation r ->
-      renderRange r
+      f r
     LibraryFunction (Name n) ->
       "In the standard library function '" <> n <> "'"
     DataConstructor (Constructor c) (TypeName tn) ->
       "In the data constructor '" <> c <> "' for type '" <> tn <> "'"
+    TypeSignature r ->
+      f r <> " in a type signature"
+    Variable (Name n) r ->
+      f r <> " in the variable '" <> n <> "'"
+    CaseExpression r ->
+      f r <> " in a case expression"
+    InlineFunction (Name n) r ->
+      f r <> " in the inline function binding '" <> n <> "'"
+    FunctionApplication r ->
+      f r <> " in a function application"
+    HtmlExpression r ->
+      f r <> " in a HTML expression"
+    HtmlBlock r ->
+      f r <> " in a HTML block"
+    PatternVar (Name n) r ->
+      f r <> " in the pattern binding '" <> n <> "'"
+    PatternCon (Name n) r ->
+      f r <> " in the constructor pattern '" <> n <> "'"
+    StringLiteral r ->
+      f r <> " in a string literal"
+    AttributeExpression r ->
+      f r <> " in an attribute expression"

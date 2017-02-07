@@ -147,7 +147,7 @@ data ReplResponse
 
 data ReplState = ReplState {
     replBindings :: Bindings
-  , replKnown :: Map Text (HtmlType, Annotation)
+  , replKnown :: Map Text (HtmlType, SrcAnnotation)
   , replMultiline :: Bool
   } deriving (Eq, Show)
 
@@ -176,9 +176,9 @@ withBind n f = do
   maybe (err (ReplUnbound n)) f mbind
 
 data Binding
-  = TBind (Template Annotation) HtmlType (HtmlExpr (HtmlType, Annotation))
-  | TFBind FilePath (Template Annotation) HtmlType (HtmlExpr (HtmlType, Annotation))
-  | EBind HtmlType (HtmlExpr (HtmlType, Annotation))
+  = TBind (Template Range) HtmlType (HtmlExpr (HtmlType, SrcAnnotation))
+  | TFBind FilePath (Template Range) HtmlType (HtmlExpr (HtmlType, SrcAnnotation))
+  | EBind HtmlType (HtmlExpr (HtmlType, SrcAnnotation))
   deriving (Eq, Show)
 
 boundType :: Binding -> HtmlType
@@ -191,7 +191,7 @@ boundType b =
     EBind t _ ->
       t
 
-boundCore :: Binding -> HtmlExpr (HtmlType, Annotation)
+boundCore :: Binding -> HtmlExpr (HtmlType, SrcAnnotation)
 boundCore b =
   case b of
     TBind _ _ c ->
@@ -201,7 +201,7 @@ boundCore b =
     EBind _ c ->
       c
 
-boundTemplate :: Binding -> Maybe (Template Annotation)
+boundTemplate :: Binding -> Maybe (Template Range)
 boundTemplate b =
   case b of
     TBind t _ _ ->
@@ -253,12 +253,12 @@ runReplCommand cmd =
     ExitRepl ->
       pure ReplExit
 
-loadTemplate :: FilePath -> Repl (Template Annotation, HtmlType, HtmlExpr (HtmlType, Annotation))
+loadTemplate :: FilePath -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 loadTemplate f = do
   t <- liftIO (T.readFile f)
   parseTemplate' f t
 
-parseTemplate' :: FilePath -> Text -> Repl (Template Annotation, HtmlType, HtmlExpr (HtmlType, Annotation))
+parseTemplate' :: FilePath -> Text -> Repl (Template Range, HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 parseTemplate' f t =
   Repl $ do
     k <- gets replKnown
