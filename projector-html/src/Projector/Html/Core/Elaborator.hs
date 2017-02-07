@@ -81,12 +81,12 @@ eAttr :: TAttribute a -> HtmlExpr (Annotation a)
 eAttr attr =
   case attr of
     TAttribute a name aval ->
-      ECon (SourceAnnotation a) (Constructor "Attribute") Lib.nAttribute [
+      ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
           eAttrKey a name
         , eAttrVal aval
         ]
     TEmptyAttribute a name ->
-      ECon (SourceAnnotation a) (Constructor "Attribute") Lib.nAttribute [
+      ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
           eAttrKey a name
         , eAttrVal (TQuotedAttrValue a (TPlainText ""))
         ]
