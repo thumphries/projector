@@ -86,17 +86,17 @@ renderHtmlError he =
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
 
-parseTemplate :: FilePath -> Text -> Either HtmlError (Template SrcAnnotation)
+parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
 parseTemplate f =
-  bimap HtmlParseError annotateTemplate . parse f
+  first HtmlParseError . parse f
 
-checkTemplate :: Template SrcAnnotation -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
+checkTemplate :: Template Range -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkTemplate =
   checkTemplateIncremental mempty
 
 checkTemplateIncremental ::
      Map Text (HtmlType, SrcAnnotation)
-  -> Template SrcAnnotation
+  -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkTemplateIncremental known ast =
     first HtmlCoreError

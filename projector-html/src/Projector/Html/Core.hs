@@ -51,7 +51,7 @@ renderCoreErrorAnnotation :: (a -> Text) -> CoreError (Annotation a) -> Text
 renderCoreErrorAnnotation f =
   renderCoreError (\r -> (renderAnnotation f r <> ": ")) (const mempty)
 
-templateToCore :: Template a -> Either (CoreError a) (HtmlType, HtmlExpr (HtmlType, a))
+templateToCore :: Template a -> Either (CoreError (Annotation a)) (HtmlType, HtmlExpr (HtmlType, Annotation a))
 templateToCore =
   typeTree . Elab.elaborate
 

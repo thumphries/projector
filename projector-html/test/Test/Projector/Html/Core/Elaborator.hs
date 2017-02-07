@@ -14,7 +14,6 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Html
-import           Projector.Html.Data.Annotation
 import           Projector.Html.Parser.QQ  (template)
 
 
@@ -23,7 +22,7 @@ elabProp ast =
   either
     (\e -> counterexample (show e) (property False))
     (const (property True))
-    (checkTemplate (annotateTemplate ast))
+    (checkTemplate ast)
 
 tshow :: Show a => a -> Text
 tshow =
