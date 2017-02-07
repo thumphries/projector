@@ -118,7 +118,13 @@ eExpr expr =
     TELit _ l ->
       eLit l
     TEEach a f g ->
-      EMap a (eExpr f) (eExpr g)
+      ECon a (Constructor "Html") Lib.nHtml . pure $
+        EMap a
+          (ELam a (Name "x") Nothing $
+            ECon a (Constructor "Nested") Lib.nHtmlNode
+              [EApp a (eExpr g) (EVar a (Name "x"))]
+            )
+          (eExpr f)
     TENode a e ->
       ECon a (Constructor "Html") Lib.nHtml [
           EList a Lib.tHtmlNode [eNode e]
