@@ -44,10 +44,11 @@ genWellTypedHtmlExpr ctx = do
 
 genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT ())
 genWellTypedHtmlModule n decls =
+  let ourDecls = subtractTypes decls htmlTypes in
   Module
-    <$> pure (subtractTypes decls htmlTypes)
+    <$> pure ourDecls
     <*> pure (M.fromList [(htmlRuntime, OpenImport)])
-    <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions decls) (genHtmlType decls) genWellTypedHtmlLit
+    <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions ourDecls) (genHtmlType decls) genWellTypedHtmlLit
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =
