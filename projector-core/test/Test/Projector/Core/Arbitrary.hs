@@ -448,7 +448,7 @@ genWellTypedLetrec n decls known genty genval = do
     -- generate n names and types
     ntys <- genSizedMap k genName genty
     let
-      ctxi = M.foldrWithKey (\n t c -> cextend decls c t n) centy known
+      ctxi = M.foldrWithKey (\name t c -> cextend decls c t name) centy known
     (_, res) <- foldM (\(ctx, acc) (na, ty) -> do
       m <- chooseInt (0, n `div` k)
       e <- genWellTypedExpr' m ty decls ctx genty genval
