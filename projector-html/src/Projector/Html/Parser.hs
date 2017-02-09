@@ -298,11 +298,8 @@ attrValue (n :@ a) =
 attrValueString :: Parser (TAttrValue Range)
 attrValueString =
   label "attribute value" $ do
-    t :@ a <- withPosition $ do
-      void (P.char '"')
-      t <- P.someTill P.anyChar (P.char '"')
-      pure (T.pack t)
-    pure (TQuotedAttrValue a (TPlainText t))
+    s <- stringExpr
+    pure (TQuotedAttrValue (extract s) s)
 
 attrValueExpr :: Parser (TAttrValue Range)
 attrValueExpr =
@@ -311,6 +308,42 @@ attrValueExpr =
     e <- lexemeRN expr
     _ :@ b <- token ExprEnd
     pure (TAttrExpr (a <> b) e)
+
+stringExpr :: Parser (TIString Range)
+stringExpr =
+  label "string with interpolation" $ do
+    _ :@ a <- token StringStart
+    chunks <- P.manyTill (P.try exprChunk <|> P.try stringChunk) (P.lookAhead (token StringEnd))
+    _ :@ b <- token StringEnd
+    pure (TIString (a <> b) chunks)
+
+stringChunk :: Parser (TIChunk Range)
+stringChunk =
+  label "string fragment" $ do
+    t :@ a <- withPosition $ do
+      let
+        escF c =
+          if c == 'n'then
+            pure '\n'
+          else if c == 'r' then
+            pure '\r'
+          else if c == '\\' || c == '"' || c == '{' || c == '}' then
+            pure c
+          else
+            empty
+      t <- P.someTill (esc' escF '\\') (P.lookAhead (P.char '"' <|> P.char '{'))
+      pure (T.pack t)
+    pure (TStringChunk a t)
+
+
+exprChunk :: Parser (TIChunk Range)
+exprChunk =
+  label "string expression fragment" $ do
+    _ :@ a <- lexemeRN (token ExprStart)
+    e <- lexemeRN expr
+    _ :@ b <- lexemeRN (token ExprEnd)
+    pure (TExprChunk (a <> b) e)
+
 
 -- -----------------------------------------------------------------------------
 
@@ -329,7 +362,7 @@ expr' =
     <|> P.try eappParen
     <|> P.try elam
     <|> P.try evar
-    <|> P.try elit
+    <|> P.try estring
     <|> P.try elementExpr
 
 evar :: Parser (TExpr Range)
@@ -402,24 +435,11 @@ eOptionalParens :: Parser a -> Parser a
 eOptionalParens p =
   P.try (eParens p) <|> p
 
-elit :: Parser (TExpr Range)
-elit =
-  label "literal" $ do
-    t :@ a <- withPosition . lexeme $ do
-      void (P.char '"')
-      let
-        escF c =
-          if c == 'n'then
-            pure '\n'
-          else if c == 'r' then
-            pure '\r'
-          else if c == '\\' || c == '"' then
-            pure c
-          else
-            empty
-      t <- P.try $ P.manyTill (esc' escF '\\') (P.char '"')
-      pure (T.pack t)
-    pure (TELit a (TLString a t))
+estring :: Parser (TExpr Range)
+estring =
+  label "string" $ do
+    s <- stringExpr
+    pure (TEString (extract s) s)
 
 alt :: Parser (TAlt Range)
 alt =

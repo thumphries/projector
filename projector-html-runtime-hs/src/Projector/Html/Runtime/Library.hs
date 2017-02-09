@@ -11,6 +11,8 @@ module Projector.Html.Runtime.Library (
   , Hydrant.voidNode
   , Hydrant.comment
   , foldHtml
+  , append
+  , concat
   , text
   , fmap
   , attrValue
@@ -20,7 +22,7 @@ module Projector.Html.Runtime.Library (
 
 import           Data.Foldable (fold)
 import           Data.Functor (fmap)
-import           Data.Monoid (mempty)
+import           Data.Monoid (Monoid (..))
 import qualified Hydrant
 import           Projector.Html.Runtime.Prim
 
@@ -28,6 +30,16 @@ foldHtml :: [Hydrant.Html] -> Hydrant.Html
 foldHtml =
   fold
 {-# INLINE foldHtml #-}
+
+append :: Text -> Text -> Text
+append =
+  mappend
+{-# INLINE append #-}
+
+concat :: [Text] -> Text
+concat =
+  fold
+{-# INLINE concat #-}
 
 -- TODO this only exists until we start inlining library functions
 text :: Text -> Hydrant.Html

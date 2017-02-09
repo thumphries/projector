@@ -18,9 +18,10 @@ module Projector.Html.Data.Template (
   , TAttrValue (..)
   -- ** Expressions
   , TExpr (..)
-  , TLit (..)
   , TAlt (..)
   , TPattern (..)
+  , TIString (..)
+  , TIChunk (..)
   -- ** Strings
   , TId (..)
   , TPlainText (..)
@@ -160,7 +161,7 @@ instance Comonad TAttribute where
         TEmptyAttribute (f attr) n
 
 data TAttrValue a
-  = TQuotedAttrValue a TPlainText
+  = TQuotedAttrValue a (TIString a)
   | TAttrExpr a (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
@@ -172,7 +173,7 @@ instance Comonad TAttrValue where
       TAttrExpr a _ ->
         a
   extend f expr = case expr of
-    TQuotedAttrValue _ t -> TQuotedAttrValue (f expr) t
+    TQuotedAttrValue _ t -> TQuotedAttrValue (f expr) (extend (const (f expr)) t)
     TAttrExpr _ e -> TAttrExpr (f expr) (extend (const (f expr)) e)
 
 data TExpr a
@@ -180,9 +181,9 @@ data TExpr a
   | TELam a (NonEmpty TId) (TExpr a)
   | TEApp a (TExpr a) (TExpr a)
   | TECase a (TExpr a) (NonEmpty (TAlt a))
-  | TELit a (TLit a)
   | TEEach a (TExpr a) (TExpr a)
   | TENode a (TNode a)
+  | TEString a (TIString a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TExpr where
@@ -196,11 +197,11 @@ instance Comonad TExpr where
         a
       TECase a _ _ ->
         a
-      TELit a _ ->
-        a
       TEEach a _ _ ->
         a
       TENode a _ ->
+        a
+      TEString a _ ->
         a
   extend f expr =
     case expr of
@@ -212,22 +213,41 @@ instance Comonad TExpr where
         TEApp (f expr) (extend f e1) (extend f e2)
       TECase _ e alts ->
         TECase (f expr) (extend f e) (fmap (extend (const (f expr))) alts)
-      TELit _ a ->
-        TELit (f expr) (extend (const (f expr)) a)
       TEEach _ e1 e2 ->
         TEEach (f expr) (extend f e1) (extend f e2)
       TENode _ a ->
         TENode (f expr) (extend (const (f expr)) a)
+      TEString _ s ->
+        TEString (f expr) (extend (const (f expr)) s)
 
-data TLit a
-  = TLString a Text
+data TIString a = TIString a [TIChunk a]
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
-instance Comonad TLit where
-  extract (TLString a _) =
-    a
-  extend f a@(TLString _ s) =
-    TLString (f a) s
+instance Comonad TIString where
+  extract (TIString a _) = a
+  extend f str =
+    case str of
+      TIString _ ss ->
+        TIString (f str) (fmap (extend (const (f str))) ss)
+
+data TIChunk a
+  = TStringChunk a Text
+  | TExprChunk a (TExpr a)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+instance Comonad TIChunk where
+  extract chunk =
+    case chunk of
+      TStringChunk a _ ->
+        a
+      TExprChunk a _ ->
+        a
+  extend f chunk =
+    case chunk of
+      TStringChunk _ t ->
+        TStringChunk (f chunk) t
+      TExprChunk _ e ->
+        TExprChunk (f chunk) (extend (const (f chunk)) e)
 
 data TAlt a
   = TAlt a (TPattern a) (TExpr a)

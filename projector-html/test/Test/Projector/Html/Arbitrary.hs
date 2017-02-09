@@ -151,18 +151,33 @@ genAttributeName =
 genAttributeValue :: Int -> Jack (TAttrValue ())
 genAttributeValue k =
   if k <= 2
-    then TQuotedAttrValue () <$> genAttrValueText
+    then TQuotedAttrValue () <$> genInterpolatedString k
     else TAttrExpr () <$> genTemplateExpr k
 
-genAttrValueText :: Jack TPlainText
-genAttrValueText =
-  TPlainText <$> oneOf [
+genInterpolatedString :: Int -> Jack (TIString ())
+genInterpolatedString k = do
+  n <- chooseInt (0, k)
+  (everywhere (mkT mergeTIChunk) . TIString ()) <$>
+    listOfN 0 n
+      (oneOf [genStringChunk, fmap (TExprChunk ()) (genTemplateExpr (k - n))])
+
+genStringChunk :: Jack (TIChunk ())
+genStringChunk =
+  TStringChunk () <$> oneOf [
       pure "true"
     , pure "false"
     , pure "0"
     , elements muppets
     -- TODO arbitrary JS would be nice
     ]
+
+mergeTIChunk :: TIString () -> TIString ()
+mergeTIChunk (TIString () chunks) =
+  TIString () (go chunks)
+  where
+    go [] = []
+    go (TStringChunk _ a : TStringChunk _ b : xs) = go (TStringChunk () (a <> b) : xs)
+    go (x:xs) = x : go xs
 
 genTag :: Jack (TTag ())
 genTag =
@@ -187,21 +202,15 @@ genTemplateExpr k =
   let j = k `div` 2
       nonrec = [
           TEVar () <$> (TId <$> elements muppets)
-        , TELit () <$> genLit
         ]
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
         , TECase () <$> genTemplateExpr j <*> genTemplateAlts j
         , TELam () <$> (listOf1 (TId <$> elements simpsons)) <*> genTemplateExpr j
+        , TEString () <$> genInterpolatedString j
         , TEEach () <$> genTemplateExpr j <*> genTemplateExpr j
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
-
-genLit :: Jack (TLit ())
-genLit =
-  oneof [
-      TLString () <$> arbitrary
-    ]
 
 genTemplateAlts :: Int -> Jack (NonEmpty (TAlt ()))
 genTemplateAlts j = do

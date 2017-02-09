@@ -31,6 +31,12 @@ module Projector.Html.Core.Library (
   , nHtmlBlank
   , tHtmlBlank
   , eHtmlBlank
+  , nStringAppend
+  , tStringAppend
+  , eStringAppend
+  , nStringConcat
+  , tStringConcat
+  , eStringConcat
   ) where
 
 
@@ -60,6 +66,8 @@ exprs =
       (nHtmlText, (tHtmlText, eHtmlText))
     , (nHtmlAttrValue, (tHtmlAttrValue, eHtmlAttrValue))
     , (nHtmlBlank, (tHtmlBlank, eHtmlBlank))
+    , (nStringAppend, (tStringAppend, eStringAppend))
+    , (nStringConcat, (tStringConcat, eStringConcat))
     ]
 
 -- -----------------------------------------------------------------------------
@@ -180,6 +188,8 @@ eHtmlText =
     (ECon () (Constructor "Html") nHtml
       [EList () tHtmlNode [ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")]]])
 
+-- -----------------------------------------------------------------------------
+
 nHtmlAttrValue :: Name
 nHtmlAttrValue =
   Name "attrValue"
@@ -193,6 +203,8 @@ eHtmlAttrValue =
   lam (Name "t") (Just (TLit TString))
     (con (Constructor "AttributeValue") nAttributeValue [var (Name "t")])
 
+-- -----------------------------------------------------------------------------
+
 nHtmlBlank :: Name
 nHtmlBlank =
   Name "blank"
@@ -205,3 +217,31 @@ eHtmlBlank :: HtmlExpr ()
 eHtmlBlank =
   con (Constructor "Html") nHtml
     [list tHtmlNode []]
+
+-- -----------------------------------------------------------------------------
+
+nStringAppend :: Name
+nStringAppend =
+  Name "append"
+
+tStringAppend :: HtmlType
+tStringAppend =
+  TArrow (TLit TString) (TArrow (TLit TString) (TLit TString))
+
+eStringAppend :: HtmlExpr ()
+eStringAppend =
+  foreign_ nStringAppend tStringAppend
+
+-- -----------------------------------------------------------------------------
+
+nStringConcat :: Name
+nStringConcat =
+  Name "concat"
+
+tStringConcat :: HtmlType
+tStringConcat =
+  TArrow (TList (TLit TString)) (TLit TString)
+
+eStringConcat :: HtmlExpr ()
+eStringConcat =
+  foreign_ nStringConcat tStringConcat
