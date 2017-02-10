@@ -83,7 +83,7 @@ testTemplate =
         TElement () (TTag () "h1") [
             TAttribute ()
               (TAttrName "display")
-              (TQuotedAttrValue () (TPlainText "inline-block"))
+              (TQuotedAttrValue () (TIString () [TStringChunk () "inline-block"]))
           ] (THtml () [
            TPlain () (TPlainText "Hello, world!")
           ])
@@ -187,8 +187,8 @@ attrTokens attr =
 attrValueTokens :: TAttrValue a -> DList (Token)
 attrValueTokens aval =
   case aval of
-    TQuotedAttrValue _ (TPlainText t) ->
-      [AttValueQ t]
+    TQuotedAttrValue _ s ->
+      stringTokens s
     TAttrExpr _ expr ->
       mconcat [
           [ExprStart]
@@ -231,16 +231,30 @@ exprTokens expr =
         , exprTokens g
         , [ExprRParen]
         ]
-    TELit _ l ->
-      litTokens l
     TENode _ n ->
       nodeTokens n
+    TEString _ s ->
+      stringTokens s
 
-litTokens :: TLit a -> DList (Token)
-litTokens l =
-  case l of
-    TLString _ s ->
-      [LitString s]
+stringTokens :: TIString a -> DList (Token)
+stringTokens (TIString _ ss) =
+  mconcat [
+      [StringStart]
+    , mconcat (fmap chunkTokens ss)
+    , [StringEnd]
+    ]
+
+chunkTokens :: TIChunk a -> DList (Token)
+chunkTokens chunk =
+  case chunk of
+    TStringChunk _ t ->
+      [StringChunk t]
+    TExprChunk _ e ->
+      mconcat [
+         [ExprStart]
+       , exprTokens e
+       , [ExprEnd]
+       ]
 
 altsTokens :: NonEmpty (TAlt a) -> DList (Token)
 altsTokens =

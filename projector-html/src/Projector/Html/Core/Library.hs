@@ -7,27 +7,36 @@ module Projector.Html.Core.Library (
     types
   , exprs
   -- * Types
+  -- ** Tag
   , tTag
   , nTag
+  -- ** Attributes
   , tAttribute
   , nAttribute
+  -- *** Attribute keys
   , tAttributeKey
   , nAttributeKey
+  -- *** Attribute values
   , tAttributeValue
   , nAttributeValue
+  -- ** Html
   , tHtml
   , nHtml
   , dHtml
+  -- *** Html nodes
   , tHtmlNode
   , nHtmlNode
   , dHtmlNode
   -- * Expressions
+  -- ** text
   , nHtmlText
   , tHtmlText
   , eHtmlText
+  -- ** attrValue
   , nHtmlAttrValue
   , tHtmlAttrValue
   , eHtmlAttrValue
+  -- ** blank
   , nHtmlBlank
   , tHtmlBlank
   , eHtmlBlank
@@ -180,6 +189,8 @@ eHtmlText =
     (ECon () (Constructor "Html") nHtml
       [EList () tHtmlNode [ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")]]])
 
+-- -----------------------------------------------------------------------------
+
 nHtmlAttrValue :: Name
 nHtmlAttrValue =
   Name "attrValue"
@@ -193,6 +204,8 @@ eHtmlAttrValue =
   lam (Name "t") (Just (TLit TString))
     (con (Constructor "AttributeValue") nAttributeValue [var (Name "t")])
 
+-- -----------------------------------------------------------------------------
+
 nHtmlBlank :: Name
 nHtmlBlank =
   Name "blank"
@@ -205,3 +218,5 @@ eHtmlBlank :: HtmlExpr ()
 eHtmlBlank =
   con (Constructor "Html") nHtml
     [list tHtmlNode []]
+
+-- -----------------------------------------------------------------------------

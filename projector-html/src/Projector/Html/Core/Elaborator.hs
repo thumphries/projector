@@ -13,6 +13,7 @@ import           P
 import           Projector.Core
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
+import qualified Projector.Html.Data.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Template
 
@@ -88,7 +89,7 @@ eAttr attr =
     TEmptyAttribute a name ->
       ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
           eAttrKey a name
-        , eAttrVal (TQuotedAttrValue a (TPlainText ""))
+        , eAttrVal (TQuotedAttrValue a (TIString a []))
         ]
 
 eAttrKey :: a -> TAttrName -> HtmlExpr (Annotation a)
@@ -100,8 +101,8 @@ eAttrVal aval =
   let mkVal a t =
         ECon  (AttributeExpression a) (Constructor "AttributeValue") Lib.nAttributeValue [t]
   in case aval of
-       TQuotedAttrValue a (TPlainText t) ->
-         mkVal a (stringLit a t)
+       TQuotedAttrValue a str ->
+         mkVal a (eStr str)
        TAttrExpr _ expr ->
          eExpr expr
 
@@ -116,8 +117,6 @@ eExpr expr =
       EApp (FunctionApplication a) (eExpr f) (eExpr g)
     TECase a e alts ->
       ECase (CaseExpression a) (eExpr e) (NE.toList (fmap eAlt alts))
-    TELit _ l ->
-      eLit l
     TEEach a f g ->
       ECon (SourceAnnotation a) (Constructor "Html") Lib.nHtml . pure $
         EMap (SourceAnnotation a)
@@ -126,16 +125,28 @@ eExpr expr =
               [EApp (SourceAnnotation a) (eExpr g) (EVar (SourceAnnotation a) (Name "x"))]
             )
           (eExpr f)
+    TEString _ s ->
+      eStr s
     TENode a e ->
       ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [
           EList (HtmlBlock a) Lib.tHtmlNode [eNode e]
         ]
 
-eLit :: TLit a -> HtmlExpr (Annotation a)
-eLit l =
-  case l of
-    TLString a s ->
-      ELit (StringLiteral a) $ VString s
+eStr :: TIString a -> HtmlExpr (Annotation a)
+eStr (TIString a chunks) =
+-- TODO custom annotation
+  EApp
+    (SourceAnnotation a)
+    (fmap (const (LibraryFunction Prim.nStringConcat)) Prim.eStringConcat)
+    (EList (SourceAnnotation a) (TLit TString) (fmap eChunk chunks))
+
+eChunk :: TIChunk a -> HtmlExpr (Annotation a)
+eChunk chunk =
+  case chunk of
+    TStringChunk a t ->
+      ELit (SourceAnnotation a) (VString t)
+    TExprChunk _ e ->
+      eExpr e
 
 -- curried function
 funX :: a -> NonEmpty Name -> HtmlExpr (Annotation a) -> HtmlExpr (Annotation a)

@@ -37,7 +37,9 @@ data Token
   | WhiteSpace      -- [ \t\r\n]+
   | HtmlComment Text -- <!-- foo -->
   | HtmlText Text   -- Hello!
-  | LitString Text  -- "text"
+  | StringStart     -- "
+  | StringEnd       -- "
+  | StringChunk Text -- foo
   -- Exprs
   | ExprStart       -- {
   | ExprEnd         -- }
@@ -85,7 +87,9 @@ renderToken tok =
     WhiteSpace      -> " "
     HtmlComment t   -> "<!--" <> t <> "-->" -- TODO this should be three tokens
     HtmlText t      -> escape t
-    LitString t     -> "\"" <> escapeLiteral t <> "\""
+    StringStart     -> "\""
+    StringEnd       -> "\""
+    StringChunk t   -> escapeLiteral t
 
     ExprStart       -> "{"
     ExprEnd         -> "}"
@@ -122,3 +126,5 @@ escapeLiteral =
   . T.replace "\n" "\\n"
   . T.replace "\r" "\\r"
   . T.replace "\\" "\\\\"
+  . T.replace "{" "\\{"
+  . T.replace "}" "\\}"

@@ -34,7 +34,7 @@ prop_empty_module =
 prop_library_module =
   once . moduleProp (ModuleName "Test.Purescript.Library") $ Module {
       moduleTypes = Lib.types <> Prim.types
-    , moduleImports = mempty
+    , moduleImports = M.fromList [(htmlRuntime, OpenImport)]
     , moduleExprs = Lib.exprs <> M.fromList [
           helloWorld
         ]
