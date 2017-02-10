@@ -13,6 +13,7 @@ import           P
 import           Projector.Core
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
+import qualified Projector.Html.Data.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Template
 
@@ -136,7 +137,7 @@ eStr (TIString a chunks) =
 -- TODO custom annotation
   EApp
     (SourceAnnotation a)
-    (fmap (const (LibraryFunction Lib.nStringConcat)) Lib.eStringConcat)
+    (fmap (const (LibraryFunction Prim.nStringConcat)) Prim.eStringConcat)
     (EList (SourceAnnotation a) (TLit TString) (fmap eChunk chunks))
 
 eChunk :: TIChunk a -> HtmlExpr (Annotation a)

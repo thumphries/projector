@@ -7,36 +7,39 @@ module Projector.Html.Core.Library (
     types
   , exprs
   -- * Types
+  -- ** Tag
   , tTag
   , nTag
+  -- ** Attributes
   , tAttribute
   , nAttribute
+  -- *** Attribute keys
   , tAttributeKey
   , nAttributeKey
+  -- *** Attribute values
   , tAttributeValue
   , nAttributeValue
+  -- ** Html
   , tHtml
   , nHtml
   , dHtml
+  -- *** Html nodes
   , tHtmlNode
   , nHtmlNode
   , dHtmlNode
   -- * Expressions
+  -- ** text
   , nHtmlText
   , tHtmlText
   , eHtmlText
+  -- ** attrValue
   , nHtmlAttrValue
   , tHtmlAttrValue
   , eHtmlAttrValue
+  -- ** blank
   , nHtmlBlank
   , tHtmlBlank
   , eHtmlBlank
-  , nStringAppend
-  , tStringAppend
-  , eStringAppend
-  , nStringConcat
-  , tStringConcat
-  , eStringConcat
   ) where
 
 
@@ -66,8 +69,6 @@ exprs =
       (nHtmlText, (tHtmlText, eHtmlText))
     , (nHtmlAttrValue, (tHtmlAttrValue, eHtmlAttrValue))
     , (nHtmlBlank, (tHtmlBlank, eHtmlBlank))
-    , (nStringAppend, (tStringAppend, eStringAppend))
-    , (nStringConcat, (tStringConcat, eStringConcat))
     ]
 
 -- -----------------------------------------------------------------------------
@@ -219,29 +220,3 @@ eHtmlBlank =
     [list tHtmlNode []]
 
 -- -----------------------------------------------------------------------------
-
-nStringAppend :: Name
-nStringAppend =
-  Name "append"
-
-tStringAppend :: HtmlType
-tStringAppend =
-  TArrow (TLit TString) (TArrow (TLit TString) (TLit TString))
-
-eStringAppend :: HtmlExpr ()
-eStringAppend =
-  foreign_ nStringAppend tStringAppend
-
--- -----------------------------------------------------------------------------
-
-nStringConcat :: Name
-nStringConcat =
-  Name "concat"
-
-tStringConcat :: HtmlType
-tStringConcat =
-  TArrow (TList (TLit TString)) (TLit TString)
-
-eStringConcat :: HtmlExpr ()
-eStringConcat =
-  foreign_ nStringConcat tStringConcat
