@@ -87,6 +87,10 @@ renderModule mn@(ModuleName n) m =
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
+        , "{-# OPTIONS_GHC -fno-warn-unused-imports #-}"
+        -- FIX This is because of each introducing a lambda with a constant variable "x"
+        -- We should be writing the tree to stop shadowing in the output
+        , "{-# OPTIONS_GHC -fno-warn-name-shadowing #-}"
         ]
       (_mn', m') = second toHaskellModule (rewriteModule mn m)
       modName = T.unwords ["module", n, "where"]
