@@ -106,7 +106,7 @@ cinemaBuild b msp tg mdg o = do
     let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
     pure (stripPrefix, body)
   -- Run the build
-  BuildArtefacts out <- hoistEither (first BuildError (runBuild b udts rts))
+  BuildArtefacts out _ <- hoistEither (first BuildError (runBuild b udts rts))
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
