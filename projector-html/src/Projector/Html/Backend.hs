@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Backend (
-    Backend
+    Backend (..)
   , BackendT (..)
   , getBackend
   , BackendError (..)

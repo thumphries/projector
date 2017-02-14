@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Html.Arbitrary where
 
@@ -19,6 +20,8 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
+import           Projector.Html
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim as Prim
@@ -34,7 +37,7 @@ import           Test.QuickCheck.Jack hiding (listOf1)
 
 genHtmlTypeDecls :: Jack HtmlDecls
 genHtmlTypeDecls =
-  genTypeDecls htmlTypes genTypeName genConstructor genHtmlLitT
+  genTypeDecls htmlTypes genHtmlLitT
 
 genWellTypedHtmlExpr :: HtmlDecls -> Jack (HtmlType, HtmlExpr ())
 genWellTypedHtmlExpr ctx = do
@@ -42,13 +45,17 @@ genWellTypedHtmlExpr ctx = do
   ex <- genWellTypedExpr ctx ty (genHtmlType ctx) genWellTypedHtmlLit
   pure (ty, ex)
 
-genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT ())
-genWellTypedHtmlModule n decls =
-  let ourDecls = subtractTypes decls htmlTypes in
-  Module
+genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT (HtmlType, SrcAnnotation))
+genWellTypedHtmlModule n decls = do
+  let ourDecls = subtractTypes decls htmlTypes
+  modl <- Module
     <$> pure ourDecls
     <*> pure (M.fromList [(htmlRuntime, OpenImport)])
     <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions ourDecls) (genHtmlType decls) genWellTypedHtmlLit
+  either
+    (\e -> (fail ("invariant: module was not well-typed!\n" <> show e)))
+    pure
+    (checkModule ourDecls (fmap (const EmptyAnnotation) modl))
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =

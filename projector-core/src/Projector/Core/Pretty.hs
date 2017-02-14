@@ -61,16 +61,27 @@ ppTypeError' err =
                , ". Perhaps you meant one of:"
                , T.intercalate ", " (fmap (unConstructor . fst) cts)
                ])
-    BadConstructorArity (Constructor c) (DVariant cts) i a ->
+        DRecord _ ->
+          WL.annotate a $
+          text
+            (mconcat
+               [ "Invalid constructor! '"
+               , c
+               , "' is not a constructor for"
+               , tn
+               , ". Perhaps you meant: "
+               , tn
+               ])
+    BadConstructorArity (Constructor c) i j a ->
       WL.annotate a $
       text
         (T.unwords
            [ "Constructor"
            , c
            , "expects"
-           , renderIntegral (length cts)
-           , "arguments, but received"
            , renderIntegral i
+           , "arguments, but received"
+           , renderIntegral j
            ])
     BadPatternArity (Constructor c) ty nexp ngot a ->
       WL.annotate a $
@@ -88,11 +99,26 @@ ppTypeError' err =
                ])))
     BadPatternConstructor (Constructor c) a ->
       WL.annotate a (text "Unknown constructor: " WL.<> WL.squotes (text c))
+    MissingRecordField (TypeName tn) (FieldName fn) a ->
+      WL.annotate a (text "Missing record field for type " WL.<> WL.squotes (text tn) WL.<> text ": " WL.<> WL.squotes (text fn))
+    ExtraRecordField (TypeName tn) (FieldName fn) a ->
+      WL.annotate a (text "Extraneous record field for type " WL.<> WL.squotes (text tn) WL.<> text ": " WL.<> WL.squotes (text fn))
+    DuplicateRecordFields (TypeName tn) fns a ->
+      WL.annotate a $
+        WL.hang 2
+          (text "Duplicate record fields for type " WL.<> WL.squotes (text tn) WL.<> text ":"
+          WL.<$$> (WL.hcat (WL.punctuate WL.comma (fmap (text . unFieldName) fns))))
+
     UndeclaredType (TypeName n) a ->
       WL.annotate a (text "Undeclared type: " WL.<> WL.squotes (text n))
     InferenceError a ->
       -- TODO this error is really awful
       WL.annotate a (text "Could not infer a monotype for some expression.")
+    RecordInferenceError fts a ->
+      WL.annotate a $
+        WL.hang 2
+          ((text "Could not infer the full type for the record with fields")
+           WL.<$$> (WL.semiBraces (fmap (\(FieldName fn, ty) -> text fn WL.<> text " : " WL.<> text (ppType ty)) fts)))
     InfiniteType (t1, a) (t2, b) ->
       WL.hang 2
         (text "Type error (occurs check) - cannot construct the infinite type!"
@@ -144,6 +170,8 @@ ppType' ctx verbose t =
       in ty <> case (verbose, mty) of
            (True, Just (DVariant cts)) ->
              " = " <> ppConstructors cts
+           (True, Just (DRecord fts)) ->
+             " = " <> ppRecordFields fts
            (False, _) ->
              T.empty
            (_, Nothing) ->
@@ -158,6 +186,10 @@ ppType' ctx verbose t =
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =
   T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))
+
+ppRecordFields :: Ground l => [(FieldName, Type l)] -> Text
+ppRecordFields =
+  T.intercalate " , " . fmap (\(FieldName fn, ty) -> T.unwords [fn, ":", ppType ty])
 
 -- -----------------------------------------------------------------------------
 
@@ -209,6 +241,14 @@ ppExpr' types e =
           </> (foldr (\(p, g) doc ->
                      (WL.hang 2 ((text (ppPattern p) <+> text "->") </> ppExpr' types g))
                  </> (doc WL.<> text ";")) WL.empty bs))
+
+    ERec a (TypeName tn) fes ->
+      WL.annotate a . WL.hang 2 . WL.parens $
+        text tn <+> WL.encloseSep WL.lbrace WL.rbrace WL.comma
+          (fmap (\(FieldName fn, fe) -> text fn <+> text "=" <+> ppExpr' types fe) fes)
+
+    EPrj a f fn ->
+      WL.annotate a . WL.hang 2 $ ppExpr' types f WL.<> text ("." <> unFieldName fn)
 
     EList a es ->
       WL.annotate a $ WL.hang 2 (WL.list (fmap (ppExpr' types) es))

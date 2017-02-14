@@ -14,10 +14,11 @@ import           Projector.Html.Data.Position
 
 
 data Annotation a
-  -- TODO we want to swap SourceAnnotation for something a little more specific
-  = SourceAnnotation a
+  = EmptyAnnotation
+  | SourceAnnotation a
   | LibraryFunction Name
   | DataConstructor Constructor TypeName
+  | RecordConstructor TypeName
   | TypeSignature a
   | Variable Name a
   | CaseExpression a
@@ -37,12 +38,16 @@ type SrcAnnotation = Annotation Range
 renderAnnotation :: (a -> Text) -> Annotation a -> Text
 renderAnnotation f ann =
   case ann of
+    EmptyAnnotation ->
+      "(no source information)"
     SourceAnnotation r ->
       f r
     LibraryFunction (Name n) ->
       "In the standard library function '" <> n <> "'"
     DataConstructor (Constructor c) (TypeName tn) ->
       "In the data constructor '" <> c <> "' for type '" <> tn <> "'"
+    RecordConstructor (TypeName tn) ->
+      "In the constructor for record '" <> tn <> "'"
     TypeSignature r ->
       f r <> " in a type signature"
     Variable (Name n) r ->

@@ -20,8 +20,7 @@ import qualified Projector.Core as Core
 import           Projector.Html
 import qualified Projector.Html as Html
 import           Projector.Html.Data.Annotation
-import qualified Projector.Html.Backend.Haskell as Haskell
-import qualified Projector.Html.Backend.Purescript as Purescript
+import           Projector.Html.Backend as Backend
 import qualified Projector.Html.Pretty as HP
 
 import           System.Console.Haskeline as HL
@@ -239,10 +238,10 @@ runReplCommand cmd =
       let dump = pure . ReplSuccess . Core.ppType
       withBind name $ dump . boundType
     DumpHaskell name -> do
-      let dump = pure . ReplSuccess . Haskell.renderExpr (Core.Name name)
+      let dump = renderHaskellExpr (Core.Name name)
       withBind name $ dump . boundCore
     DumpPurescript name -> do
-      let dump = pure . ReplSuccess . Purescript.renderExpr (Core.Name name)
+      let dump = renderPurescriptExpr (Core.Name name)
       withBind name $ dump . boundCore
     SetMultiline -> do
       Repl (modify' (\s -> s { replMultiline = True }))
@@ -266,6 +265,21 @@ parseTemplate' f t =
       ast <- hoistEither (Html.parseTemplate f t)
       (ty, core) <- hoistEither (Html.checkTemplateIncremental mempty k ast)
       pure (ast, ty, core)
+
+renderHaskellExpr :: Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
+renderHaskellExpr =
+  renderExpr' Backend.Haskell
+
+renderPurescriptExpr :: Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
+renderPurescriptExpr =
+  renderExpr' Backend.Purescript
+
+renderExpr' :: Backend.BackendT -> Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
+renderExpr' b n expr =
+  Repl $ do
+    lift (hoistEither (bimap (ReplError . HtmlBackendError) ReplSuccess
+      (Backend.renderExpr (Backend.getBackend b) n expr)))
+
 
 err :: ReplError -> Repl a
 err =

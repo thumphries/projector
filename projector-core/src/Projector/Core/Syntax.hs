@@ -25,6 +25,10 @@ module Projector.Core.Syntax (
   , case_
   , con
   , con_
+  , rec_
+  , rec__
+  , prj
+  , prj_
   , list
   , foreign_
   , foreign_'
@@ -71,6 +75,8 @@ data Expr l a
   | EApp a (Expr l a) (Expr l a)
   | ECon a Constructor TypeName [Expr l a]
   | ECase a (Expr l a) [(Pattern a, Expr l a)]
+  | ERec a TypeName [(FieldName, Expr l a)]
+  | EPrj a (Expr l a) FieldName
   | EList a [Expr l a]
   | EMap a (Expr l a) (Expr l a)
   | EForeign a Name (Type l)
@@ -92,6 +98,10 @@ extractAnnotation e =
     EApp a _ _ ->
       a
     ECon a _ _ _ ->
+      a
+    ERec a _ _ ->
+      a
+    EPrj a _ _ ->
       a
     ECase a _ _ ->
       a
@@ -119,6 +129,10 @@ setAnnotation a e =
       ECon a b c d
     ECase _ b c ->
       ECase a b c
+    ERec _ b c ->
+      ERec a b c
+    EPrj _ b c ->
+      EPrj a b c
     EList _ b ->
       EList a b
     EMap _ b c ->
@@ -186,6 +200,22 @@ con_ :: Text -> Text -> [Expr l ()] -> Expr l ()
 con_ c t =
   con (Constructor c) (TypeName t)
 
+rec_ :: TypeName -> [(FieldName, Expr l ())] -> Expr l ()
+rec_ tn fes =
+  ERec () tn fes
+
+rec__ :: Text -> [(Text, Expr l ())] -> Expr l ()
+rec__ tn fes =
+  rec_ (TypeName tn) (fmap (first FieldName) fes)
+
+prj :: Expr l () -> FieldName -> Expr l ()
+prj =
+  EPrj ()
+
+prj_ :: Expr l () -> Text -> Expr l ()
+prj_ e t =
+  prj e (FieldName t)
+
 list :: [Expr l ()] -> Expr l ()
 list =
  EList ()
@@ -246,6 +276,12 @@ foldFree f acc expr =
                     foldl' patBinds bnd pats
           in foldl' (\a (p, ee) -> go f' ee (patBinds bound p) a) (go f' e bound acc') $! pes
 
+        ERec _ _ fes ->
+          foldl' (\a (_fn, e) -> go f' e bound a) acc' fes
+
+        EPrj _ e _ ->
+          go f' e bound acc'
+
         EList _ es ->
           foldl' (\a e -> go f' e bound a) acc' es
 
@@ -297,6 +333,12 @@ mapGround tmap vmap expr =
     ECase a e pes ->
       ECase a (mapGround tmap vmap e) (fmap (fmap (mapGround tmap vmap)) pes)
 
+    ERec a tn fes ->
+      ERec a tn (fmap (fmap (mapGround tmap vmap)) fes)
+
+    EPrj a e f ->
+      EPrj a (mapGround tmap vmap e) f
+
     EList a es ->
       EList a (fmap (mapGround tmap vmap) es)
 
@@ -338,6 +380,12 @@ foldrExprM fx fp acc expr =
           pes
       acc'' <- foldrExprM fx fp acc' e
       fx expr acc''
+    ERec _ _ fes -> do
+      acc' <- foldrM (\a b -> foldrExprM fx fp b (snd a)) acc fes
+      fx expr acc'
+    EPrj _ e _ -> do
+      acc' <- foldrExprM fx fp acc e
+      fx expr acc'
     EList _ es -> do
       acc' <- foldrM (flip (foldrExprM fx fp)) acc es
       fx expr acc'
@@ -403,6 +451,12 @@ foldlExprM fx fp acc expr =
         (\a (pat, ex) -> foldlPatternM fp a pat >>= \a' -> foldlExprM fx fp a' ex)
         acc''
         pes
+    ERec _ _ fes -> do
+      acc' <- fx acc expr
+      foldM (foldlExprM fx fp) acc' (fmap snd fes)
+    EPrj _ e _ -> do
+      acc' <- fx acc expr
+      foldlExprM fx fp acc' e
     EList _ es -> do
       acc' <- fx acc expr
       foldM (foldlExprM fx fp) acc' es

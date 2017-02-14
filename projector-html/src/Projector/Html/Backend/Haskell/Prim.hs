@@ -72,6 +72,8 @@ toHaskellTypeDecls (TypeDecls decls) =
     case decl of
       DVariant cts ->
         DVariant (with cts (fmap (fmap toHaskellType)))
+      DRecord fts ->
+        DRecord (with fts (fmap toHaskellType))
 
 -- if we encounter library types we also have to tweak them
 swapLibTypes :: HaskellType -> HaskellType

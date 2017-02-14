@@ -12,10 +12,10 @@ the following features:
 - Damas-Milner polymorphism (TODO)
 - A configurable set of ground/primitive types
 - Variants (sum types)
-- Records (product types) (TODO)
+- Records (product types)
 - Damas-Milner type inference
   - The record system is quite simplistic. Records require some
-    hinting! (TODO)
+    hinting!
 - Termination checker (TODO)
 
 The `projector-core` package includes the syntax and type definitions,

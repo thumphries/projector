@@ -31,11 +31,22 @@ data BackendT
   | Purescript
   deriving (Eq, Ord, Show)
 
+-- | Backends take typechecked modules and expressions to target
+-- platform source code, with a validation pass derived from a set of
+-- predicates.
 data Backend a e = Backend {
-    renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
-  , renderExpr :: Name -> HtmlExpr a -> Text
+    renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either e (FilePath, Text)
+  , renderExpr :: Name -> HtmlExpr (HtmlType, a) -> Either e Text
   , predicates :: [Predicate a e]
-  } deriving (Functor)
+  }
+
+instance Functor (Backend a) where
+  fmap f (Backend m e p) =
+    Backend {
+        renderModule = fmap (fmap (first f)) m
+      , renderExpr = fmap (fmap (first f)) e
+      , predicates = fmap (fmap f) p
+      }
 
 data Predicate a e
   = ExprPredicate (HtmlExpr a -> PredResult e)
