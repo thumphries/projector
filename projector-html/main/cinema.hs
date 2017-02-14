@@ -153,7 +153,7 @@ buildP =
   Build
     <$> optional backendP
     <*> prefixP
-    <*> optional dataModuleNameP
+    <*> many dataModuleNameP
 
 backendP :: Parser BackendT
 backendP =

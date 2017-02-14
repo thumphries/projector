@@ -149,7 +149,7 @@ codeGenModule backend =
 data Build = Build {
     buildBackend :: Maybe HB.BackendT -- ^ The type of code to generate.
   , buildModulePrefix :: ModulePrefix -- ^ A prefix to be prepended to generated module names.
-  , buildDataModule :: Maybe DataModuleName -- ^ The module containing user datatypes.
+  , buildDataModules :: [DataModuleName] -- ^ The modules containing user datatypes.
   } deriving (Eq, Ord, Show)
 
 newtype ModulePrefix = ModulePrefix {
@@ -215,7 +215,7 @@ validateModules backend mods =
 -- * the module name is also derived from the filepath
 -- * we expect all user datatypes to be exported from a single module
 smush ::
-     Maybe DataModuleName
+     [DataModuleName]
   -> ModulePrefix
   -> RawTemplates
   -> Either
@@ -230,7 +230,7 @@ smush mdm (ModulePrefix prefix) (RawTemplates templates) = do
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
       , HB.moduleImports = M.fromList $
-          (HB.htmlRuntime, HB.OpenImport) : maybe [] (\(DataModuleName dm) -> [(dm, HB.OpenImport)]) mdm
+          (HB.htmlRuntime, HB.OpenImport) : fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
       , HB.moduleExprs = M.singleton expn ((), core)
       })
   pure (buildModuleGraph mmap, mmap)
