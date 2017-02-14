@@ -217,6 +217,7 @@ typeVar ty =
     I (Am _ _) ->
       Nothing
 
+
 -- -----------------------------------------------------------------------------
 -- Monad stack
 
@@ -283,6 +284,7 @@ freshTypeVar a =
 
 data Constraint l a
   = Equal (IType l a) (IType l a)
+  | HasField (IType l a) (FieldName, IType l a)
   deriving (Eq, Ord, Show)
 
 -- | Record a new constraint.
@@ -345,6 +347,7 @@ withBinding :: Ground l => Name -> Check l a b -> Check l a ([IType l a], b)
 withBinding x k = do
   (as, b) <- withBindings [x] k
   pure (fromMaybe mempty (M.lookup x as), b)
+
 
 -- -----------------------------------------------------------------------------
 -- Constraint generation
