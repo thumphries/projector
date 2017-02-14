@@ -109,19 +109,19 @@ checkTemplateIncremental known ast =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () PrimT SrcAnnotation
-  -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
-checkModule decls (HB.Module typs imps exps) = do
+  -> UncheckedHtmlModule SrcAnnotation
+  -> Either HtmlError (CheckedHtmlModule (HtmlType, SrcAnnotation))
+checkModule decls (UncheckedHtmlModule (HB.Module typs imps exps)) = do
   exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
-  pure (HB.Module typs imps exps')
+  pure (CheckedHtmlModule (HB.Module typs imps exps'))
 
 -- | Figure out the dependency order of a set of modules, then
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
   -> Map PC.Name (HtmlType, SrcAnnotation)
-  -> Map HB.ModuleName (HB.Module () PrimT SrcAnnotation)
-  -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
+  -> Map HB.ModuleName (UncheckedHtmlModule SrcAnnotation)
+  -> Either HtmlError (Map HB.ModuleName (CheckedHtmlModule (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names
   first HtmlCoreError (fmap fst (foldM fun (mempty, HC.constructorFunctions decls <> known) deps))
