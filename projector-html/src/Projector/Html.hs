@@ -8,6 +8,7 @@ module Projector.Html (
   -- * Builds
   , Build (..)
   , runBuild
+  , runBuildIncremental
   , RawTemplates (..)
   , BuildArtefacts (..)
   , DataModuleName (..)
@@ -163,9 +164,12 @@ newtype RawTemplates = RawTemplates {
     unRawTemplates :: [(FilePath, Text)]
   } deriving (Eq, Ord, Show)
 
-newtype BuildArtefacts = BuildArtefacts {
-    unBuildArtefacts :: [(FilePath, Text)]
-  } deriving (Eq, Ord, Show)
+data BuildArtefacts = BuildArtefacts {
+    buildArtefactsTemplates :: [(FilePath, Text)]
+  , buildArtefactsHtmlModules :: HtmlModules
+  } deriving (Eq, Show)
+
+type HtmlModules = Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 
 newtype DataModuleName = DataModuleName {
     unDataModuleName :: HB.ModuleName
@@ -183,21 +187,25 @@ newtype ModuleNamer = ModuleNamer {
 --
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
 runBuild :: Build -> UserDataTypes -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuild (Build mb mnr mdm) (UserDataTypes dfs) rts = do
+runBuild b udt rts =
+  runBuildIncremental b udt mempty rts
+
+runBuildIncremental :: Build -> UserDataTypes -> HtmlModules -> RawTemplates -> Either [HtmlError] BuildArtefacts
+runBuildIncremental (Build mb mnr mdm) (UserDataTypes dfs) hms rts = do
   -- Build the module map
-  (mg, mmap) <- smush mdm mnr rts
+  (mg, mmap) <- smush mdm mnr hms rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  checked <- first pure (checkModules (CM.machinatorDecls dfs) libraryExprs mmap)
+  checked <- first pure (checkModules (CM.machinatorDecls dfs) (libraryExprs <> HB.extractModuleBindings hms) mmap)
   -- If there's a backend, codegen (this can be a lazy stream)
   case mb of
     Just backend -> do
       validateModules backend checked
-      pure (BuildArtefacts (M.elems (M.mapWithKey (codeGenModule backend) checked)))
+      pure (BuildArtefacts (M.elems (M.mapWithKey (codeGenModule backend) checked)) checked)
     Nothing ->
-      pure (BuildArtefacts [])
+      pure (BuildArtefacts [] checked)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
@@ -218,12 +226,15 @@ validateModules backend mods =
 smush ::
      [DataModuleName]
   -> ModuleNamer
+  -> HtmlModules
   -> RawTemplates
   -> Either
        [HtmlError]
        (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
-smush mdm mnr (RawTemplates templates) = do
-  mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
+smush mdm mnr hms (RawTemplates templates) = do
+  let
+    known = fmap (M.keysSet . HB.moduleExprs) hms
+  mmap <- fmap (deriveImportsIncremental known . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)
     let core = Elab.elaborate ast
         modn = pathToModuleName mnr fp

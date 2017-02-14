@@ -8,6 +8,7 @@ module Projector.Html.ModuleGraph (
   , DependencyGraph (..)
   , buildDependencyGraph
   , deriveImports
+  , deriveImportsIncremental
   , dependencyOrder
   , rebuildOrder
   , detectCycles
@@ -49,12 +50,16 @@ newtype DependencyGraph = DependencyGraph {
 -- Since we have globally-unique names (i.e. our modules are a
 -- compilation detail), we can figure these out automatically.
 deriveImports :: Map ModuleName (Module b l a) -> Map ModuleName (Module b l a)
-deriveImports mods =
+deriveImports =
+  deriveImportsIncremental mempty
+
+deriveImportsIncremental :: Map ModuleName (Set Name) -> Map ModuleName (Module b l a) -> Map ModuleName (Module b l a)
+deriveImportsIncremental known mods =
   let modfrees :: Map ModuleName (Set Name)
       modfrees = fmap moduleFree mods
 
       modbinds :: Map ModuleName (Set Name)
-      modbinds = fmap moduleBound mods
+      modbinds = known <> fmap moduleBound mods
 
       inverted :: Map Name ModuleName
       inverted = M.foldMapWithKey (\k vs -> foldl' (\acc v -> M.insert v k acc) mempty vs) modbinds

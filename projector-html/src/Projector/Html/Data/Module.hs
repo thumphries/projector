@@ -1,4 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Module (
     ModuleName (..)
@@ -6,6 +9,7 @@ module Projector.Html.Data.Module (
   , Module (..)
   , moduleFree
   , moduleBound
+  , extractModuleBindings
   , Imports (..)
   ) where
 
@@ -33,7 +37,7 @@ data Module b l a = Module {
     moduleTypes :: TypeDecls l
   , moduleImports :: Map ModuleName Imports
   , moduleExprs :: Map Name (b, Expr l a)
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance Ground l => Monoid (Module b l a) where
   mempty = Module mempty mempty mempty
@@ -52,6 +56,10 @@ moduleFree (Module _types _imports exprs) =
 moduleBound :: Module b l a -> Set Name
 moduleBound (Module _types _imports exprs) =
   S.fromList (M.keys exprs)
+
+extractModuleBindings :: Map k (Module b l a) -> Map Name a
+extractModuleBindings =
+  foldMap (fmap (extractAnnotation . snd) . moduleExprs) . M.elems
 
 data Imports
   = OpenImport
