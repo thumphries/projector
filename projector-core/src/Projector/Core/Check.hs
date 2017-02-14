@@ -146,7 +146,9 @@ typeTree decls expr = do
 --
 -- i.e. regular types, recursively extended with annotations and an
 -- extra constructor, 'IDunno', representing fresh type/unification variables.
-newtype IType l a = I (IVar a (TypeF l (IType l a)))
+--
+-- We also need to track any used record field names in the type.
+newtype IType l a = I (IVar a (TypeF l (IType l a)), [Field l a])
   deriving (Eq, Ord, Show)
 
 -- | 'IVar' is an open functor equivalent to an annotated 'Either Int'.
@@ -154,6 +156,12 @@ data IVar ann a
   = Dunno ann Int
   | Am ann a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+-- | 'Field' asserts that a type has a record field of a certain type.
+data Field l a = Field {
+    fieldName :: FieldName
+  , fieldType :: IType l a
+  } deriving (Eq, Ord, Show)
 
 -- | Lift a known type into an 'IType', with an annotation.
 hoistType :: a -> Type l -> IType l a
