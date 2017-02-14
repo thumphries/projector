@@ -1,4 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Module (
     ModuleName (..)
@@ -33,7 +36,7 @@ data Module b l a = Module {
     moduleTypes :: TypeDecls l
   , moduleImports :: Map ModuleName Imports
   , moduleExprs :: Map Name (b, Expr l a)
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance Ground l => Monoid (Module b l a) where
   mempty = Module mempty mempty mempty
