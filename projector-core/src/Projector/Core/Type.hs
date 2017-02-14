@@ -24,6 +24,7 @@ module Projector.Core.Type (
   , Ground (..)
   , TypeName (..)
   , Constructor (..)
+  , FieldName (..)
   , TypeDecls (..)
   , declareType
   , lookupType
@@ -78,6 +79,7 @@ mapGroundType tmap (Type ty) =
 -- | Declared types.
 data Decl l
   = DVariant [(Constructor, [Type l])]
+  | DRecord [(FieldName, Type l)]
   deriving (Eq, Ord, Show)
 
 -- | The class of user-supplied primitive types.
@@ -93,6 +95,10 @@ newtype TypeName = TypeName { unTypeName :: Text }
 
 -- | A constructor's name.
 newtype Constructor  = Constructor { unConName :: Text }
+  deriving (Eq, Ord, Show)
+
+-- | A record field's name.
+newtype FieldName = FieldName { unRecordField :: Text }
   deriving (Eq, Ord, Show)
 
 -- | Type contexts.
@@ -123,3 +129,5 @@ lookupConstructor con (TypeDecls m) =
       DVariant cts ->
         with cts $ \(c, ts) ->
           (c, (tn, ts))
+      DRecord _ ->
+        []

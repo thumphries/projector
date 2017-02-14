@@ -69,9 +69,10 @@ data Expr l a
   | ELam a Name (Maybe (Type l)) (Expr l a)
   | EApp a (Expr l a) (Expr l a)
   | ECon a Constructor TypeName [Expr l a]
+  | EPrj a (Expr l a) FieldName
   | ECase a (Expr l a) [(Pattern a, Expr l a)]
-  | EList a (Type l) [Expr l a]
-  | EMap a (Expr l a) (Expr l a)
+  | EList a (Type l) [Expr l a]  -- TODO remove
+  | EMap a (Expr l a) (Expr l a) -- TODO remove
   | EForeign a Name (Type l)
   deriving (Functor, Foldable, Traversable)
 
@@ -91,6 +92,8 @@ extractAnnotation e =
     EApp a _ _ ->
       a
     ECon a _ _ _ ->
+      a
+    EPrj a _ _ ->
       a
     ECase a _ _ ->
       a
@@ -212,6 +215,9 @@ foldFree f acc expr =
         ECon _ _ _ es ->
           foldl' (\a e -> go f' e bound a) acc' es
 
+        EPrj _ e _ ->
+          go f' e bound acc'
+
         ECase _ e pes ->
           let patBinds bnd pat =
                 case pat of
@@ -269,6 +275,9 @@ mapGround tmap vmap expr =
     ECon a c tn es ->
       ECon a c tn (fmap (mapGround tmap vmap) es)
 
+    EPrj a e f ->
+      EPrj a (mapGround tmap vmap e) f
+
     ECase a e pes ->
       ECase a (mapGround tmap vmap e) (fmap (fmap (mapGround tmap vmap)) pes)
 
@@ -304,6 +313,9 @@ foldrExprM fx fp acc expr =
       fx expr acc''
     ECon _ _ _ es -> do
       acc' <- foldrM (flip (foldrExprM fx fp)) acc es
+      fx expr acc'
+    EPrj _ e _ -> do
+      acc' <- foldrExprM fx fp acc e
       fx expr acc'
     ECase _ e pes -> do
       acc' <-
@@ -371,6 +383,9 @@ foldlExprM fx fp acc expr =
     ECon _ _ _ es -> do
       acc' <- fx acc expr
       foldM (foldlExprM fx fp) acc' es
+    EPrj _ e _ -> do
+      acc' <- fx acc expr
+      foldlExprM fx fp acc' e
     ECase _ e pes -> do
       acc' <- fx acc expr
       acc'' <- foldlExprM fx fp acc' e
