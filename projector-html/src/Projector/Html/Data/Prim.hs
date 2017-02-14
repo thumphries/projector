@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -21,6 +25,8 @@ module Projector.Html.Data.Prim (
   , HtmlDecls
   , HtmlExpr
   , HtmlLit
+  , CheckedHtmlModule (..)
+  , UncheckedHtmlModule (..)
   , parsePrimT
   ) where
 
@@ -32,6 +38,7 @@ import qualified Data.Text as T
 import           P
 
 import           Projector.Core
+import           Projector.Html.Data.Module
 
 
 type HtmlType = Type PrimT
@@ -39,6 +46,14 @@ type HtmlDecl = Decl PrimT
 type HtmlDecls = TypeDecls PrimT
 type HtmlExpr a = Expr PrimT a
 type HtmlLit = Value PrimT
+
+newtype CheckedHtmlModule a = CheckedHtmlModule {
+    unCheckedHtmlModule :: Module HtmlType PrimT a
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+newtype UncheckedHtmlModule a = UncheckedHtmlModule {
+    unUncheckedHtmlModule :: Module () PrimT a
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- -----------------------------------------------------------------------------
 -- Primitive types that every backend must provide/support
