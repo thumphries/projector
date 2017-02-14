@@ -12,7 +12,7 @@ module Projector.Html (
   , BuildArtefacts (..)
   , DataModuleName (..)
   , UserDataTypes (..)
-  , ModulePrefix (..)
+  , ModuleNamer (..)
   , ModuleGraph (..)
   , HB.ModuleName (..)
   , HB.BackendT (..)
@@ -28,6 +28,7 @@ module Projector.Html (
   , Range
   , HtmlType
   , HtmlExpr
+  , moduleNamerSimple
   ) where
 
 
@@ -148,13 +149,9 @@ codeGenModule backend =
 
 data Build = Build {
     buildBackend :: Maybe HB.BackendT -- ^ The type of code to generate.
-  , buildModulePrefix :: ModulePrefix -- ^ A prefix to be prepended to generated module names.
-  , buildDataModule :: Maybe DataModuleName -- ^ The module containing user datatypes.
-  } deriving (Eq, Ord, Show)
-
-newtype ModulePrefix = ModulePrefix {
-    unModulePrefix :: HB.ModuleName
-  } deriving (Eq, Ord, Show)
+  , buildModuleNamer :: ModuleNamer -- ^ A customisable way to name modules
+  , buildDataModules :: [DataModuleName] -- ^ The modules containing user datatypes.
+  }
 
 -- | A set of templates that have been read from disk, but not yet
 -- parsed or checked.
@@ -178,13 +175,17 @@ newtype UserDataTypes = UserDataTypes {
     unUserDataTypes :: [MC.Definition]
   } deriving (Eq, Ord, Show, Monoid)
 
+newtype ModuleNamer = ModuleNamer {
+    pathToModuleName :: FilePath -> HB.ModuleName
+  }
+
 -- | Run a complete build from start to finish, with no caching of artefacts.
 --
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
 runBuild :: Build -> UserDataTypes -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuild (Build mb mp mdm) (UserDataTypes dfs) rts = do
+runBuild (Build mb mnr mdm) (UserDataTypes dfs) rts = do
   -- Build the module map
-  (mg, mmap) <- smush mdm mp rts
+  (mg, mmap) <- smush mdm mnr rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
@@ -215,22 +216,22 @@ validateModules backend mods =
 -- * the module name is also derived from the filepath
 -- * we expect all user datatypes to be exported from a single module
 smush ::
-     Maybe DataModuleName
-  -> ModulePrefix
+     [DataModuleName]
+  -> ModuleNamer
   -> RawTemplates
   -> Either
        [HtmlError]
        (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
-smush mdm (ModulePrefix prefix) (RawTemplates templates) = do
+smush mdm mnr (RawTemplates templates) = do
   mmap <- fmap (deriveImports . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
     ast <- first (:[]) (parseTemplate fp body)
     let core = Elab.elaborate ast
-        modn = prefix `HB.moduleNameAppend` (filePathToModuleName fp)
+        modn = pathToModuleName mnr fp
         expn = filePathToExprName fp
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
       , HB.moduleImports = M.fromList $
-          (HB.htmlRuntime, HB.OpenImport) : maybe [] (\(DataModuleName dm) -> [(dm, HB.OpenImport)]) mdm
+          (HB.htmlRuntime, HB.OpenImport) : fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
       , HB.moduleExprs = M.singleton expn ((), core)
       })
   pure (buildModuleGraph mmap, mmap)
@@ -241,9 +242,13 @@ smush mdm (ModulePrefix prefix) (RawTemplates templates) = do
 -- λ> filePathToModuleName "./path_to/my/favourite_Template_place.hs"
 -- ModuleName {unModuleName = "PathTo.My.FavouriteTemplatePlace"}
 -- @
-filePathToModuleName :: FilePath -> HB.ModuleName
-filePathToModuleName =
-  HB.ModuleName . T.pack . goUpper . FilePath.dropExtension
+moduleNamerSimple :: Maybe HB.ModuleName -> ModuleNamer
+moduleNamerSimple prefix =
+  ModuleNamer $ \fp ->
+    let
+      n = HB.ModuleName . T.pack . goUpper . FilePath.dropExtension $ fp
+    in
+      maybe n (flip HB.moduleNameAppend n) prefix
   where
     goUpper [] = []
     goUpper (x:xs)

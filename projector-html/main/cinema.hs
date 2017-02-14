@@ -49,7 +49,9 @@ renderCinemaError ce =
       "Data errors:\n" <> me -- FIX
 
 data CinemaArgs = CinemaArgs {
-    caBuild :: Build
+    caBackend :: Maybe BackendT
+  , caModulePrefix :: Maybe ModuleName
+  , caDataModules :: [DataModuleName]
   , caStripPrefix :: Maybe StripPrefix
   , caTemplateGlob :: Glob
   , caDataGlob :: Maybe Glob
@@ -86,7 +88,7 @@ run :: CinemaArgs -> IO ()
 run args =
   orDie renderCinemaError $
     cinemaBuild
-      (caBuild args)
+      (Build (caBackend args) (moduleNamerSimple (caModulePrefix args)) (caDataModules args))
       (caStripPrefix args)
       (caTemplateGlob args)
       (caDataGlob args)
@@ -142,18 +144,13 @@ globSafe g = do
 cinemaP :: Parser CinemaArgs
 cinemaP =
   CinemaArgs
-    <$> buildP
+    <$> optional backendP
+    <*> optional prefixP
+    <*> many dataModuleNameP
     <*> optional stripPrefixP
     <*> templatesP
     <*> optional dataP
     <*> outputP
-
-buildP :: Parser Build
-buildP =
-  Build
-    <$> optional backendP
-    <*> prefixP
-    <*> optional dataModuleNameP
 
 backendP :: Parser BackendT
 backendP =
@@ -164,18 +161,14 @@ backendP =
     , O.metavar "BACKEND"
     ]
 
-prefixP :: Parser ModulePrefix
+prefixP :: Parser ModuleName
 prefixP =
-  O.option modulePrefixR $ fold [
+  O.option (ModuleName <$> XO.textRead) $ fold [
       O.short 'p'
     , O.long "prefix"
     , O.help "The module prefix to use for generated code."
     , O.metavar "MODULE_PREFIX"
     ]
-
-modulePrefixR :: ReadM ModulePrefix
-modulePrefixR =
-  fmap (ModulePrefix . ModuleName . T.pack) O.str
 
 dataModuleNameP :: Parser DataModuleName
 dataModuleNameP =
