@@ -7,6 +7,7 @@ module Projector.Html.Runtime.Library (
   , Hydrant.AttributeKey (..)
   , Hydrant.AttributeValue (..)
   , Hydrant.textNode
+  , Hydrant.textNodeUnescaped
   , Hydrant.parentNode
   , Hydrant.voidNode
   , Hydrant.comment
