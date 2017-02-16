@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Projector.Html.Backend.Haskell.Rewrite (
     rewriteModule
   , rewriteExpr
@@ -11,6 +12,7 @@ module Projector.Html.Backend.Haskell.Rewrite (
 import           P
 
 import           Projector.Core
+import           Projector.Html.Backend.Rewrite (globalRules)
 import qualified Projector.Html.Core.Library as CL
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
@@ -18,12 +20,12 @@ import           Projector.Html.Data.Prim
 
 rewriteModule :: ModuleName -> Module HtmlType PrimT a -> (ModuleName, Module HtmlType PrimT a)
 rewriteModule mn (Module tys imports exprs) =
-  let exprs' = fmap (\(ty, e) -> (ty, rewriteFix rules e)) exprs
+  let exprs' = fmap (\(ty, e) -> (ty, rewriteFix (globalRules <> rules) e)) exprs
   in (mn, Module tys imports exprs')
 
 rewriteExpr :: Expr PrimT a -> Expr PrimT a
 rewriteExpr =
-  rewrite rules
+  rewrite (globalRules <> rules)
 
 -- TODO these rules can operate on the fully typed AST if we need it
 -- TODO oh god, this all goes to hell if people shadow the runtime names
@@ -35,6 +37,7 @@ rewriteExpr =
 rules :: [RewriteRule PrimT a]
 rules =
   fmap Rewrite [
+      -- These rules are important for correctness - won't work without these.
       (\case ECon a (Constructor "Plain") _ [x] ->
                pure (apply (textNode a) [x])
              _ ->
@@ -44,7 +47,7 @@ rules =
              _ ->
                empty)
     , (\case ECon a (Constructor "Whitespace") _ _ ->
-               pure (apply (textNode a) [(ELit a (VString " "))])
+               pure (apply (rawTextNode a) [(ELit a (VString " "))])
              _ ->
                empty)
     , (\case ECon a (Constructor "Element") _ [tag, attrs, body] ->
@@ -67,7 +70,24 @@ rules =
                pure (apply (foldHtml a) [nodes])
              _ ->
                empty)
+
+      -- These rules are just optimisations.
+      -- foldHtml of a singleton: id
+    , (\case EApp _ (EForeign _ (Name "foldHtml") _) (EList _ _ [x]) ->
+               pure x
+             _ ->
+               empty)
+      -- adjacent raw plaintext nodes can be merged
+    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b t nodes) ->
+               pure (EApp a fh (EList b t (foldRaw nodes)))
+             _ ->
+               empty)
+
+      -- TODO
+      -- adjacent plaintext nodes can be merged
+      -- hoist nested foldHtmls up to the top level
     ]
+
 
 textNode :: a -> Expr PrimT a
 textNode a =
@@ -97,3 +117,18 @@ foldHtml a =
 apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
 apply f =
   foldl' (EApp (extractAnnotation f)) f
+
+pattern RawTextNode a b c t =
+  EApp a
+    (EForeign b (Name "textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
+    (ELit c (VString t))
+
+foldRaw :: [HtmlExpr a] -> [HtmlExpr a]
+foldRaw exprs =
+  case exprs of
+    [] ->
+      []
+    (RawTextNode a b c t1 : RawTextNode _ _ _ t2 : xs) ->
+      foldRaw (RawTextNode a b c (t1 <> t2) : xs)
+    (x:xs) ->
+      x : foldRaw xs
