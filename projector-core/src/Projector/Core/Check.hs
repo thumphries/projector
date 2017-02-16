@@ -694,9 +694,9 @@ unifyVar points a x xrows t2 = do
          -- Performs the occurs check before actually unifying.
          ET.hoistEither (occurs c z u2)
          -- Pull the representative for u2
-         murows <- lift (getFields points z)
+         urows <- fmap (\(I (_, fs)) -> fs) (lift (getRepr' points u2))
          -- Unify the record fields
-         fields <- unifyFields points rows (fromMaybe [] murows)
+         fields <- unifyFields points rows urows
          -- Unify the two classes, setting a new representative
          lift (union points fields (I (Dunno c z, rows)) u2)
 
@@ -740,7 +740,7 @@ unifyFields points fs1 fs2 = do
       m2 = fieldMap fs2
       unify _fn t1 t2 = do
         mguST points t1 t2
-        pure t2 -- FIX, need to get the representative probably
+        lift (getRepr' points t1)
   m3 <- safeMapUnionM unify m1 m2
   pure (fmap (uncurry Field) (M.toList m3))
 
@@ -789,6 +789,10 @@ getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
 getRepr points x = do
   ps <- ST.readSTRef points
   for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
+
+getRepr' :: STRef s (Points s l a) -> IType l a -> ST s (IType l a)
+getRepr' points =
+  UF.descriptor <=< UF.repr <=< getPoint points
 
 -- | Get the fields for a given unification variable.
 getFields :: STRef s (Points s l a) -> Int -> ST s (Maybe [Field l a])

@@ -18,6 +18,20 @@ import           System.IO (IO)
 import           Test.Projector.Core.Arbitrary
 
 
+rctx :: TypeDecls TestLitT
+rctx =
+  declareType (TypeName "Phil") dr mempty
+
+dr :: Decl TestLitT
+dr =
+  DRecord [
+      (FieldName "foo", TLit TInt)
+    , (FieldName "bar", TLit TString)
+    ]
+
+
+
+
 -- big lambda billy
 
 buildExpr :: Int -> Expr TestLitT ()
@@ -145,4 +159,3 @@ nth n = app succ (nth (n - 1))
 mul :: Int -> Int -> Expr TestLitT ()
 mul m n =
   app (app mult (nth m)) (nth n)
-
