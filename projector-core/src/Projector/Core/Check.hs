@@ -55,6 +55,7 @@ data TypeError l a
   | BadPatternConstructor Constructor a
   | InferenceError a
   | InfiniteType (Type l, a) (Type l, a)
+  | InvalidRecordFields (Type l, a) [(FieldName, (Type l, a))]
 
 deriving instance (Ground l, Eq a) => Eq (TypeError l a)
 deriving instance (Ground l, Show a) => Show (TypeError l a)
@@ -114,7 +115,7 @@ typeCheckAll' decls known exprs = do
   if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
 
   -- solve them all at once
-  subs <- solveConstraints constraints
+  subs <- solveConstraints decls constraints
   -- substitute them all at once
   let subbed = fmap (substitute subs) annotated
   -- lower them all at once
@@ -135,7 +136,7 @@ typeTree decls expr = do
   if M.keys (M.filter (not . null) assums) == mempty
     then pure ()
     else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
-  subs <- solveConstraints constraints
+  subs <- solveConstraints decls constraints
   let subbed = substitute subs expr'
   first D.toList (lowerExpr subbed)
 
@@ -166,16 +167,16 @@ data Field l a = Field {
 -- | Lift a known type into an 'IType', with an annotation.
 hoistType :: a -> Type l -> IType l a
 hoistType a (Type ty) =
-  I (Am a (fmap (hoistType a) ty))
+  I (Am a (fmap (hoistType a) ty), [])
 
 -- | Assert that we have a monotype. Returns 'InferenceError' if we
 -- encounter a unification variable.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
 lowerIType (I v) =
   case v of
-    Dunno a _ ->
+    (Dunno a _, _rows) ->
       Left (InferenceError a)
-    Am _ ty ->
+    (Am _ ty, _rows) ->
       fmap Type (traverse lowerIType ty)
 
 -- Produce concrete type name for a fresh variable.
@@ -194,24 +195,19 @@ flattenIType :: IType l a -> (Type l, a)
 flattenIType i@(I v) =
   (flattenIType' i,
     case v of
-      Dunno a _ ->
+      (Dunno a _, _rows) ->
         a
-      Am a _ ->
+      (Am a _, _rows) ->
         a)
 
 flattenIType' :: IType l a -> Type l
 flattenIType' (I v) =
   case v of
-    Dunno _ x ->
+    (Dunno _ x, _rows) ->
       TVar (dunnoTypeVar x)
 
-    Am _ ty ->
+    (Am _ ty, _rows) ->
       Type (fmap flattenIType' ty)
-
--- | Report a unification error.
-unificationError :: IType l a -> IType l a -> TypeError l a
-unificationError =
-  UnificationError `on` flattenIType
 
 lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Type l, a))
 lowerExpr =
@@ -220,9 +216,9 @@ lowerExpr =
 typeVar :: IType l a -> Maybe Int
 typeVar ty =
   case ty of
-    I (Dunno _ x) ->
+    I (Dunno _ x, _rows) ->
       pure x
-    I (Am _ _) ->
+    I (Am _ _, _rows) ->
       Nothing
 
 
@@ -285,7 +281,7 @@ freshTypeVar a =
   Check . lift $ do
     v <- gets (nextVar . sSupply)
     modify' (\s -> s { sSupply = NameSupply (v + 1) })
-    return (I (Dunno a v))
+    return (I (Dunno a v, []))
 
 -- -----------------------------------------------------------------------------
 -- Constraints
@@ -391,7 +387,7 @@ generateConstraints' decls expr =
       (as, e') <- withBinding n (generateConstraints' decls e)
       ta <- maybe (freshTypeVar a) (pure . hoistType a) mta
       for_ as (addConstraint . Equal ta)
-      let ty = I (Am a (TArrowF ta (extractType e')))
+      let ty = I (Am a (TArrowF ta (extractType e')), [])
       pure (ELam (ty, a) n mta e')
 
     EApp a f g -> do
@@ -401,7 +397,7 @@ generateConstraints' decls expr =
       f' <- generateConstraints' decls f
       g' <- generateConstraints' decls g
       t <- freshTypeVar a
-      addConstraint (Equal (I (Am a (TArrowF (extractType g') t))) (extractType f'))
+      addConstraint (Equal (I (Am a (TArrowF (extractType g') t), [])) (extractType f'))
       pure (EApp (t, a) f' g')
 
     EList a te es -> do
@@ -409,7 +405,7 @@ generateConstraints' decls expr =
       -- Constrain each type to be the annotated 'ty'.
       es' <- for es (generateConstraints' decls)
       for_ es' (addConstraint . Equal (hoistType a te) . extractType)
-      let ty = I (Am a (TListF (hoistType a te)))
+      let ty = I (Am a (TListF (hoistType a te)), [])
       pure (EList (ty, a) te es')
 
     EMap a f g -> do
@@ -418,9 +414,9 @@ generateConstraints' decls expr =
       g' <- generateConstraints' decls g
       ta <- freshTypeVar a
       tb <- freshTypeVar a
-      addConstraint (Equal (I (Am a (TArrowF ta tb))) (extractType f'))
-      addConstraint (Equal (I (Am a (TListF ta))) (extractType g'))
-      let ty = I (Am a (TListF tb))
+      addConstraint (Equal (I (Am a (TArrowF ta tb), [])) (extractType f'))
+      addConstraint (Equal (I (Am a (TListF ta), [])) (extractType g'))
+      let ty = I (Am a (TListF tb),[])
       pure (EMap (ty, a) f' g')
 
     ECon a c tn es ->
@@ -433,8 +429,12 @@ generateConstraints' decls expr =
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType a) ts) (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal expected inferred))
-          let ty' = I (Am a (TVarF tn))
+          let ty' = I (Am a (TVarF tn), [])
           pure (ECon (ty', a) c tn es')
+
+        -- TODO support record construction - the type name is the constructor
+        Just ty@(DRecord fts) -> do
+          undefined
 
         Nothing ->
           throwError (UndeclaredType tn a)
@@ -479,7 +479,7 @@ patternConstraints decls ty pat =
         Just (tn, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
-          let ty' = I (Am a (TVarF tn))
+          let ty' = I (Am a (TVarF tn), [])
           addConstraint (Equal ty' ty)
           pats' <- for (L.zip (fmap (hoistType a) ts) pats) (uncurry (patternConstraints decls))
           pure (PCon (ty', a) c pats')
@@ -494,9 +494,39 @@ extractType =
 -- -----------------------------------------------------------------------------
 -- Constraint solving
 
+
+solveConstraints :: Ground l => Traversable f => TypeDecls l -> f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
+solveConstraints decls constraints =
+  runST $ do
+    -- Initialise mutable state.
+    points <- ST.newSTRef (Points M.empty)
+
+    -- Solve all the constraints independently.
+    es <- fmap ET.sequenceEither . for constraints $ \c ->
+      case c of
+        Equal t1 t2 ->
+          fmap (first D.singleton) (mostGeneralUnifierST decls points t1 t2)
+        HasField ty (fn, ft) ->
+          -- need a new function to handle this
+          -- if the type is solved, validate (unify the rows against decls)
+          -- if the type isn't solved, unify the rows and set a new class representative
+          undefined
+
+    -- Retrieve the remaining points and produce a substitution map
+    solvedPoints <- ST.readSTRef points
+    for (first D.toList es) $ \_ -> do
+      substitutionMap solvedPoints
+
 newtype Substitutions l a
   = Substitutions { unSubstitutions :: Map Int (IType l a) }
   deriving (Eq, Ord, Show)
+
+substitutionMap :: Points s l a -> ST s (Substitutions l a)
+substitutionMap points = do
+  subs <- for (unPoints points) (UF.descriptor <=< UF.repr)
+  pure . Substitutions $
+    -- Filter out any reflexive substitutions
+    M.filterWithKey (\k v -> case v of I (Dunno _ x, _) -> k /= x; _ -> True) subs
 
 substitute :: Ground l => Substitutions l a -> Expr l (IType l a, a) -> Expr l (IType l a, a)
 substitute subs expr =
@@ -505,20 +535,21 @@ substitute subs expr =
 
 substituteType :: Ground l => Substitutions l a -> IType l a -> IType l a
 substituteType subs ty =
+  -- TODO what to do with the rows here? should we sub?
   case ty of
-    I (Dunno _ x) ->
+    I (Dunno _ x, _rows) ->
       maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
 
-    I (Am a (TArrowF t1 t2)) ->
-      I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)))
+    I (Am a (TArrowF t1 t2), rows) ->
+      I (Am a (TArrowF (substituteType subs t1) (substituteType subs t2)), rows)
 
-    I (Am a (TListF t)) ->
-      I (Am a (TListF (substituteType subs t)))
+    I (Am a (TListF t), rows) ->
+      I (Am a (TListF (substituteType subs t)), rows)
 
-    I (Am _ (TLitF _)) ->
+    I (Am _ (TLitF _), _) ->
       ty
 
-    I (Am _ (TVarF _)) ->
+    I (Am _ (TVarF _), _) ->
       ty
 {-# INLINE substituteType #-}
 
@@ -528,59 +559,105 @@ newtype Points s l a = Points {
 
 mostGeneralUnifierST ::
      Ground l
-  => STRef s (Points s l a)
+  => TypeDecls l
+  -> STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> ST s (Either (TypeError l a) ())
-mostGeneralUnifierST points t1 t2 =
-  runEitherT (mguST points t1 t2)
+mostGeneralUnifierST decls points t1 t2 =
+  runEitherT (mguST decls points t1 t2)
 
+-- TODO it seems the row constraints are purely a solver construct.
+--      there's no real need to inject them or include them in syntax.
+--      for this reason maybe we can store them in Points and expose nowhere else.
+--      would also allow treating them as maps and reducing runtime cost.
+
+-- We now need to make sure rows are being propagated properly.
 mguST ::
      Ground l
-  => STRef s (Points s l a)
+  => TypeDecls l
+  -> STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> EitherT (TypeError l a) (ST s) ()
-mguST points t1 t2 =
+mguST decls points t1 t2 =
   case (t1, t2) of
-    (I (Dunno a x), _) -> do
-      unifyVar points a x t2
+    (I (Dunno a x, xrows), _) -> do
+      -- Check against decl before calling unifyVar
+      unifyVar decls points a x xrows t2
 
-    (_, I (Dunno a x)) -> do
-      unifyVar points a x t1
+    (_, I (Dunno a x, xrows)) -> do
+      -- Check against decl before calling unifyVar
+      unifyVar decls points a x xrows t1
 
-    (I (Am _ (TVarF x)), I (Am _ (TVarF y))) ->
+    (I (Am _ (TVarF x), xrows), I (Am _ (TVarF y), yrows)) -> do
       unless (x == y) (left (unificationError t1 t2))
+      -- unify record fields here.
+      _ <- unifyFields points xrows yrows
+      pure ()
 
-    (I (Am _ (TLitF x)), I (Am _ (TLitF y))) ->
+    (I (Am _ (TLitF x), xrows), I (Am _ (TLitF y), yrows)) -> do
       unless (x == y) (left (unificationError t1 t2))
+      -- throw an error if the rows aren't empty.
+      unless (null xrows) (left (recordFieldError t1 xrows))
+      unless (null yrows) (left (recordFieldError t2 yrows))
+      -- validate the rows?
 
-    (I (Am _ (TArrowF f g)), I (Am _ (TArrowF h i))) -> do
-      mguST points f h
-      mguST points g i
+    (I (Am _ (TArrowF f g), xrows), I (Am _ (TArrowF h i), yrows)) -> do
+      mguST decls points f h
+      mguST decls points g i
+      -- throw an error if the rows aren't empty.
+      unless (null xrows) (left (recordFieldError t1 xrows))
+      unless (null yrows) (left (recordFieldError t2 yrows))
 
-    (I (Am _ (TListF a)), I (Am _ (TListF b))) ->
-      mguST points a b
+    (I (Am _ (TListF a), xrows), I (Am _ (TListF b), yrows)) -> do
+      mguST decls points a b
+      -- throw an error if the rows aren't empty.
+      unless (null xrows) (left (recordFieldError t1 xrows))
+      unless (null yrows) (left (recordFieldError t2 yrows))
 
     (_, _) ->
       left (unificationError t1 t2)
 
-unifyVar :: Ground l => STRef s (Points s l a) -> a -> Int -> IType l a -> EitherT (TypeError l a) (ST s) ()
-unifyVar points a x t2 = do
+-- We now need to update the representative with a merged set of rows
+unifyVar ::
+     Ground l
+  => TypeDecls l
+  -> STRef s (Points s l a)
+  -> a
+  -> Int
+  -> [Field l a]
+  -> IType l a
+  -> EitherT (TypeError l a) (ST s) ()
+unifyVar decls points a x xrows t2 = do
   mt1 <- lift (getRepr points x)
-  let safeUnion c z u2 =
-        unless (typeVar u2 == Just z)
-          (ET.hoistEither (occurs c z u2) *> lift (union points (I (Dunno c z)) u2))
   case mt1 of
     -- special case if the var is its class representative
-    Just t1@(I (Dunno b y)) ->
+    Just t1@(I (Dunno b y, rows)) ->
       if x == y
-        then safeUnion b y t2
-        else mguST points t1 t2
-    Just t1@(I (Am _ _)) ->
-      mguST points t1 t2
+        then safeUnion b y t2 rows
+        else mguST decls points t1 t2
+    Just t1@(I (Am _ _, _)) -> do
+      -- Propagate + unify all record fields
+      safeUnion a x t1 xrows
+      -- Unify on the class representative
+      t1' <- lift (getRepr points x)
+      mcase t1'
+        (pure ()) {- invariant - this should never happen -}
+        (\r1 -> mguST decls points r1 t2)
     Nothing ->
-      safeUnion a x t2
+      safeUnion a x t2 xrows
+  where
+     safeUnion c z u2 rows =
+       unless (typeVar u2 == Just z) $ do
+         -- Performs the occurs check before actually unifying.
+         ET.hoistEither (occurs c z u2)
+         -- Pull the representative for u2
+         murows <- lift (getFields points z)
+         -- Unify the record fields
+         fields <- unifyFields points rows (fromMaybe [] murows)
+         -- Unify the two classes, setting a new representative
+         lift (union points fields (I (Dunno c z, rows)) u2)
 
 -- | Check that a given unification variable isn't present inside the
 -- type it's being unified with. This is necessary for typechecking
@@ -589,59 +666,72 @@ occurs :: a -> Int -> IType l a -> Either (TypeError l a) ()
 occurs a q ity =
   go q ity
   where
+    goRows x = traverse_ (go x . fieldType)
     go x i =
       case i of
-        I (Dunno _ y) ->
+        -- also need to go through all the rows
+        I (Dunno _ y, yrows) ->
           if x == y
-            then Left (InfiniteType (flattenIType (I (Dunno a x))) (flattenIType ity))
-            else pure ()
-        I (Am _ j) ->
+            then Left (InfiniteType (flattenIType (I (Dunno a x, []))) (flattenIType ity))
+            else goRows x yrows
+        I (Am _ j, yrows) ->
           case j of
             TVarF _ ->
-              pure ()
+              goRows x yrows
             TLitF _ ->
-              pure ()
+              goRows x yrows
             TArrowF f g ->
-              go x f *> go x g
+              go x f *> go x g *> goRows x yrows
             TListF f ->
-              go x f
+              go x f *> goRows x yrows
 {-# INLINE occurs #-}
 
-solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
-solveConstraints constraints =
-  runST $ do
-    -- Initialise mutable state.
-    points <- ST.newSTRef (Points M.empty)
+unifyFields ::
+     Ground l
+  => STRef s (Points s l a)
+  -> [Field l a]
+  -> [Field l a]
+  -> EitherT (TypeError l a) (ST s) [Field l a]
+unifyFields points fs1 fs2 = do
+  -- TODO once this works, just thread maps instead of lists.
+  let fieldMap = M.fromList . fmap (\(Field n t) -> (n, t))
+      m1 = fieldMap fs1
+      m2 = fieldMap fs2
+      unify _fn t1 t2 = do
+        mguST undefined points t1 t2
+        pure t2 -- FIX, need to get the representative probably
+  m3 <- safeMapUnionM unify m1 m2
+  pure (fmap (uncurry Field) (M.toList m3))
 
-    -- Solve all the constraints independently.
-    es <- fmap ET.sequenceEither . for constraints $ \c ->
-      case c of
-        Equal t1 t2 ->
-          fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
+-- | Union, performing some monadic action on duplicates.
+safeMapUnionM :: (Ord k, Monad m) => (k -> a -> a -> m a) -> Map k a -> Map k a -> m (Map k a)
+safeMapUnionM combine m1 m2 =
+  sequenceA (M.unionWithKey f (fmap pure m1) (fmap pure m2))
+  where
+    f k m n = do
+      m' <- m
+      n' <- n
+      combine k m' n'
 
-    -- Retrieve the remaining points and produce a substitution map
-    solvedPoints <- ST.readSTRef points
-    for (first D.toList es) $ \_ -> do
-      substitutionMap solvedPoints
-
-substitutionMap :: Points s l a -> ST s (Substitutions l a)
-substitutionMap points = do
-  subs <- for (unPoints points) (UF.descriptor <=< UF.repr)
-  pure (Substitutions (M.filterWithKey (\k v -> case v of I (Dunno _ x) -> k /= x; _ -> True) subs))
-
-union :: STRef s (Points s l a) -> IType l a -> IType l a -> ST s ()
-union points t1 t2 = do
+-- | Unify two equivalence classes, updating the record fields as we go.
+union :: STRef s (Points s l a) -> [Field l a] -> IType l a -> IType l a -> ST s ()
+union points fields t1 t2 = do
   p1 <- getPoint points t1
   p2 <- getPoint points t2
-  UF.union p1 p2
+  UF.union' p1 p2 (\_r1 (I (r2, _)) -> pure (I (r2, fields)))
 
 -- | Fills the 'lookup' API hole in the union-find package.
+--
+-- Given a type,
+-- * if it's a unification variable, get its class representative
+-- * if there's no class representative, create a fresh point
+-- * all non-unification variables get unique fresh points
 getPoint :: STRef s (Points s l a) -> IType l a -> ST s (UF.Point s (IType l a))
 getPoint mref ty =
   case ty of
-    I (Dunno _ x) -> do
-      ps <- ST.readSTRef mref
-      case M.lookup x (unPoints ps) of
+    I (Dunno _ x, _) -> do
+      Points ps <- ST.readSTRef mref
+      case M.lookup x ps of
         Just point ->
           pure point
         Nothing -> do
@@ -649,11 +739,33 @@ getPoint mref ty =
           ST.modifySTRef' mref (Points . M.insert x point . unPoints)
           pure point
 
-    I (Am _ _) ->
+    I (Am _ _, _) ->
       UF.fresh ty
 {-# INLINE getPoint #-}
 
+-- | Grab the class representative for a given unification variable.
 getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
 getRepr points x = do
   ps <- ST.readSTRef points
   for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
+
+-- | Get the fields for a given unification variable.
+getFields :: STRef s (Points s l a) -> Int -> ST s (Maybe [Field l a])
+getFields points x = do
+  mt <- getRepr points x
+  pure (mt >>= \(I (_, fs)) -> pure fs)
+
+-- | Report a unification error.
+unificationError :: IType l a -> IType l a -> TypeError l a
+unificationError =
+  UnificationError `on` flattenIType
+
+-- | Report a record field error.
+recordFieldError :: IType l a -> [Field l a] -> TypeError l a
+recordFieldError ty =
+  InvalidRecordFields (flattenIType ty) . fmap flattenField
+
+-- | Flatten a field constraint for error reporting.
+flattenField :: Field l a -> (FieldName, (Type l, a))
+flattenField f =
+  (fieldName f, flattenIType (fieldType f))
