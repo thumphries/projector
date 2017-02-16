@@ -54,6 +54,7 @@ data TypeError l a
   | BadPatternArity Constructor (Type l) Int Int a
   | BadPatternConstructor Constructor a
   | InferenceError a
+  | RecordInferenceError a [(FieldName, (Type l, a))]
   | InfiniteType (Type l, a) (Type l, a)
   | InvalidRecordFields (Type l, a) [(FieldName, (Type l, a))]
 
@@ -72,7 +73,7 @@ typeCheckIncremental ::
   -> Map Name (Expr l a)
   -> Either [TypeError l a] (Map Name (Expr l (Type l, a)))
 typeCheckIncremental decls known exprs =
-  typeCheckAll' decls (fmap (\(t,a) -> hoistType a t) known) exprs
+  typeCheckAll' decls (fmap (\(t,a) -> hoistType decls a t) known) exprs
 
 -- | Typecheck an interdependent set of named expressions.
 -- This is essentially top-level letrec.
@@ -165,19 +166,50 @@ data Field l a = Field {
   } deriving (Eq, Ord, Show)
 
 -- | Lift a known type into an 'IType', with an annotation.
-hoistType :: a -> Type l -> IType l a
-hoistType a (Type ty) =
-  I (Am a (fmap (hoistType a) ty), [])
+--
+-- For records, this means injecting the known set of fields.
+hoistType :: Ground l => TypeDecls l -> a -> Type l -> IType l a
+hoistType decls a (Type ty) =
+  case ty of
+    TVarF tn ->
+      case lookupType tn decls of
+        Just (DVariant _cns) ->
+          I (Am a (TVarF tn), [])
+        Just (DRecord fts) ->
+          I (Am a (TVarF tn), hoistFields decls a fts)
+        Nothing ->
+          -- This is an error. Should probably be in Either here.
+          I (Am a (TVarF tn), [])
+
+    _ ->
+      I (Am a (fmap (hoistType decls a) ty), [])
+
+hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> [Field l a]
+hoistFields decls a fts =
+  with fts $ \(fn, ty) -> Field fn (hoistType decls a ty)
 
 -- | Assert that we have a monotype. Returns 'InferenceError' if we
 -- encounter a unification variable.
+--
+-- This also involves checking the list of fields for validity.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
-lowerIType (I v) =
+lowerIType t@(I v) =
   case v of
-    (Dunno a _, _rows) ->
+    (Dunno a _, []) ->
       Left (InferenceError a)
-    (Am _ ty, _rows) ->
+    (Dunno a _, fields) ->
+      Left (RecordInferenceError a (lowerFields fields))
+    (Am _ ty, []) ->
       fmap Type (traverse lowerIType ty)
+    (Am _ ty@(TVarF _tn), _fields) ->
+      -- FIX pick out any extraneous fields
+      fmap Type (traverse lowerIType ty)
+    (Am _ _, fields) ->
+      Left (InvalidRecordFields (flattenIType t) (lowerFields fields))
+
+lowerFields :: [Field l a] -> [(FieldName, (Type l, a))]
+lowerFields =
+  fmap (\f -> (fieldName f, flattenIType (fieldType f)))
 
 -- Produce concrete type name for a fresh variable.
 dunnoTypeVar :: Int -> TypeName
@@ -380,7 +412,7 @@ generateConstraints' decls expr =
     ELit a v ->
       -- We know the type of literals instantly.
       let ty = TLit (typeOf v)
-      in pure (ELit (hoistType a ty, a) v)
+      in pure (ELit (hoistType decls a ty, a) v)
 
     EVar a v -> do
       -- We introduce a new type variable representing the type of this expression.
@@ -394,7 +426,7 @@ generateConstraints' decls expr =
       -- Gather the assumed types of 'n', and constrain them to be the known (annotated) type.
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
-      ta <- maybe (freshTypeVar a) (pure . hoistType a) mta
+      ta <- maybe (freshTypeVar a) (pure . hoistType decls a) mta
       for_ as (addConstraint . Equal ta)
       let ty = I (Am a (TArrowF ta (extractType e')), [])
       pure (ELam (ty, a) n mta e')
@@ -413,8 +445,8 @@ generateConstraints' decls expr =
       -- Proceed bottom-up, inferring types for each expression in the list.
       -- Constrain each type to be the annotated 'ty'.
       es' <- for es (generateConstraints' decls)
-      for_ es' (addConstraint . Equal (hoistType a te) . extractType)
-      let ty = I (Am a (TListF (hoistType a te)), [])
+      for_ es' (addConstraint . Equal (hoistType decls a te) . extractType)
+      let ty = I (Am a (TListF (hoistType decls a te)), [])
       pure (EList (ty, a) te es')
 
     EMap a f g -> do
@@ -436,7 +468,7 @@ generateConstraints' decls expr =
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
           unless (length ts == length es) (throwError (BadConstructorArity c ty (length es) a))
           es' <- for es (generateConstraints' decls)
-          for_ (L.zip (fmap (hoistType a) ts) (fmap extractType es'))
+          for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal expected inferred))
           let ty' = I (Am a (TVarF tn), [])
           pure (ECon (ty', a) c tn es')
@@ -447,7 +479,7 @@ generateConstraints' decls expr =
           unless (length fts == length es) (throwError (BadConstructorArity c ty (length es) a))
           es' <- for es (generateConstraints' decls)
           -- introduce constraints for each subterm
-          let fts' = fmap (fmap (hoistType a)) fts
+          let fts' = fmap (fmap (hoistType decls a)) fts
               ts = fmap snd fts'
           for_ (L.zip ts (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal expected inferred))
@@ -475,6 +507,8 @@ generateConstraints' decls expr =
       pure (ECase (ty, a) e' pes')
 
     EPrj a e fn -> do
+      -- We introduce a new unification variable for the result of the projection.
+      -- We add a field constraint, asserting that the type of e has a field of this variable.
       e' <- generateConstraints' decls e
       tp <- freshTypeVar a
       hasField a (extractType e') (Field fn tp)
@@ -482,7 +516,7 @@ generateConstraints' decls expr =
 
     EForeign a n ty -> do
       -- We know the type of foreign expressions immediately, because they're annotated.
-      pure (EForeign (hoistType a ty, a) n ty)
+      pure (EForeign (hoistType decls a ty, a) n ty)
 
 -- | Patterns are binding sites that also introduce lots of new constraints.
 patternConstraints ::
@@ -499,13 +533,13 @@ patternConstraints decls ty pat =
       pure (PVar (ty, a) x)
 
     PCon a c pats ->
-      case lookupConstructor c decls of
+      case lookupConstructor c decls of -- FIX this should include records
         Just (tn, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
           let ty' = I (Am a (TVarF tn), [])
           addConstraint (Equal ty' ty)
-          pats' <- for (L.zip (fmap (hoistType a) ts) pats) (uncurry (patternConstraints decls))
+          pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) (uncurry (patternConstraints decls))
           pure (PCon (ty', a) c pats')
 
         Nothing ->
@@ -585,12 +619,6 @@ mostGeneralUnifierST ::
 mostGeneralUnifierST points t1 t2 =
   runEitherT (mguST points t1 t2)
 
--- TODO it seems the row constraints are purely a solver construct.
---      there's no real need to inject them or include them in syntax.
---      for this reason maybe we can store them in Points and expose nowhere else.
---      would also allow treating them as maps and reducing runtime cost.
-
--- We now need to make sure rows are being propagated properly.
 mguST ::
      Ground l
   => STRef s (Points s l a)
@@ -600,11 +628,9 @@ mguST ::
 mguST points t1 t2 =
   case (t1, t2) of
     (I (Dunno a x, xrows), _) -> do
-      -- Check against decl before calling unifyVar
       unifyVar points a x xrows t2
 
     (_, I (Dunno a x, xrows)) -> do
-      -- Check against decl before calling unifyVar
       unifyVar points a x xrows t1
 
     (I (Am _ (TVarF x), xrows), I (Am _ (TVarF y), yrows)) -> do
@@ -618,7 +644,6 @@ mguST points t1 t2 =
       -- throw an error if the rows aren't empty.
       unless (null xrows) (left (recordFieldError t1 xrows))
       unless (null yrows) (left (recordFieldError t2 yrows))
-      -- validate the rows?
 
     (I (Am _ (TArrowF f g), xrows), I (Am _ (TArrowF h i), yrows)) -> do
       mguST points f h
