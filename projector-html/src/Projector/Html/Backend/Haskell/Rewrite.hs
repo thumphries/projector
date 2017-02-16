@@ -39,6 +39,10 @@ rules =
                pure (apply (textNode a) [x])
              _ ->
                empty)
+    , (\case ECon a (Constructor "Raw") _ [x] ->
+               pure (apply (rawTextNode a) [x])
+             _ ->
+               empty)
     , (\case ECon a (Constructor "Whitespace") _ _ ->
                pure (apply (textNode a) [(ELit a (VString " "))])
              _ ->
@@ -68,6 +72,10 @@ rules =
 textNode :: a -> Expr PrimT a
 textNode a =
   EForeign a (Name "textNode") (TArrow (TLit TString) CL.tHtml)
+
+rawTextNode :: a -> Expr PrimT a
+rawTextNode a =
+  EForeign a (Name "textNodeUnescaped") (TArrow (TLit TString) CL.tHtml)
 
 parentNode :: a -> Expr PrimT a
 parentNode a =

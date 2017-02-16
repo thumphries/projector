@@ -51,7 +51,7 @@ eNode node =
     TWhiteSpace a ->
       ECon (SourceAnnotation a) (Constructor "Whitespace") Lib.nHtmlNode []
     TPlain a (TPlainText t) ->
-      ECon (SourceAnnotation a) (Constructor "Plain") Lib.nHtmlNode [stringLit a t]
+      ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtmlNode [stringLit a t]
     TComment a (TPlainText t) ->
       ECon (SourceAnnotation a) (Constructor "Comment") Lib.nHtmlNode [stringLit a t]
     TVoidElement a tag attrs ->
