@@ -288,7 +288,6 @@ freshTypeVar a =
 
 data Constraint l a
   = Equal (IType l a) (IType l a)
-  | HasField (IType l a) (FieldName, IType l a)
   deriving (Eq, Ord, Show)
 
 -- | Record a new constraint.
@@ -296,6 +295,16 @@ addConstraint :: Ground l => Constraint l a -> Check l a ()
 addConstraint c =
   Check . lift $
     modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
+
+-- | Add a field constraint.
+--
+-- This involves creating a new unification variable with that field,
+-- and asserting that it should unify with the parent type.
+hasField :: Ground l => a -> IType l a -> Field l a -> Check l a ()
+hasField a ta field = do
+  I (tb, _) <- freshTypeVar a
+  addConstraint (Equal (I (tb, [field])) ta)
+
 
 -- -----------------------------------------------------------------------------
 -- Assumptions
@@ -456,6 +465,12 @@ generateConstraints' decls expr =
         pure res
       pure (ECase (ty, a) e' pes')
 
+    EPrj a e fn -> do
+      e' <- generateConstraints' decls e
+      tp <- freshTypeVar a
+      hasField a (extractType e') (Field fn tp)
+      pure (EPrj (tp, a) e' fn)
+
     EForeign a n ty -> do
       -- We know the type of foreign expressions immediately, because they're annotated.
       pure (EForeign (hoistType a ty, a) n ty)
@@ -494,9 +509,9 @@ extractType =
 -- -----------------------------------------------------------------------------
 -- Constraint solving
 
-
-solveConstraints :: Ground l => Traversable f => TypeDecls l -> f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
-solveConstraints decls constraints =
+-- | Solve a set of constraints, accumulating all independent type errors in a list.
+solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
+solveConstraints constraints =
   runST $ do
     -- Initialise mutable state.
     points <- ST.newSTRef (Points M.empty)
@@ -505,12 +520,7 @@ solveConstraints decls constraints =
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
         Equal t1 t2 ->
-          fmap (first D.singleton) (mostGeneralUnifierST decls points t1 t2)
-        HasField ty (fn, ft) ->
-          -- need a new function to handle this
-          -- if the type is solved, validate (unify the rows against decls)
-          -- if the type isn't solved, unify the rows and set a new class representative
-          undefined
+          fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
@@ -559,13 +569,12 @@ newtype Points s l a = Points {
 
 mostGeneralUnifierST ::
      Ground l
-  => TypeDecls l
-  -> STRef s (Points s l a)
+  => STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> ST s (Either (TypeError l a) ())
-mostGeneralUnifierST decls points t1 t2 =
-  runEitherT (mguST decls points t1 t2)
+mostGeneralUnifierST points t1 t2 =
+  runEitherT (mguST points t1 t2)
 
 -- TODO it seems the row constraints are purely a solver construct.
 --      there's no real need to inject them or include them in syntax.
@@ -575,20 +584,19 @@ mostGeneralUnifierST decls points t1 t2 =
 -- We now need to make sure rows are being propagated properly.
 mguST ::
      Ground l
-  => TypeDecls l
-  -> STRef s (Points s l a)
+  => STRef s (Points s l a)
   -> IType l a
   -> IType l a
   -> EitherT (TypeError l a) (ST s) ()
-mguST decls points t1 t2 =
+mguST points t1 t2 =
   case (t1, t2) of
     (I (Dunno a x, xrows), _) -> do
       -- Check against decl before calling unifyVar
-      unifyVar decls points a x xrows t2
+      unifyVar points a x xrows t2
 
     (_, I (Dunno a x, xrows)) -> do
       -- Check against decl before calling unifyVar
-      unifyVar decls points a x xrows t1
+      unifyVar points a x xrows t1
 
     (I (Am _ (TVarF x), xrows), I (Am _ (TVarF y), yrows)) -> do
       unless (x == y) (left (unificationError t1 t2))
@@ -604,14 +612,14 @@ mguST decls points t1 t2 =
       -- validate the rows?
 
     (I (Am _ (TArrowF f g), xrows), I (Am _ (TArrowF h i), yrows)) -> do
-      mguST decls points f h
-      mguST decls points g i
+      mguST points f h
+      mguST points g i
       -- throw an error if the rows aren't empty.
       unless (null xrows) (left (recordFieldError t1 xrows))
       unless (null yrows) (left (recordFieldError t2 yrows))
 
     (I (Am _ (TListF a), xrows), I (Am _ (TListF b), yrows)) -> do
-      mguST decls points a b
+      mguST points a b
       -- throw an error if the rows aren't empty.
       unless (null xrows) (left (recordFieldError t1 xrows))
       unless (null yrows) (left (recordFieldError t2 yrows))
@@ -622,21 +630,20 @@ mguST decls points t1 t2 =
 -- We now need to update the representative with a merged set of rows
 unifyVar ::
      Ground l
-  => TypeDecls l
-  -> STRef s (Points s l a)
+  => STRef s (Points s l a)
   -> a
   -> Int
   -> [Field l a]
   -> IType l a
   -> EitherT (TypeError l a) (ST s) ()
-unifyVar decls points a x xrows t2 = do
+unifyVar points a x xrows t2 = do
   mt1 <- lift (getRepr points x)
   case mt1 of
     -- special case if the var is its class representative
     Just t1@(I (Dunno b y, rows)) ->
       if x == y
         then safeUnion b y t2 rows
-        else mguST decls points t1 t2
+        else mguST points t1 t2
     Just t1@(I (Am _ _, _)) -> do
       -- Propagate + unify all record fields
       safeUnion a x t1 xrows
@@ -644,7 +651,7 @@ unifyVar decls points a x xrows t2 = do
       t1' <- lift (getRepr points x)
       mcase t1'
         (pure ()) {- invariant - this should never happen -}
-        (\r1 -> mguST decls points r1 t2)
+        (\r1 -> mguST points r1 t2)
     Nothing ->
       safeUnion a x t2 xrows
   where
@@ -698,7 +705,7 @@ unifyFields points fs1 fs2 = do
       m1 = fieldMap fs1
       m2 = fieldMap fs2
       unify _fn t1 t2 = do
-        mguST undefined points t1 t2
+        mguST points t1 t2
         pure t2 -- FIX, need to get the representative probably
   m3 <- safeMapUnionM unify m1 m2
   pure (fmap (uncurry Field) (M.toList m3))
