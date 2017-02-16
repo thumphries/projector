@@ -129,5 +129,5 @@ lookupConstructor con (TypeDecls m) =
       DVariant cts ->
         with cts $ \(c, ts) ->
           (c, (tn, ts))
-      DRecord _ ->
-        []
+      DRecord fts ->
+        [(Constructor (unTypeName tn), (tn, fmap snd fts))]
