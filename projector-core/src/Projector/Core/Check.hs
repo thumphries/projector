@@ -115,7 +115,7 @@ typeCheckAll' decls known exprs = do
   if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
 
   -- solve them all at once
-  subs <- solveConstraints decls constraints
+  subs <- solveConstraints constraints
   -- substitute them all at once
   let subbed = fmap (substitute subs) annotated
   -- lower them all at once
@@ -136,7 +136,7 @@ typeTree decls expr = do
   if M.keys (M.filter (not . null) assums) == mempty
     then pure ()
     else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
-  subs <- solveConstraints decls constraints
+  subs <- solveConstraints constraints
   let subbed = substitute subs expr'
   first D.toList (lowerExpr subbed)
 
@@ -441,9 +441,18 @@ generateConstraints' decls expr =
           let ty' = I (Am a (TVarF tn), [])
           pure (ECon (ty', a) c tn es')
 
-        -- TODO support record construction - the type name is the constructor
+        -- Record construction - the type name is the constructor.
         Just ty@(DRecord fts) -> do
-          undefined
+          -- Check arity
+          unless (length fts == length es) (throwError (BadConstructorArity c ty (length es) a))
+          es' <- for es (generateConstraints' decls)
+          -- introduce constraints for each subterm
+          let fts' = fmap (fmap (hoistType a)) fts
+              ts = fmap snd fts'
+          for_ (L.zip ts (fmap extractType es'))
+            (\(expected, inferred) -> addConstraint (Equal expected inferred))
+          let ty' = I (Am a (TVarF tn), fmap (uncurry Field) fts')
+          pure (ECon (ty', a) c tn es')
 
         Nothing ->
           throwError (UndeclaredType tn a)
