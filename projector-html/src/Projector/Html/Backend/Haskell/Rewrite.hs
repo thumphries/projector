@@ -78,8 +78,9 @@ rules =
              _ ->
                empty)
       -- adjacent raw plaintext nodes can be merged
-    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b t nodes) ->
-               pure (EApp a fh (EList b t (foldRaw nodes)))
+    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b t nodes) -> do
+               nodes' <- foldRaw nodes
+               pure (EApp a fh (EList b t nodes'))
              _ ->
                empty)
 
@@ -123,12 +124,15 @@ pattern RawTextNode a b c t =
     (EForeign b (Name "textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
     (ELit c (VString t))
 
-foldRaw :: [HtmlExpr a] -> [HtmlExpr a]
+foldRaw :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldRaw exprs =
-  case exprs of
-    [] ->
-      []
-    (RawTextNode a b c t1 : RawTextNode _ _ _ t2 : xs) ->
-      foldRaw (RawTextNode a b c (t1 <> t2) : xs)
-    (x:xs) ->
-      x : foldRaw xs
+  if length (go exprs) == length exprs then empty else pure (go exprs)
+  where
+    go es =
+      case es of
+        [] ->
+          []
+        (RawTextNode a b c t1 : RawTextNode _ _ _ t2 : xs) ->
+          go (RawTextNode a b c (t1 <> t2) : xs)
+        (x:xs) ->
+          x : go xs
