@@ -31,6 +31,12 @@
 [build.branches-0-9-3-html-runtime-purs]
   command = [["master", "build", "branches-0-9-3", "-C", "projector-html-runtime-purs"]]
 
+[build.dist-0-10-7-html-runtime-purs]
+  command = [["master", "build", "dist-0-10-7", "-C", "projector-html-runtime-purs"]]
+
+[build.branches-0-10-7-html-runtime-purs]
+  command = [["master", "build", "branches-0-10-7", "-C", "projector-html-runtime-purs"]]
+
 [build.dist-validate]
   command = [["validate-respect"]]
 

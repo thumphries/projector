@@ -2,9 +2,18 @@
   version = 1
   runner = "s3://ambiata-dispensary-v2/dist/master/master-purescript/linux/x86_64/20161214031347-e8a22d4/master-purescript-20161214031347-e8a22d4"
   sha1 = "e7360794d6d6fb14e7ec92f2515bd99486e4a806"
+
 [build.dist]
-  PURESCRIPT_VERSION="0.9.3"
+  PURESCRIPT_VERSION="0.10.7"
+
 [build.dist-0-9-3]
   PURESCRIPT_VERSION="0.9.3"
+
 [build.branches-0-9-3]
   PURESCRIPT_VERSION="0.9.3"
+
+[build.dist-0-10-7]
+  PURESCRIPT_VERSION="0.10.7"
+
+[build-branches-0-10-7]
+  PURESCRIPT VERSION="0.10.7"
