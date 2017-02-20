@@ -155,7 +155,7 @@ genExp expr =
                       WL.empty
                       bs))))
 
-    EList a _ es ->
+    EList a es ->
       WL.annotate a (WL.hang 2 (WL.list (fmap genExp es)))
 
     EMap a f g ->

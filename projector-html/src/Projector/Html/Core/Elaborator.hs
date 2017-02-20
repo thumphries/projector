@@ -43,7 +43,7 @@ eType ty =
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml (THtml a nodes) =
-  ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [EList (SourceAnnotation a) Lib.tHtmlNode (fmap eNode nodes)]
+  ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [EList (SourceAnnotation a) (fmap eNode nodes)]
 
 eNode :: TNode a -> HtmlExpr (Annotation a)
 eNode node =
@@ -76,7 +76,7 @@ eTag (TTag a t) =
 
 eAttrs :: a -> [TAttribute a] -> HtmlExpr (Annotation a)
 eAttrs a =
-  EList (SourceAnnotation a) Lib.tAttribute . fmap eAttr
+  EList (SourceAnnotation a) . fmap eAttr
 
 eAttr :: TAttribute a -> HtmlExpr (Annotation a)
 eAttr attr =
@@ -129,7 +129,7 @@ eExpr expr =
       eStr s
     TENode a e ->
       ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [
-          EList (HtmlBlock a) Lib.tHtmlNode [eNode e]
+          EList (HtmlBlock a) [eNode e]
         ]
 
 eStr :: TIString a -> HtmlExpr (Annotation a)
@@ -138,7 +138,7 @@ eStr (TIString a chunks) =
   EApp
     (SourceAnnotation a)
     (fmap (const (LibraryFunction Prim.nStringConcat)) Prim.eStringConcat)
-    (EList (SourceAnnotation a) (TLit TString) (fmap eChunk chunks))
+    (EList (SourceAnnotation a) (fmap eChunk chunks))
 
 eChunk :: TIChunk a -> HtmlExpr (Annotation a)
 eChunk chunk =

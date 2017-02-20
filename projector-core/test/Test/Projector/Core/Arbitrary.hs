@@ -79,7 +79,7 @@ genExpr n t v =
         ECase _ e pes ->
           e : fmap snd pes
 
-        EList _ _ es ->
+        EList _ es ->
           es
 
         EMap _ f g ->
@@ -99,7 +99,7 @@ genExpr n t v =
         , genLam n t v
         , genCon (fmap (TypeName . unName) n) (genExpr n t v)
         , genCase (genExpr n t v) (genPattern genConstructor n)
-        , list <$> t <*> listOf (genExpr n t v)
+        , list <$> listOf (genExpr n t v)
         , EMap () <$> genExpr n t v <*> genExpr n t v
         ]
  in reshrink shrink (oneOfRec nonrec recc)
@@ -317,8 +317,8 @@ genWellTypedExpr' n ty ctx names genty genval =
           genWellTypedLam n t1 t2 ctx names genty genval
 
         Type (TListF lty) -> do
-          k <- chooseInt (0, n)
-          list lty <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
+          k <- chooseInt (1, n+1)
+          list <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
 
   -- try to look something appropriate up from the context
   in case plookup names ty of

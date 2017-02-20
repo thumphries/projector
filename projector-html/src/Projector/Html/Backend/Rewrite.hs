@@ -18,13 +18,13 @@ globalRules :: [RewriteRule PrimT a]
 globalRules =
   fmap Rewrite [
       -- adjacent plaintext nodes - fold together
-      (\case ECon a (Constructor "Html") ty [EList b t nodes] -> do
+      (\case ECon a (Constructor "Html") ty [EList b nodes] -> do
                nodes' <- foldRaw nodes
-               pure (ECon a (Constructor "Html") ty [EList b t nodes'])
+               pure (ECon a (Constructor "Html") ty [EList b nodes'])
              _ ->
                empty)
       -- concat of a singleton - id
-    , (\case EApp _ (EForeign _ (Name "concat") _) (EList _ _ [x]) ->
+    , (\case EApp _ (EForeign _ (Name "concat") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
