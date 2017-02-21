@@ -11,6 +11,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Check
+import           Projector.Core.Eval (whnf, nf)
 import           Projector.Core.Syntax (extractAnnotation)
 
 import           Test.Projector.Core.Arbitrary
@@ -45,6 +46,14 @@ prop_illtyped =
 prop_illtyped_shrink =
   jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
     property (isLeft (typeCheck ctx e))
+
+prop_nf_consistent =
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (nf mempty e) === pure ty
+
+prop_whnf_consistent =
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (whnf mempty e) === pure ty
 
 
 return []
