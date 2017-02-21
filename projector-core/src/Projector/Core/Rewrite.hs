@@ -67,9 +67,9 @@ rewriteT rules expr =
       e' <- rewriteT rules e
       pes' <- for pes (\(p, ex) -> fmap (p,) (rewriteT rules ex))
       applyRules (ECase a e' pes') rules
-    EList a t es -> do
+    EList a es -> do
       es' <- traverse (rewriteT rules) es
-      applyRules (EList a t es') rules
+      applyRules (EList a es') rules
     EMap a e1 e2 -> do
       e1' <- rewriteT rules e1
       e2' <- rewriteT rules e2

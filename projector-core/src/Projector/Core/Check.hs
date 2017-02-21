@@ -393,13 +393,14 @@ generateConstraints' decls expr =
       addConstraint (Equal (I (Am a (TArrowF (extractType g') t))) (extractType f'))
       pure (EApp (t, a) f' g')
 
-    EList a te es -> do
+    EList a es -> do
       -- Proceed bottom-up, inferring types for each expression in the list.
       -- Constrain each type to be the annotated 'ty'.
       es' <- for es (generateConstraints' decls)
-      for_ es' (addConstraint . Equal (hoistType a te) . extractType)
-      let ty = I (Am a (TListF (hoistType a te)))
-      pure (EList (ty, a) te es')
+      te <- freshTypeVar a
+      for_ es' (addConstraint . Equal te . extractType)
+      let ty = I (Am a (TListF te))
+      pure (EList (ty, a) es')
 
     EMap a f g -> do
       -- Special case polymorphic map. g must be List a, f must be (a -> b)

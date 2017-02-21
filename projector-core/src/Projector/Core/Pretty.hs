@@ -187,7 +187,7 @@ ppExpr' types e =
                      (WL.hang 2 ((text (ppPattern p) <+> text "->") </> ppExpr' types g))
                  </> (doc WL.<> text ";")) WL.empty bs))
 
-    EList a _ es ->
+    EList a es ->
       WL.annotate a $ WL.hang 2 (WL.list (fmap (ppExpr' types) es))
 
     EMap a f g ->

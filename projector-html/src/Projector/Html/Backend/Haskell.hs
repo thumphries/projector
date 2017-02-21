@@ -202,7 +202,7 @@ genExp expr =
     ECase _ e pats ->
       caseE (genExp e) (fmap (uncurry genMatch) pats)
 
-    EList _ _ es ->
+    EList _ es ->
       listE (fmap genExp es)
 
     EForeign _ (Name x) _ ->

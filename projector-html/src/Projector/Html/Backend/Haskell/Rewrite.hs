@@ -73,14 +73,14 @@ rules =
 
       -- These rules are just optimisations.
       -- foldHtml of a singleton: id
-    , (\case EApp _ (EForeign _ (Name "foldHtml") _) (EList _ _ [x]) ->
+    , (\case EApp _ (EForeign _ (Name "foldHtml") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
       -- adjacent raw plaintext nodes can be merged
-    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b t nodes) -> do
+    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b nodes) -> do
                nodes' <- foldRaw nodes
-               pure (EApp a fh (EList b t nodes'))
+               pure (EApp a fh (EList b nodes'))
              _ ->
                empty)
 

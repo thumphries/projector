@@ -70,7 +70,7 @@ data Expr l a
   | EApp a (Expr l a) (Expr l a)
   | ECon a Constructor TypeName [Expr l a]
   | ECase a (Expr l a) [(Pattern a, Expr l a)]
-  | EList a (Type l) [Expr l a]
+  | EList a [Expr l a]
   | EMap a (Expr l a) (Expr l a)
   | EForeign a Name (Type l)
   deriving (Functor, Foldable, Traversable)
@@ -94,7 +94,7 @@ extractAnnotation e =
       a
     ECase a _ _ ->
       a
-    EList a _ _ ->
+    EList a _ ->
       a
     EMap a _ _ ->
       a
@@ -161,7 +161,7 @@ con_ :: Text -> Text -> [Expr l ()] -> Expr l ()
 con_ c t =
   con (Constructor c) (TypeName t)
 
-list :: Type l -> [Expr l ()] -> Expr l ()
+list :: [Expr l ()] -> Expr l ()
 list =
  EList ()
 
@@ -221,7 +221,7 @@ foldFree f acc expr =
                     foldl' patBinds bnd pats
           in foldl' (\a (p, ee) -> go f' ee (patBinds bound p) a) (go f' e bound acc') $! pes
 
-        EList _ _ es ->
+        EList _ es ->
           foldl' (\a e -> go f' e bound a) acc' es
 
         EMap _ a b ->
@@ -272,8 +272,8 @@ mapGround tmap vmap expr =
     ECase a e pes ->
       ECase a (mapGround tmap vmap e) (fmap (fmap (mapGround tmap vmap)) pes)
 
-    EList a t es ->
-      EList a (mapGroundType tmap t) (fmap (mapGround tmap vmap) es)
+    EList a es ->
+      EList a (fmap (mapGround tmap vmap) es)
 
     EMap a f g ->
       EMap a (mapGround tmap vmap f) (mapGround tmap vmap g)
@@ -313,7 +313,7 @@ foldrExprM fx fp acc expr =
           pes
       acc'' <- foldrExprM fx fp acc' e
       fx expr acc''
-    EList _ _ es -> do
+    EList _ es -> do
       acc' <- foldrM (flip (foldrExprM fx fp)) acc es
       fx expr acc'
     EMap _ i j -> do
@@ -378,7 +378,7 @@ foldlExprM fx fp acc expr =
         (\a (pat, ex) -> foldlPatternM fp a pat >>= \a' -> foldlExprM fx fp a' ex)
         acc''
         pes
-    EList _ _ es -> do
+    EList _ es -> do
       acc' <- fx acc expr
       foldM (foldlExprM fx fp) acc' es
     EMap _ i j -> do
