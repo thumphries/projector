@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Core.Match (
     MatchTree (..)
+  , Pat (..)
   , buildMatchTree
   ) where
 
