@@ -60,13 +60,13 @@ addToMatchTree mt@(MatchTree m) pat =
 {-
 testPats :: [Pattern ()]
 testPats = [
-    pvar_ "x"
-  , pcon_ "Def" [pcon_ "Xyz" [pvar_ "ddd"]]
+    pcon_ "Def" [pcon_ "Xyz" [pvar_ "ddd"]]
   , pcon_ "Abc" [pvar_ "y"]
   , pcon_ "Abc" [pcon_ "Def" []]
   , pcon_ "Abc" [pvar_ "foo"]
   , pcon_ "Abc" [pvar_ "abc"]
   , pcon_ "Def" [pcon_ "AAA" []]
   , pcon_ "Def" [pcon_ "Xyz" [pcon_ "Abc" [pvar_ "foo"]]]
+  , pvar_ "x"
   ]
 -}
