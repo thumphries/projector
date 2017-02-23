@@ -5,13 +5,15 @@
 module Test.Projector.Core.Eval where
 
 
+import qualified Data.Map as M
+
 import           Disorder.Core
 import           Disorder.Jack
 
 import           P
 
 import           Projector.Core.Eval (nf, whnf)
-import           Projector.Core.Syntax (Expr (..), lam_, var_, app)
+import           Projector.Core.Syntax
 import           Projector.Core.Type
 
 import           Test.Projector.Core.Arbitrary
@@ -78,6 +80,24 @@ nth n = app succ (nth (n - 1))
 mul :: Int -> Int -> Expr TestLitT ()
 mul m n =
   app (app mult (nth m)) (nth n)
+
+-- -----------------------------------------------------------------------------
+-- dodgy unit test
+
+prop_nf_letrec_unit =
+  once $
+    nf known expr
+    ===
+    expected
+  where
+    known = M.fromList [
+        (Name "foo", var_ "bar")
+      , (Name "bar", var_ "baz")
+      , (Name "baz", var_ "quux")
+      , (Name "quux", lit (VString "foo"))
+      ]
+    expr = var_ "foo"
+    expected = lit (VString "foo")
 
 
 return []
