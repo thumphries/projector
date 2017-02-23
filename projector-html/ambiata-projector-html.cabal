@@ -15,6 +15,7 @@ library
                        base                            >= 3          && < 5
                      , ambiata-p
                      , ambiata-projector-core
+                     , ambiata-hydrant
                      , ambiata-machinator-core
                      , ambiata-x-eithert
                      , ambiata-x-templatehaskell
@@ -61,6 +62,8 @@ library
                        Projector.Html.Data.Prim
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
+
+                       Projector.Html.Interpreter
 
                        Projector.Html.ModuleGraph
 
