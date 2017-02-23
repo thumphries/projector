@@ -41,7 +41,7 @@ unionWith f l1 l2 =
 
 -- | Key nodes in the pattern tree.
 data Pat
-  = WildCard
+  = Var Name
   | Con Constructor
   deriving (Eq, Ord, Show)
 
@@ -52,8 +52,8 @@ buildMatchTree =
 addToMatchTree :: MatchTree -> Pattern a -> MatchTree
 addToMatchTree mt@(MatchTree m) pat =
   case pat of
-    PVar _ _ ->
-      MatchTree (m <> [(WildCard, [])])
+    PVar _ n ->
+      MatchTree (m <> [(Var n, [])])
     PCon _ c ps ->
       mt <> MatchTree [(Con c, fmap (buildMatchTree . pure) ps)]
 
@@ -64,6 +64,7 @@ testPats = [
   , pcon_ "Abc" [pvar_ "y"]
   , pcon_ "Abc" [pcon_ "Def" []]
   , pcon_ "Abc" [pvar_ "foo"]
+  , pcon_ "Abc" [pvar_ "abc"]
   , pcon_ "Def" [pcon_ "AAA" []]
   , pcon_ "Def" [pcon_ "Xyz" [pcon_ "Abc" [pvar_ "foo"]]]
   ]
