@@ -57,6 +57,7 @@ addToMatchTree mt@(MatchTree m) pat =
     PCon _ c ps ->
       mt <> MatchTree [(Con c, fmap (buildMatchTree . pure) ps)]
 
+{-
 testPats :: [Pattern ()]
 testPats = [
     pvar_ "x"
@@ -68,3 +69,4 @@ testPats = [
   , pcon_ "Def" [pcon_ "AAA" []]
   , pcon_ "Def" [pcon_ "Xyz" [pcon_ "Abc" [pvar_ "foo"]]]
   ]
+-}

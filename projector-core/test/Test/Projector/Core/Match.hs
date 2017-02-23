@@ -31,7 +31,9 @@ prop_matchtree_monoid_right_id =
 
 genMatchTree :: Jack MatchTree
 genMatchTree =
-  buildMatchTree <$> (listOf (genPattern genConstructor genName))
+  sized $ \n -> do
+    k <- chooseInt (0, n)
+    buildMatchTree <$> (listOfN 0 k (genPattern genConstructor genName))
 
 
 return []
