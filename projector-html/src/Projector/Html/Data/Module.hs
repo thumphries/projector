@@ -10,6 +10,7 @@ module Projector.Html.Data.Module (
   , moduleFree
   , moduleBound
   , extractModuleBindings
+  , extractModuleExprs
   , Imports (..)
   ) where
 
@@ -60,6 +61,10 @@ moduleBound (Module _types _imports exprs) =
 extractModuleBindings :: Map k (Module b l a) -> Map Name a
 extractModuleBindings =
   foldMap (fmap (extractAnnotation . snd) . moduleExprs) . M.elems
+
+extractModuleExprs :: Map k (Module b l a) -> Map Name (Expr l a)
+extractModuleExprs =
+  foldMap (fmap snd . moduleExprs) . M.elems
 
 data Imports
   = OpenImport
