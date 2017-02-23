@@ -94,16 +94,17 @@ parseTemplate f =
 
 checkTemplate :: Template Range -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkTemplate =
-  checkTemplateIncremental mempty
+  checkTemplateIncremental mempty mempty
 
 checkTemplateIncremental ::
-     Map Text (HtmlType, SrcAnnotation)
+     HtmlDecls
+  -> Map Text (HtmlType, SrcAnnotation)
   -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
-checkTemplateIncremental known ast =
+checkTemplateIncremental decls known ast =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
-  . HC.typeCheckIncremental mempty (libraryExprs <> (M.mapKeys PC.Name known))
+  . HC.typeCheckIncremental decls (libraryExprs <> (M.mapKeys PC.Name known))
   . M.singleton (PC.Name "it")
   $ Elab.elaborate ast
 
