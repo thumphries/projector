@@ -23,10 +23,6 @@ module Projector.Html.Core.Library (
   , tHtml
   , nHtml
   , dHtml
-  -- *** Html nodes
-  , tHtmlNode
-  , nHtmlNode
-  , dHtmlNode
   -- * Expressions
   -- ** text
   , nHtmlText
@@ -60,7 +56,6 @@ types =
     , (nAttributeKey, dAttributeKey)
     , (nAttributeValue, dAttributeValue)
     , (nHtml, dHtml)
-    , (nHtmlNode, dHtmlNode)
     ]
 
 exprs :: Map Name (HtmlType, HtmlExpr ())
@@ -148,30 +143,13 @@ tHtml =
 dHtml :: HtmlDecl
 dHtml =
   DVariant [
-      (Constructor "Html", [TList tHtmlNode])
-    ]
-
-
--- -----------------------------------------------------------------------------
-
-nHtmlNode :: TypeName
-nHtmlNode =
-  TypeName "HtmlNode"
-
-tHtmlNode :: HtmlType
-tHtmlNode =
-  TVar nHtmlNode
-
-dHtmlNode :: HtmlDecl
-dHtmlNode =
-  DVariant [
       (Constructor "Element", [tTag, TList tAttribute, tHtml])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
     , (Constructor "Comment", [TLit TString])
     , (Constructor "Plain", [TLit TString])
     , (Constructor "Raw", [TLit TString])
     , (Constructor "Whitespace", [])
-    , (Constructor "Nested", [tHtml])
+    , (Constructor "Nested", [TList tHtml])
     ]
 
 -- -----------------------------------------------------------------------------
@@ -187,8 +165,7 @@ tHtmlText =
 eHtmlText :: HtmlExpr ()
 eHtmlText =
   ELam () (Name "t") (Just (TLit TString))
-    (ECon () (Constructor "Html") nHtml
-      [EList () [ECon () (Constructor "Plain") nHtmlNode [EVar () (Name "t")]]])
+    (ECon () (Constructor "Plain") nHtml [EVar () (Name "t")])
 
 -- -----------------------------------------------------------------------------
 
@@ -217,7 +194,7 @@ tHtmlBlank =
 
 eHtmlBlank :: HtmlExpr ()
 eHtmlBlank =
-  con (Constructor "Html") nHtml
+  con (Constructor "Nested") nHtml
     [list []]
 
 -- -----------------------------------------------------------------------------

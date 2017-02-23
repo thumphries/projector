@@ -51,12 +51,12 @@ helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
 helloWorld =
   ( Name "helloWorld"
   , ( Lib.tHtml
-    , con (Constructor "Html") Lib.nHtml [
+    , con (Constructor "Nested") Lib.nHtml [
         list [
-            con (Constructor "Plain") Lib.nHtmlNode [lit (Prim.VString "Hello,")]
-          , con (Constructor "Whitespace") Lib.nHtmlNode []
-          , con (Constructor "Nested") Lib.nHtmlNode [app (var Lib.nHtmlText) (lit (Prim.VString "world!"))]
-          , con (Constructor "Element") Lib.nHtmlNode [
+            con (Constructor "Plain") Lib.nHtml [lit (Prim.VString "Hello,")]
+          , con (Constructor "Whitespace") Lib.nHtml []
+          , app (var Lib.nHtmlText) (lit (Prim.VString "world!"))
+          , con (Constructor "Element") Lib.nHtml [
                 con (Constructor "Tag") Lib.nTag [lit (Prim.VString "div")]
               , list [
                     con (Constructor "Attribute") Lib.nAttribute [
@@ -64,8 +64,8 @@ helloWorld =
                     , app (var Lib.nHtmlAttrValue) (lit (Prim.VString "table"))
                     ]
                   ]
-              , con (Constructor "Html") Lib.nHtml [list [con (Constructor "Whitespace") Lib.nHtmlNode []]]
+              , con (Constructor "Nested") Lib.nHtml [list [con (Constructor "Whitespace") Lib.nHtml []]]
               ]
-          , con (Constructor "Nested") Lib.nHtmlNode [var Lib.nHtmlBlank]
+          , var Lib.nHtmlBlank
           ]
       ]))
