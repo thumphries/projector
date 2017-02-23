@@ -62,6 +62,8 @@ library
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
+                       Projector.Html.Interpreter
+
                        Projector.Html.ModuleGraph
 
                        Projector.Html.Parser
