@@ -18,9 +18,9 @@ globalRules :: [RewriteRule PrimT a]
 globalRules =
   fmap Rewrite [
       -- adjacent plaintext nodes - fold together
-      (\case ECon a (Constructor "Html") ty [EList b nodes] -> do
+      (\case ECon a (Constructor "Nested") ty [EList b nodes] -> do
                nodes' <- foldRaw nodes
-               pure (ECon a (Constructor "Html") ty [EList b nodes'])
+               pure (ECon a (Constructor "Nested") ty [EList b nodes'])
              _ ->
                empty)
       -- concat of a singleton - id
@@ -31,7 +31,7 @@ globalRules =
     ]
 
 
-pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "HtmlNode") [ELit b (VString t)]
+pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "Html") [ELit b (VString t)]
 
 foldRaw :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldRaw exprs =

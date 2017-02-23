@@ -31,7 +31,7 @@ rewriteExpr =
 -- TODO oh god, this all goes to hell if people shadow the runtime names
 --      (we better make this hard or illegal)
 
--- * Erase all evidence of the HtmlNode type, which doesn't exist at runtime.
+-- * Erase all evidence of the Html type, which doesn't exist at runtime.
 --   Each gets converted to Hydrant's Html type.
 -- * Projector's HTML type becomes a monoidal fold of Hydrant's Html type.
 rules :: [RewriteRule PrimT a]
@@ -62,11 +62,7 @@ rules =
                pure (apply (comment a) [str])
              _ ->
                empty)
-    , (\case ECon _ (Constructor "Nested") _ [html] ->
-               pure html
-             _ ->
-               empty)
-    , (\case ECon a (Constructor "Html") _ [nodes] ->
+    , (\case ECon a (Constructor "Nested") _ [nodes] ->
                pure (apply (foldHtml a) [nodes])
              _ ->
                empty)

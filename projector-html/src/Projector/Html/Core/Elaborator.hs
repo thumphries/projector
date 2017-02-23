@@ -43,31 +43,31 @@ eType ty =
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml (THtml a nodes) =
-  ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [EList (SourceAnnotation a) (fmap eNode nodes)]
+  ECon (HtmlBlock a) (Constructor "Nested") Lib.nHtml [EList (SourceAnnotation a) (fmap eNode nodes)]
 
 eNode :: TNode a -> HtmlExpr (Annotation a)
 eNode node =
   case node of
     TWhiteSpace a ->
-      ECon (SourceAnnotation a) (Constructor "Whitespace") Lib.nHtmlNode []
+      ECon (SourceAnnotation a) (Constructor "Whitespace") Lib.nHtml []
     TPlain a (TPlainText t) ->
-      ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtmlNode [stringLit a t]
+      ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtml [stringLit a t]
     TComment a (TPlainText t) ->
-      ECon (SourceAnnotation a) (Constructor "Comment") Lib.nHtmlNode [stringLit a t]
+      ECon (SourceAnnotation a) (Constructor "Comment") Lib.nHtml [stringLit a t]
     TVoidElement a tag attrs ->
-      ECon (SourceAnnotation a) (Constructor "VoidElement") Lib.nHtmlNode [
+      ECon (SourceAnnotation a) (Constructor "VoidElement") Lib.nHtml [
           eTag tag
         , eAttrs a attrs
         ]
     TElement a tag attrs html ->
-      ECon (SourceAnnotation a) (Constructor "Element") Lib.nHtmlNode [
+      ECon (SourceAnnotation a) (Constructor "Element") Lib.nHtml [
           eTag tag
         , eAttrs a attrs
         , eHtml html
         ]
     TExprNode a expr ->
-      ECon (HtmlExpression a) (Constructor "Nested") Lib.nHtmlNode [
-          eExpr expr
+      ECon (HtmlExpression a) (Constructor "Nested") Lib.nHtml [
+          EList (SourceAnnotation a) [eExpr expr]
         ]
 
 eTag :: TTag a -> HtmlExpr (Annotation a)
@@ -118,17 +118,12 @@ eExpr expr =
     TECase a e alts ->
       ECase (CaseExpression a) (eExpr e) (NE.toList (fmap eAlt alts))
     TEEach a f g ->
-      ECon (SourceAnnotation a) (Constructor "Html") Lib.nHtml . pure $
-        EMap (SourceAnnotation a)
-          (ELam (SourceAnnotation a) (Name "x") Nothing $
-            ECon (SourceAnnotation a) (Constructor "Nested") Lib.nHtmlNode
-              [EApp (SourceAnnotation a) (eExpr g) (EVar (SourceAnnotation a) (Name "x"))]
-            )
-          (eExpr f)
+      ECon (SourceAnnotation a) (Constructor "Nested") Lib.nHtml . pure $
+        EMap (SourceAnnotation a) (eExpr g) (eExpr f)
     TEString _ s ->
       eStr s
     TENode a e ->
-      ECon (HtmlBlock a) (Constructor "Html") Lib.nHtml [
+      ECon (HtmlBlock a) (Constructor "Nested") Lib.nHtml [
           EList (HtmlBlock a) [eNode e]
         ]
 

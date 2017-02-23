@@ -77,8 +77,6 @@ toHaskellTypeDecls (TypeDecls decls) =
 swapLibTypes :: HaskellType -> HaskellType
 swapLibTypes ty =
   case ty of
-    TVar (TypeName "HtmlNode") ->
-      TVar (TypeName "Html")
     TList t2 ->
       TList (swapLibTypes t2)
     TArrow t2 t3 ->

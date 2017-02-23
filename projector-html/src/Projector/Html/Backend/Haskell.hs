@@ -55,7 +55,7 @@ renderHaskellError :: HaskellError -> Text
 renderHaskellError e =
   case e of
     HtmlCase ->
-      "Don't case on Html or HtmlNode, pal!"
+      "Don't case on Html, pal!"
 
 predicates :: [Predicate a HaskellError]
 predicates = [
@@ -76,7 +76,7 @@ htmlConstructors =
 
 htmlNodeConstructors :: Set Constructor
 htmlNodeConstructors =
-  case dHtmlNode of
+  case dHtml of
     DVariant cts ->
       S.fromList (fmap fst cts)
 
