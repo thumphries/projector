@@ -10,6 +10,7 @@
 module Projector.Core.Syntax (
     Expr (..)
   , extractAnnotation
+  , setAnnotation
   , Name (..)
   , Pattern (..)
   , extractPatternAnnotation
@@ -101,6 +102,30 @@ extractAnnotation e =
     EForeign a _ _ ->
       a
 {-# INLINE extractAnnotation #-}
+
+-- Set the top-level annotation.
+setAnnotation :: a -> Expr l a -> Expr l a
+setAnnotation a e =
+  case e of
+    ELit _ b ->
+      ELit a b
+    EVar _ b ->
+      EVar a b
+    ELam _ b c d ->
+      ELam a b c d
+    EApp _ b c ->
+      EApp a b c
+    ECon _ b c d ->
+      ECon a b c d
+    ECase _ b c ->
+      ECase a b c
+    EList _ b ->
+      EList a b
+    EMap _ b c ->
+      EMap a b c
+    EForeign _ b c ->
+      EForeign a b c
+{-# INLINE setAnnotation #-}
 
 newtype Name = Name { unName :: Text }
   deriving (Eq, Ord, Show)

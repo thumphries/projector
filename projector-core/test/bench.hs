@@ -73,7 +73,7 @@ main = do
             reportFile = Just "dist/build/projector-bench.html"
           , csvFile = Just "dist/build/projector-bench.csv"
           }
-
+      norm f = C.whnf (nf mempty) . f
       tc f c = C.whnf (typeCheck c) . f
       mul2 = mul 2
 
@@ -102,6 +102,33 @@ main = do
           bench "check-casey-100" $ tc buildCase caseyCtx 100
         , bench "check-casey-200" $ tc buildCase caseyCtx 200
         , bench "check-casey-1000" $ tc buildCase caseyCtx 1000
+        ]
+
+
+    , bgroup "eval-intlist" [
+          bench "eval-intlist-100" $ norm buildIntList  100
+        , bench "eval-intlist-200" $ norm buildIntList  200
+        , bench "eval-intlist-1000" $ norm buildIntList 1000
+        ]
+    , bgroup "eval-billy" [
+          bench "eval-billy-100" $ norm buildExpr  100
+        , bench "eval-billy-200" $ norm buildExpr  200
+        , bench "eval-billy-1000" $ norm buildExpr 1000
+        ]
+    , bgroup "eval-church" [
+          bench "eval-church-100" $ norm nth  100
+        , bench "eval-church-200" $ norm nth  200
+        , bench "eval-church-1000" $ norm nth 1000
+        ]
+    , bgroup "eval-church-mul2" [
+          bench "eval-church-mul2-100" $ norm mul2  100
+        , bench "eval-church-mul2-200" $ norm mul2  200
+        , bench "eval-church-mul2-1000" $ norm mul2 1000
+        ]
+    , bgroup "eval-casey" [
+          bench "eval-casey-100" $ norm buildCase  100
+        , bench "eval-casey-200" $ norm buildCase  200
+        , bench "eval-casey-1000" $ norm buildCase 1000
         ]
     ]
 

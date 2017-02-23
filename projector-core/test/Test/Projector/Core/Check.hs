@@ -46,6 +46,18 @@ prop_illtyped_shrink =
   jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
     property (isLeft (typeCheck ctx e))
 
+{-
+-- these are disabled until we can represent type schemes
+-- (sometimes functions will simplify into id, which we can't type)
+
+-- prop_nf_consistent =
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (nf mempty e) === pure ty
+
+-- prop_whnf_consistent =
+  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+    typeCheck ctx (whnf mempty e) === pure ty
+-}
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal
