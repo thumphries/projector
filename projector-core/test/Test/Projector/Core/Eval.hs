@@ -32,15 +32,6 @@ prop_whnf_nf_idem =
   gamble genWellTypedTestExpr' $ \(_, _, e) ->
     whnf mempty (nf mempty e) === nf mempty e
 
---prop_alphaNf_idem =
---  gamble genWellTypedTestExpr' $ \(_, _, e) ->
---    alphaNf (alphaNf e) === alphaNf e
---
---prop_alpha_idem =
---  gamble genWellTypedTestExpr' $ \(_, _, e) ->
---    alpha (alpha e) === alpha e
-
-
 -- -----------------------------------------------------------------------------
 -- church numerals
 

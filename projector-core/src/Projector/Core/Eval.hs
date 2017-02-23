@@ -187,9 +187,9 @@ subst' subs free expr =
              -- it might be safe to just add it to the subst map and proceed in one pass?
              -- worth a try once this implementation is demonstrably correct
              f' <- lift (subst z (EVar a z') f)
-             r' <- subst' subs free f'
+             r' <- subst' subs (S.insert z' free) f'
              U.progress (ELam a z' ty r')
-        else ELam a z ty <$> subst' subs free f
+        else ELam a z ty <$> subst' subs (S.insert z free) f
 
     ECase a e pes ->
       ECase a <$> subst' subs free e <*> traverse (uncurry (patSubst subs free)) pes
