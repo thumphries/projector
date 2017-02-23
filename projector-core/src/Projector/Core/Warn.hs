@@ -7,6 +7,7 @@
 module Projector.Core.Warn (
     Warning (..)
   , warnShadowing
+  , warnExhaustivity
   ) where
 
 
@@ -17,12 +18,18 @@ import qualified Data.Set as S
 
 import           P
 
+import           Projector.Core.Match
 import           Projector.Core.Syntax
+import           Projector.Core.Type
 
 
 data Warning l a
   = ShadowedName a Name
+  | InexhaustiveCase a [Constructor]
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
+-- -----------------------------------------------------------------------------
+-- Shadowed variables
 
 warnShadowing :: Set Name -> Expr l a -> Either [Warning l a] ()
 warnShadowing bound expr =
@@ -58,3 +65,64 @@ warnShadowing bound expr =
         EMap _ f g -> do
           go bound' f
           go bound' g
+
+-- -----------------------------------------------------------------------------
+-- Pattern exhaustivity
+
+warnExhaustivity :: Ground l => TypeDecls l -> Expr l a -> Either [Warning l a] ()
+warnExhaustivity decls =
+  foldlExprM
+    (const (checkExhaustivity decls))
+    (\_ _ -> pure ())
+    ()
+
+checkExhaustivity :: Ground l => TypeDecls l -> Expr l a -> Either [Warning l a] ()
+checkExhaustivity decls expr =
+  case expr of
+    ECase a _ pes ->
+      checkPatternExhaustivity a decls (fmap fst pes)
+    _ ->
+      pure ()
+
+checkPatternExhaustivity :: Ground l => a -> TypeDecls l -> [Pattern a] -> Either [Warning l a] ()
+checkPatternExhaustivity a decls pats =
+  exhaustiveMatchTree a decls (buildMatchTree pats)
+
+exhaustiveMatchTree :: Ground l => a -> TypeDecls l -> MatchTree -> Either [Warning l a] ()
+exhaustiveMatchTree a decls mt@(MatchTree mtt) =
+  -- If this tier contains a PVar, stop.
+  mcase (matchTier mt) (pure ()) $ \seen -> do
+    -- Otherwise, check the Constructor set
+    checkSet a decls seen
+    -- ... and recurse
+    for_ mtt $ \(pat, subtrees) ->
+      case pat of
+        Con _ ->
+          traverse_ (exhaustiveMatchTree a decls) subtrees
+        Var _ ->
+          pure ()
+
+-- | Grab all the constructors used in this pattern tier.
+-- Short-circuits and returns 'Nothing' if we encounter an exhaustive 'Var'.
+matchTier :: MatchTree -> Maybe (Set Constructor)
+matchTier (MatchTree mt) =
+  foldlM
+    (\set (pat, _) ->
+      case pat of
+        Con c ->
+          pure (S.insert c set)
+        Var _ ->
+          Nothing)
+    mempty
+    mt
+
+checkSet :: Ground l => a -> TypeDecls l -> Set Constructor -> Either [Warning l a] ()
+checkSet a decls seen =
+  fromMaybe (Left [InexhaustiveCase a []]) $ do
+    witness <- head seen
+    (tn, _tys) <- lookupConstructor witness decls
+    defn <- lookupType tn decls
+    pure $ case defn of
+      DVariant cts ->
+        let missing = S.difference (S.fromList (fmap fst cts)) seen
+        in if missing == S.empty then pure () else Left [InexhaustiveCase a (toList missing)]

@@ -92,7 +92,7 @@ newtype TypeName = TypeName { unTypeName :: Text }
   deriving (Eq, Ord, Show)
 
 -- | A constructor's name.
-newtype Constructor  = Constructor { unConName :: Text }
+newtype Constructor  = Constructor { unConstructor :: Text }
   deriving (Eq, Ord, Show)
 
 -- | Type contexts.
