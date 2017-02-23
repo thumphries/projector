@@ -74,12 +74,11 @@ interpret' e =
           fmap mconcat . mapM interpret' $ nodes
         c ->
           Left $ InterpretInvalidExpression e
-    ECase _ _ _ ->
-      -- FIX Not implemented, but this lets us test it without failures
-      pure . html $ Plain "TODO"
     EApp _ (EVar _ (Name "text")) v ->
       html . Plain
         <$> value v
+    ECase _ _ _ ->
+      Left $ InterpretInvalidExpression e
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
