@@ -39,17 +39,13 @@ import qualified Umami.Monad.FixT as U
 
 -- | Reduce to weak head normal form with an initial set of substitutions.
 whnf :: Map Name (Expr l a) -> Expr l a -> Expr l a
-whnf bnds expr =
-  fst . runEval (EvalState 0) $ do
-    expr' <- substAll bnds expr
-    whnf' expr'
+whnf bnds =
+  fst . runEval (EvalState 0) . (whnf' <=< substAll bnds)
 
 -- | Reduce to beta-eta normal form with an initial set of substitutions.
 nf :: Map Name (Expr l a) -> Expr l a -> Expr l a
-nf bnds expr =
-  fst . runEval (EvalState 0) $ do
-    expr' <- substAll bnds expr
-    nf' expr'
+nf bnds =
+  fst . runEval (EvalState 0) . (nf' <=< substAll bnds)
 
 -- -----------------------------------------------------------------------------
 
@@ -59,7 +55,7 @@ newtype Eval l a b = Eval {
 
 data EvalState l a = EvalState {
     esSupply :: Int
-  }
+  } deriving (Eq, Ord, Show)
 
 runEval :: EvalState l a -> Eval l a b -> (b, EvalState l a)
 runEval =
@@ -140,12 +136,11 @@ beta expr =
       pure expr
 
     -- Not reducible:
+    EVar _ _ ->
+      pure expr
     ELam _ _ _ _ ->
       pure expr
     ELit _ _ ->
-      pure expr
-    EVar _ _ ->
-      -- We substitute early and eagerly, not here.
       pure expr
     EForeign _ _ _ ->
       pure expr
@@ -171,28 +166,29 @@ subst :: Name -> Expr l a -> Expr l a -> Eval l a (Expr l a)
 subst x y expr = do
   let free = S.singleton x <> gatherFree y <> gatherFree expr -- this is expensive and bad
       subs = M.singleton x y
-  subst' subs free expr
+  U.fixpoint (subst' subs free) expr
 
 substAll :: Map Name (Expr l a) -> Expr l a -> Eval l a (Expr l a)
-substAll subs =
-  let free = foldMap gatherFree subs
-  in subst' subs free
+substAll subs expr = do
+  let free = S.fromList (M.keys subs) <> gatherFree expr
+  U.fixpoint (subst' subs free) expr
 
 -- | Batch substitution.
-subst' :: Map Name (Expr l a) -> Set Name -> Expr l a -> Eval l a (Expr l a)
+subst' :: Map Name (Expr l a) -> Set Name -> Expr l a -> FixT (Eval l a) (Expr l a)
 subst' subs free expr =
   case expr of
     EVar a z ->
-      pure (mcase (M.lookup z subs) expr (setAnnotation a))
+      mcase (M.lookup z subs) (pure expr) (U.progress . setAnnotation a)
 
     ELam a z ty f ->
       if S.member z free
         then
-          do z' <- fresh z free
+          do z' <- lift (fresh z free)
              -- it might be safe to just add it to the subst map and proceed in one pass?
              -- worth a try once this implementation is demonstrably correct
-             f' <- subst z (EVar a z') f
-             ELam a z' ty <$> subst' subs free f'
+             f' <- lift (subst z (EVar a z') f)
+             r' <- subst' subs free f'
+             U.progress (ELam a z' ty r')
         else ELam a z ty <$> subst' subs free f
 
     ECase a e pes ->
@@ -214,21 +210,21 @@ subst' subs free expr =
     EForeign _ _ _ ->
       pure expr
 
-patSubst :: Map Name (Expr l a) -> Set Name -> Pattern a -> Expr l a -> Eval l a (Pattern a, Expr l a)
+patSubst :: Map Name (Expr l a) -> Set Name -> Pattern a -> Expr l a -> FixT (Eval l a) (Pattern a, Expr l a)
 patSubst subs free pat expr = do
   (pat', subs') <- patFresh free pat
   let free' = free <> S.fromList (M.elems subs') <> S.fromList (M.keys subs')
   expr' <- subst' (fmap (EVar (extractPatternAnnotation pat)) subs' <> subs) free' expr
   pure (pat', expr')
 
-patFresh :: Set Name -> Pattern a -> Eval l a (Pattern a, Map Name Name)
+patFresh :: Set Name -> Pattern a -> FixT (Eval l a) (Pattern a, Map Name Name)
 patFresh free patt =
   case patt of
     PVar a n ->
       if S.member n free
         then
-          do n' <- fresh n free
-             pure (PVar a n', M.singleton n n')
+          do n' <- lift (fresh n free)
+             U.progress (PVar a n', M.singleton n n')
         else pure (PVar a n, mempty)
     PCon a c pats -> do
       pats' <- traverse (patFresh free) pats
