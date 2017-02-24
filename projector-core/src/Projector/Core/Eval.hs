@@ -14,6 +14,7 @@ module Projector.Core.Eval (
   , nf'
   , beta
   , eta
+  , match
   , subst
   ) where
 
@@ -29,6 +30,7 @@ import qualified Data.Set as S
 
 import           P
 
+import           Projector.Core.Match
 import           Projector.Core.Syntax
 
 import           Umami.Monad.FixT (FixT (..))
@@ -128,12 +130,14 @@ beta expr =
           -- Try to get to a redex
           EMap a <$> beta e1 <*> beta e2
 
-    -- case of constructor
-    ECase _a _e _ps ->
-      -- work to do here!
-      -- need to be careful with this - don't take the wrong branch
-      -- this requires pattern splitting, etc, to do correctly.
-      pure expr
+    -- some reducible cases
+    ECase a e pes ->
+      case match e pes of
+        Just (subs, alt) ->
+          lift (substAll subs alt) >>= U.progress
+        Nothing ->
+          -- try to get the scrutinee to a redex
+          ECase a <$> beta e <*> pure pes
 
     -- Not reducible:
     EVar _ _ ->
@@ -149,6 +153,53 @@ beta expr =
     EList _ _ ->
       pure expr
 
+match :: Expr l a -> [(Pattern a, Expr l a)] -> Maybe (Map Name (Expr l a), Expr l a)
+match scrut pes =
+  (,)
+    <$> matchSubs (buildMatchTree (fmap fst pes)) scrut
+    <*> asum (with pes $ \(pat, alt) -> matchesExpr scrut pat *> pure alt)
+
+-- pattern matching
+-- - build match tree
+-- - traverse match tree recursively with scrutinee
+-- - if scrutinee is Con, ok to match
+-- - if scrutinee is not con, only ok to match early wildcards
+-- - builds up a _set of substitutions_
+matchSubs :: MatchTree -> Expr l a -> Maybe (Map Name (Expr l a))
+matchSubs (MatchTree mt') expr' =
+  go False mt' expr'
+  where
+    go _ ((Con c, nt) : tt) expr@(ECon _ d _ es) =
+      -- Scrutinee is a con and pattern is a con.
+      -- If constructors match and are well-formed, we bind!
+      if c == d && length nt == length es
+        then fmap fold (zipWithM (go False) (fmap unMatchTree nt) es)
+        else go True tt expr
+
+    go True ((Var x, _) : _) expr@(ECon _ _ _ _) =
+      -- Scrutinee is a con, so it's always safe to bind
+      pure (M.singleton x expr)
+
+    go False ((Var x, _) : _) y =
+      -- We haven't falsified a Con pattern yet, so it's safe to bind anything to x
+      pure (M.singleton x y)
+
+    go _ _ _ =
+      Nothing
+
+-- this duplicates work done by matchSubs, but MatchTree doesn't tell
+-- us which pattern it chose. MatchTree structure needs to be changed.
+matchesExpr :: Expr l a -> Pattern a -> Maybe ()
+matchesExpr expr pat =
+  case (pat, expr) of
+    (PVar _ _, _) ->
+      pure ()
+    (PCon _ c1 ps, ECon _ c2 _ es) ->
+      if (c1 == c2) && (length ps == length es)
+        then zipWithM_ matchesExpr es ps
+        else empty
+    (PCon _ _ _, _) ->
+      empty
 
 -- | Eta reduction. Eliminate redundant lambda abstractions. Runs only one step.
 eta :: Expr l a -> FixT (Eval l a) (Expr l a)

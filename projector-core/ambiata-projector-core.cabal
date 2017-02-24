@@ -35,6 +35,7 @@ library
                        Projector.Core
                        Projector.Core.Check
                        Projector.Core.Eval
+                       Projector.Core.Match     
                        Projector.Core.Pretty
                        Projector.Core.Rewrite
                        Projector.Core.Syntax
