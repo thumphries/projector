@@ -23,14 +23,14 @@ import           Test.QuickCheck.Jack
 -- FIX We need a generator to round-trip property test this
 prop_interpret_unit =
   once . either (flip counterexample False) id $ do
-     (at, a) <- first show . checkTemplate $
+     (at, a) <- first show . checkTemplate mempty $
        [template|\t : String -> <div id="a" class="{ t }">{ text t }</div>|]
      let
        ma = M.fromList [("a", (at, LibraryFunction (Name "a")))]
        na = M.fromList [(Name "a", a)]
-     (_, b) <- first show . checkTemplateIncremental ma $
+     (_, b) <- first show . checkTemplateIncremental mempty ma $
        [template|<a>{ a "b" }</a><!-- c --><hr id="d" />e|]
-     h <- first show . interpret na $ b
+     h <- first show . interpret mempty na $ b
      pure $
        h
        ===
