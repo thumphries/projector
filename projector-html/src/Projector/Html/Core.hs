@@ -18,12 +18,14 @@ module Projector.Html.Core (
   , HtmlExpr
   , HtmlLit
   , constructorFunctions
+  , constructorFunctionExprs
   , constructorFunctionTypes
   , mkCon
   ) where
 
 
 import           Data.Char (ord, chr)
+import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -94,21 +96,21 @@ extractType =
   fst . PC.extractAnnotation
 
 -- Produce regular curried functions for each constructor.
-constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, HtmlExpr (Annotation b))
+constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, PC.Expr a (PC.Type a, Annotation b))
 constructorFunctions (PC.TypeDecls m) =
   M.fromList $ M.toList m >>= \(tn, decl) ->
     case decl of
       PC.DVariant cts ->
         with cts $ \(c@(PC.Constructor cn), ts) ->
-          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, mkCon (DataConstructor c tn) c tn (length ts)))
+          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, mkCon (DataConstructor c tn) c tn ts))
 
-mkCon :: a -> PC.Constructor -> PC.TypeName -> Int -> HtmlExpr a
-mkCon a c tn n =
-  let vars = fmap intVar [1..n] in
+mkCon :: a -> PC.Constructor -> PC.TypeName -> [PC.Type l] -> PC.Expr l (PC.Type l, a)
+mkCon a c tn ts =
+  let vars = fmap intVar [1..(length ts)] in
   foldr
-    (\name expr -> PC.ELam a name Nothing expr)
-    (PC.ECon a c tn (fmap (PC.EVar a) vars))
-    vars
+    (\(name, ty) expr -> PC.ELam (PC.TArrow ty (fst (PC.extractAnnotation expr)), a) name (Just ty) expr)
+    (PC.ECon (PC.TVar tn, a) c tn (L.zipWith (\v t -> PC.EVar (t, a) v) vars ts))
+    (L.zip vars ts)
 
 -- produce a, z, a1, z26 style names from integers
 intVar :: Int -> PC.Name
@@ -120,7 +122,10 @@ intVar x =
     (m, n) ->
       PC.Name (T.pack [letter m] <> renderIntegral n)
 
+constructorFunctionExprs :: PC.TypeDecls l -> Map PC.Name (PC.Expr l (PC.Type l, Annotation b))
+constructorFunctionExprs =
+  fmap snd . constructorFunctions
 
 constructorFunctionTypes :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation b)
 constructorFunctionTypes =
-  fmap (fmap PC.extractAnnotation) . constructorFunctions
+  fmap (fmap (snd . PC.extractAnnotation)) . constructorFunctions

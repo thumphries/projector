@@ -15,6 +15,8 @@ import           P
 import           Projector.Core.Eval
 import           Projector.Core.Syntax
 import           Projector.Core.Type
+import           Projector.Html.Core
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 
 data Html =
@@ -54,12 +56,17 @@ data Attribute =
   deriving (Eq, Show)
 
 data InterpretError a =
-    InterpretInvalidExpression (HtmlExpr a)
+  InterpretInvalidExpression (HtmlExpr a)
   deriving (Eq, Show)
 
-interpret :: Map Name (HtmlExpr a) -> HtmlExpr a -> Either (InterpretError a) Html
-interpret bnds =
-  interpret' . nf bnds
+interpret ::
+     HtmlDecls
+  -> Map Name (HtmlExpr (HtmlType, SrcAnnotation))
+  -> HtmlExpr (HtmlType, SrcAnnotation)
+  -> Either (InterpretError (HtmlType, SrcAnnotation)) Html
+interpret decls bnds =
+  let confuns = constructorFunctionExprs decls in
+  interpret' . nf (confuns <> bnds)
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
 interpret' e =
