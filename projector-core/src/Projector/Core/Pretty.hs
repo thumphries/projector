@@ -21,7 +21,7 @@ import           Projector.Core.Check  (TypeError(..))
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 import           Projector.Core.Type
 
-import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>), (<$$>))
+import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
 -- -----------------------------------------------------------------------------
@@ -40,8 +40,8 @@ ppTypeError' err =
     UnificationError (t1, a) (t2, b) ->
       WL.hang 2
         (text "Type error. The differing types are:"
-          <$$> annNL a (text (ppType t1))
-          <$$> annNL b (text (ppType t2)))
+          WL.<$$> annNL a (text (ppType t1))
+          WL.<$$> annNL b (text (ppType t2)))
     FreeVariable (Name n) a ->
       WL.annotate a $
         text ("Not in scope: " <> n)
@@ -73,7 +73,7 @@ ppTypeError' err =
       WL.annotate a $
       WL.hang
         2
-        (((text "Invalid pattern for type") <+> text (ppType ty) <+> (text ":")) <$$>
+        (((text "Invalid pattern for type") <+> text (ppType ty) <+> (text ":")) WL.<$$>
          (text "Constructor" <+>
           (WL.squotes (text c)) <+>
           text
@@ -93,12 +93,12 @@ ppTypeError' err =
     InfiniteType (t1, a) (t2, b) ->
       WL.hang 2
         (text "Type error (occurs check) - cannot construct the infinite type!"
-          <$$> annNL a (text (ppType t1))
-          <$$> annNL b (text (ppType t2)))
+          WL.<$$> annNL a (text (ppType t1))
+          WL.<$$> annNL b (text (ppType t2)))
 
 annNL :: a -> Doc a -> Doc a
 annNL a val =
-  WL.hang 2 ((WL.annotate a (WL.empty)) <$$> val)
+  WL.hang 2 ((WL.annotate a (WL.empty)) WL.<$$> val)
 
 -- -----------------------------------------------------------------------------
 
@@ -172,7 +172,7 @@ ppExpr' types e =
       WL.annotate a $
         WL.hang 2
               ((text ("\\" <> n <> maybe mempty typeMay mt <> "."))
-          <$$> (ppExpr' types f))
+          WL.<$$> (ppExpr' types f))
 
     ECon a (Constructor c) _ es ->
       WL.annotate a $
