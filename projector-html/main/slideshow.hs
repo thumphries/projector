@@ -264,7 +264,7 @@ parseTemplate' f t =
     k <- gets replKnown
     lift . firstEitherT ReplError $ do
       ast <- hoistEither (Html.parseTemplate f t)
-      (ty, core) <- hoistEither (Html.checkTemplateIncremental k ast)
+      (ty, core) <- hoistEither (Html.checkTemplateIncremental mempty k ast)
       pure (ast, ty, core)
 
 err :: ReplError -> Repl a

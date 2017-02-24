@@ -22,7 +22,7 @@ elabProp ast =
   either
     (\e -> counterexample (show e) (property False))
     (const (property True))
-    (checkTemplate ast)
+    (checkTemplate mempty ast)
 
 tshow :: Show a => a -> Text
 tshow =
