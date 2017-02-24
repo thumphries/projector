@@ -94,15 +94,14 @@ interpret' e =
           fmap mconcat . mapM interpret' $ nodes
         _ ->
           Left $ InterpretInvalidExpression e
-    ECase _ _ _ ->
-      -- FIX Not implemented, but this lets us test it without failures
-      pure $ Plain "TODO"
     EApp _ (EVar _ (Name "text")) v ->
       Plain
         <$> value v
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
+      Left $ InterpretInvalidExpression e
+    ECase _ _ _ ->
       Left $ InterpretInvalidExpression e
     EList _ _ ->
       Left $ InterpretInvalidExpression e
