@@ -18,9 +18,12 @@ module Projector.Html.Core (
   , HtmlExpr
   , HtmlLit
   , constructorFunctions
+  , constructorFunctionTypes
+  , mkCon
   ) where
 
 
+import           Data.Char (ord, chr)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -90,10 +93,34 @@ extractType :: HtmlExpr (HtmlType, a) -> HtmlType
 extractType =
   fst . PC.extractAnnotation
 
-constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation b)
+-- Produce regular curried functions for each constructor.
+constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, HtmlExpr (Annotation b))
 constructorFunctions (PC.TypeDecls m) =
   M.fromList $ M.toList m >>= \(tn, decl) ->
     case decl of
       PC.DVariant cts ->
         with cts $ \(c@(PC.Constructor cn), ts) ->
-          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, DataConstructor c tn))
+          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, mkCon (DataConstructor c tn) c tn (length ts)))
+
+mkCon :: a -> PC.Constructor -> PC.TypeName -> Int -> HtmlExpr a
+mkCon a c tn n =
+  let vars = fmap intVar [1..n] in
+  foldr
+    (\name expr -> PC.ELam a name Nothing expr)
+    (PC.ECon a c tn (fmap (PC.EVar a) vars))
+    vars
+
+-- produce a, z, a1, z26 style names from integers
+intVar :: Int -> PC.Name
+intVar x =
+  let letter j = chr (ord 'a' + j)
+  in case (x `mod` 26, x `div` 26) of
+    (i, 0) ->
+      PC.Name (T.pack [letter i])
+    (m, n) ->
+      PC.Name (T.pack [letter m] <> renderIntegral n)
+
+
+constructorFunctionTypes :: PC.TypeDecls a -> Map PC.Name (PC.Type a, Annotation b)
+constructorFunctionTypes =
+  fmap (fmap PC.extractAnnotation) . constructorFunctions
