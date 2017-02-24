@@ -24,7 +24,7 @@ import           Projector.Html.Data.Prim
 
 import           System.IO  (FilePath)
 
-import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>), (<$$>))
+import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
 
@@ -95,7 +95,7 @@ genTypeDec (TypeName n) ty =
   case ty of
     DVariant cts ->
       WL.hang 2
-        (text "data" <+> text n <$$> text "="
+        (text "data" <+> text n WL.<$$> text "="
           WL.<> (foldl'
                   (<+>)
                   WL.empty
@@ -126,7 +126,7 @@ genTypeSig (Name n) ty =
 
 genExpDec :: Name -> HtmlExpr a -> Doc a
 genExpDec (Name n) expr =
-  WL.hang 2 (text n <+> text "=" <$$> genExp expr)
+  WL.hang 2 (text n <+> text "=" WL.<$$> genExp expr)
 
 genExp :: HtmlExpr a -> Doc a
 genExp expr =
@@ -138,7 +138,7 @@ genExp expr =
       WL.annotate a (text x)
 
     ELam a (Name n) _ body ->
-      WL.annotate a (WL.hang 2 (WL.parens (text ("\\" <> n <> " -> ") <$$> genExp body)))
+      WL.annotate a (WL.hang 2 (WL.parens (text ("\\" <> n <> " -> ") WL.<$$> genExp body)))
 
     EApp a fun arg ->
       WL.annotate a (WL.hang 2 (WL.parens (genExp fun </> genExp arg)))
@@ -151,7 +151,7 @@ genExp expr =
        (WL.hang 2
          (WL.parens
                 ((text "case" <+> genExp f <+> text "of")
-           <$$> (foldr (\(p, g) doc -> WL.hang 2 (genMatch p g) <$$> doc)
+           WL.<$$> (foldr (\(p, g) doc -> WL.hang 2 (genMatch p g) WL.<$$> doc)
                       WL.empty
                       bs))))
 
@@ -166,7 +166,7 @@ genExp expr =
 
 genMatch :: Pattern a -> HtmlExpr a -> Doc a
 genMatch p e =
-  WL.hang 2 ((genPat p WL.<> text " ->") <$$> genExp e)
+  WL.hang 2 ((genPat p WL.<> text " ->") WL.<$$> genExp e)
 
 genPat :: Pattern a -> Doc a
 genPat p =
