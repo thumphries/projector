@@ -24,6 +24,8 @@ module Projector.Html (
   , checkModule
   , checkModules
   , codeGenModule
+  , validateModules
+  , warnModules
   -- * Templates
   , Template
   , Range
@@ -36,6 +38,7 @@ module Projector.Html (
 import qualified Data.Char as Char
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import qualified Machinator.Core as MC
@@ -220,6 +223,14 @@ libraryExprs =
 validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()
 validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
+
+-- | Look for anything we can warn about.
+warnModules :: HtmlModules -> Either [HtmlWarning (HtmlType, SrcAnnotation)] ()
+warnModules mods =
+  let binds = S.fromList (M.keys (HB.extractModuleBindings mods))
+      exprs = HB.extractModuleExprs mods
+      shadowing = void (sequenceEither (fmap (PC.warnShadowing binds) exprs))
+  in shadowing
 
 -- | Produce the initial module map from a set of template inputs.
 -- Note that:
