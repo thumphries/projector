@@ -5,6 +5,8 @@ module Projector.Html.Core (
     CoreError (..)
   , renderCoreError
   , renderCoreErrorAnnotation
+  , renderCoreWarning
+  , renderCoreWarningAnnotation
   , templateToCore
   , typeCheck
   , typeCheckAll
@@ -55,6 +57,14 @@ renderCoreError start end err =
 renderCoreErrorAnnotation :: (a -> Text) -> CoreError (Annotation a) -> Text
 renderCoreErrorAnnotation f =
   renderCoreError (\r -> (renderAnnotation f r <> ": ")) (const mempty)
+
+renderCoreWarning :: (a -> Text) -> (a -> Text) -> HtmlWarning a -> Text
+renderCoreWarning start end =
+  PCP.ppWarningDecorated start end
+
+renderCoreWarningAnnotation :: (a -> Text) -> HtmlWarning (Annotation a) -> Text
+renderCoreWarningAnnotation f =
+  renderCoreWarning (\r -> (renderAnnotation f r <> ": ")) (const mempty)
 
 templateToCore :: Template a -> Either (CoreError (Annotation a)) (HtmlType, HtmlExpr (HtmlType, Annotation a))
 templateToCore =

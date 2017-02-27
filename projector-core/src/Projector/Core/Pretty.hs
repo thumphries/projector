@@ -3,6 +3,8 @@
 module Projector.Core.Pretty (
     ppTypeError
   , ppTypeErrorDecorated
+  , ppWarning
+  , ppWarningDecorated
   , ppType
   , ppTypeInfo
   , ppExpr
@@ -20,6 +22,7 @@ import           P
 import           Projector.Core.Check  (TypeError(..))
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
 import           Projector.Core.Type
+import           Projector.Core.Warn
 
 import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
@@ -99,6 +102,24 @@ ppTypeError' err =
 annNL :: a -> Doc a -> Doc a
 annNL a val =
   WL.hang 2 ((WL.annotate a (WL.empty)) WL.<$$> val)
+
+-- -----------------------------------------------------------------------------
+
+ppWarning :: Ground l => Warning l a -> Text
+ppWarning =
+  prettyUndecorated . ppWarning'
+
+ppWarningDecorated :: Ground l => (a -> Text) -> (a -> Text) -> Warning l a -> Text
+ppWarningDecorated start end =
+  prettyDecorated start end . ppWarning'
+
+ppWarning' :: Ground l => Warning l a -> Doc a
+ppWarning' w =
+  case w of
+    ShadowedName a (Name n) ->
+      -- this message is probably not the most intuitive thing
+      WL.annotate a (text ("This binding for '" <> n <> "' shadows an existing definition."))
+
 
 -- -----------------------------------------------------------------------------
 

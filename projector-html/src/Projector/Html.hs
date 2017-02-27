@@ -72,6 +72,7 @@ import           X.Control.Monad.Trans.Either (sequenceEither)
 data HtmlError
   = HtmlParseError ParseError
   | HtmlCoreError (CoreError SrcAnnotation)
+  | HtmlCoreWarning (HtmlWarning SrcAnnotation)
   | HtmlModuleGraphError GraphError
   | HtmlBackendError HB.BackendError
   deriving (Eq, Show)
@@ -83,6 +84,8 @@ renderHtmlError he =
       renderParseError e
     HtmlCoreError e ->
       HC.renderCoreErrorAnnotation renderRange e
+    HtmlCoreWarning e ->
+      HC.renderCoreWarningAnnotation renderRange e
     HtmlModuleGraphError e ->
       renderGraphError e
     HtmlBackendError e ->
@@ -225,11 +228,11 @@ validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 
 -- | Look for anything we can warn about.
-warnModules :: HtmlModules -> Either [HtmlWarning (HtmlType, SrcAnnotation)] ()
+warnModules :: HtmlModules -> Either [HtmlError] ()
 warnModules mods =
   let binds = S.fromList (M.keys (HB.extractModuleBindings mods))
-      exprs = HB.extractModuleExprs mods
-      shadowing = void (sequenceEither (fmap (PC.warnShadowing binds) exprs))
+      exprs = fmap (fmap snd) (HB.extractModuleExprs mods)
+      shadowing = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnShadowing binds) exprs))
   in shadowing
 
 -- | Produce the initial module map from a set of template inputs.
