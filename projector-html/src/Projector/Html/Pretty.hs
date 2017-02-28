@@ -235,6 +235,12 @@ exprTokens expr =
       nodeTokens n
     TEString _ s ->
       stringTokens s
+    TEList _ es ->
+      mconcat [
+          [ListStart]
+        , mconcat (L.intersperse [ListSep] (fmap exprTokens es))
+        , [ListEnd]
+        ]
 
 stringTokens :: TIString a -> DList (Token)
 stringTokens (TIString _ ss) =

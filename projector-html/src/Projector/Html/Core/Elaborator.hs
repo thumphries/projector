@@ -126,6 +126,8 @@ eExpr expr =
       ECon (HtmlBlock a) (Constructor "Nested") Lib.nHtml [
           EList (HtmlBlock a) [eNode e]
         ]
+    TEList a es ->
+      EList (ListLiteral a) (fmap eExpr es)
 
 eStr :: TIString a -> HtmlExpr (Annotation a)
 eStr (TIString a chunks) =

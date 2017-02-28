@@ -363,6 +363,7 @@ expr' =
     <|> P.try elam
     <|> P.try evar
     <|> P.try estring
+    <|> P.try elist
     <|> P.try elementExpr
 
 evar :: Parser (TExpr Range)
@@ -441,6 +442,14 @@ estring =
     s <- stringExpr
     pure (TEString (extract s) s)
 
+elist :: Parser (TExpr Range)
+elist =
+  label "list" $ do
+    _ :@ a <- P.try (lexemeRN (token ListStart))
+    es <- sepBy (lexemeRN expr) (lexemeRN (token ListSep))
+    _ :@ b <- P.try (token ListEnd)
+    pure (TEList (a <> b) es)
+
 alt :: Parser (TAlt Range)
 alt =
   label "case alternative" $ do
@@ -518,6 +527,16 @@ listRange ls =
     go x (_:ys) =
       go x ys
 {-# INLINEABLE listRange #-}
+
+sepBy :: Parser a -> Parser sep -> Parser [a]
+sepBy m sep =
+  P.try (fmap toList (sepBy1 m sep)) <|> pure []
+
+sepBy1 :: Parser a -> Parser sep -> Parser (NonEmpty a)
+sepBy1 m sep = do
+  a <- m
+  bs <- many (P.try sep *> m)
+  pure (a :| bs)
 
 some' :: Parser a -> Parser (NonEmpty a)
 some' p = do

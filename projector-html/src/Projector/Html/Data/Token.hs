@@ -53,6 +53,9 @@ data Token
   | LamStart        -- \
   | LamBody         -- ->
   | Each            -- "each"
+  | ListStart       -- [
+  | ListEnd         -- ]
+  | ListSep     -- ,
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
@@ -103,6 +106,9 @@ renderToken tok =
     LamStart        -> "\\"
     LamBody         -> "->"
     Each            -> "each"
+    ListStart       -> "["
+    ListEnd         -> "]"
+    ListSep         -> ","
 
     PatCon t        -> t
     PatId t         -> t
