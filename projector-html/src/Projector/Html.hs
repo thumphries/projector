@@ -41,8 +41,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import qualified Machinator.Core as MC
-
 import           P
 
 import qualified Projector.Core as PC
@@ -50,7 +48,6 @@ import qualified Projector.Html.Backend as HB
 import qualified Projector.Html.Core as HC
 import           Projector.Html.Core  (CoreError(..))
 import qualified Projector.Html.Core.Elaborator as Elab
-import qualified Projector.Html.Core.Machinator as CM
 import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Data.Backend as HB
 import qualified Projector.Html.Data.Module as HB
@@ -186,7 +183,7 @@ newtype DataModuleName = DataModuleName {
   } deriving (Eq, Ord, Show)
 
 newtype UserDataTypes = UserDataTypes {
-    unUserDataTypes :: [MC.Definition]
+    unUserDataTypes :: HtmlDecls
   } deriving (Eq, Ord, Show, Monoid)
 
 newtype ModuleNamer = ModuleNamer {
@@ -201,14 +198,14 @@ runBuild b udt rts =
   runBuildIncremental b udt mempty rts
 
 runBuildIncremental :: Build -> UserDataTypes -> HtmlModules -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuildIncremental (Build mb mnr mdm) (UserDataTypes dfs) hms rts = do
+runBuildIncremental (Build mb mnr mdm) (UserDataTypes decls) hms rts = do
   -- Build the module map
   (mg, mmap) <- smush mdm mnr hms rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  checked <- first pure (checkModules (CM.machinatorDecls dfs) (libraryExprs <> HB.extractModuleBindings hms) mmap)
+  checked <- first pure (checkModules decls (libraryExprs <> HB.extractModuleBindings hms) mmap)
   -- If there's a backend, codegen (this can be a lazy stream)
   case mb of
     Just backend -> do

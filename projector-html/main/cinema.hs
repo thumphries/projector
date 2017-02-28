@@ -19,6 +19,7 @@ import qualified Machinator.Core as MC
 import           P
 
 import           Projector.Html
+import qualified Projector.Html.Core.Machinator as HMC
 
 import           System.Directory
 import qualified System.FilePath.Glob as Glob
@@ -116,11 +117,12 @@ cinemaBuild b msp tg mdg o = do
 
 -- | Parse machinator files, discard version info.
 parseDataFiles :: [FilePath] -> EitherT CinemaError IO UserDataTypes
-parseDataFiles fps =
-  fmap (UserDataTypes . fold) . for fps $ \f -> do
+parseDataFiles fps = do
+  defs <- for fps $ \f -> do
     m <- liftIO (T.readFile f)
     MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
     pure defs
+  pure (UserDataTypes (HMC.machinatorDecls (fold defs)))
 
 -- -----------------------------------------------------------------------------
 
