@@ -55,7 +55,7 @@ data Token
   | Each            -- "each"
   | ListStart       -- [
   | ListEnd         -- ]
-  | ListSep     -- ,
+  | ListSep         -- ,
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x

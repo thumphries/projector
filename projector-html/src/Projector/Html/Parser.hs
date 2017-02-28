@@ -531,18 +531,16 @@ listRange ls =
 sepBy :: Parser a -> Parser sep -> Parser [a]
 sepBy m sep =
   P.try (fmap toList (sepBy1 m sep)) <|> pure []
+{-# INLINEABLE sepBy #-}
 
 sepBy1 :: Parser a -> Parser sep -> Parser (NonEmpty a)
-sepBy1 m sep = do
-  a <- m
-  bs <- many (P.try sep *> m)
-  pure (a :| bs)
+sepBy1 m sep =
+  (:|) <$> m <*> many (P.try sep *> m)
+{-# INLINEABLE sepBy1 #-}
 
 some' :: Parser a -> Parser (NonEmpty a)
-some' p = do
-  a <- p
-  as <- many p
-  pure (a :| as)
+some' p =
+  (:|) <$> p <*> many p
 {-# INLINEABLE some' #-}
 
 suchThat :: Parser a -> (a -> Bool) -> Parser a
