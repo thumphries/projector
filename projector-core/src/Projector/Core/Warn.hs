@@ -1,4 +1,7 @@
 {-| Warnings for things like exhaustivity and shadowing -}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Core.Warn (
@@ -19,7 +22,7 @@ import           Projector.Core.Syntax
 
 data Warning l a
   = ShadowedName a Name
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 warnShadowing :: Set Name -> Expr l a -> Either [Warning l a] ()
 warnShadowing bound expr =

@@ -21,6 +21,7 @@ module Projector.Html.Data.Prim (
   , HtmlDecls
   , HtmlExpr
   , HtmlLit
+  , HtmlWarning
   , parsePrimT
   ) where
 
@@ -39,6 +40,7 @@ type HtmlDecl = Decl PrimT
 type HtmlDecls = TypeDecls PrimT
 type HtmlExpr a = Expr PrimT a
 type HtmlLit = Value PrimT
+type HtmlWarning a = Warning PrimT a
 
 -- -----------------------------------------------------------------------------
 -- Primitive types that every backend must provide/support
