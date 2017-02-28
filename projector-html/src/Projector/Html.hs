@@ -228,12 +228,13 @@ validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 
 -- | Look for anything we can warn about.
-warnModules :: HtmlModules -> Either [HtmlError] ()
-warnModules mods =
+warnModules :: HtmlDecls -> HtmlModules -> Either [HtmlError] ()
+warnModules decls mods =
   let binds = S.fromList (M.keys (HB.extractModuleBindings mods))
       exprs = fmap (fmap snd) (HB.extractModuleExprs mods)
       shadowing = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnShadowing binds) exprs))
-  in shadowing
+      exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity decls) exprs))
+  in shadowing *> exhaustiv
 
 -- | Produce the initial module map from a set of template inputs.
 -- Note that:
