@@ -29,6 +29,7 @@ data Annotation a
   | StringLiteral a
   | HtmlBlock a
   | AttributeExpression a
+  | ListLiteral a
   deriving (Eq, Ord, Show)
 
 type SrcAnnotation = Annotation Range
@@ -64,3 +65,5 @@ renderAnnotation f ann =
       f r <> " in a string literal"
     AttributeExpression r ->
       f r <> " in an attribute expression"
+    ListLiteral r ->
+      f r <> " in a list literal"

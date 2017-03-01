@@ -76,6 +76,8 @@ AttrName, UnquotedAttrValue, Space.
 \alt <Case>
 \alt <Literal>
 \alt <ExprNode>
+\alt <InterpolatedString>
+\alt <List>
 
 <Literal> ::= `"' PlainText `"'
 
@@ -98,6 +100,22 @@ AttrName, UnquotedAttrValue, Space.
 <Patterns> ::= ID <Patterns>
 \alt `(' Constructor <Patterns> `)'
 \alt $\varepsilon$
+
+<List> ::= `[' <ListExprs> `]'
+
+<ListExprs> ::= <Expr> <ListExprs'>
+\alt $\varepsilon$
+
+<ListExprs'> ::= `,' <Expr> <ListExprs>
+\alt $\varepsilon$
+
+<InterpolatedString> ::= `"' <Chunks> `"'
+
+<Chunks> ::= <Chunk> <Chunks>
+\alt $\varepsilon$
+
+<Chunk> ::= PlainText
+\alt `{' <Expr> `}'
 
 
 \end{grammar}

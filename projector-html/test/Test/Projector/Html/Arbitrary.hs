@@ -209,6 +209,7 @@ genTemplateExpr k =
         , TELam () <$> (listOf1 (TId <$> elements simpsons)) <*> genTemplateExpr j
         , TEString () <$> genInterpolatedString j
         , TEEach () <$> genTemplateExpr j <*> genTemplateExpr j
+        , TEList () <$> listOfN 0 (j `div` 2) (genTemplateExpr (j `div` 2))
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
 

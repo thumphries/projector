@@ -52,5 +52,8 @@ prop_foo_bar =
 prop_foo_literal =
   once $ elabProp [template| { text "test" }|]
 
+prop_each_list =
+  once $ elabProp [template| { each [text "test", text "me"] \x -> x } |]
+
 return []
 tests = $disorderCheckEnvAll TestRunNormal
