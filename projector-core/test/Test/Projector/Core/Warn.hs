@@ -14,6 +14,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Syntax
+import           Projector.Core.Type
 import           Projector.Core.Warn
 
 import           Test.Projector.Core.Arbitrary
@@ -40,6 +41,57 @@ prop_warn_shadowing_vac =
     warnShadowing (S.singleton (Name "billy")) (buildExpr 0)
     ===
     Right ()
+
+-- -----------------------------------------------------------------------------
+
+prop_warn_exhaustivity =
+  gamble genWellTypedTestExpr' $ \(_ty, decls, expr) ->
+    warnExhaustivity decls expr === Right ()
+
+prop_warn_exhaustivity_casey_pos =
+  gamble (chooseInt (0, 1000)) $ \n ->
+    warnExhaustivity caseyCtx (buildCase n) === Right ()
+
+prop_warn_exhaustivity_casey_neg =
+  gamble (chooseInt (1, 1000)) $ \n ->
+    warnExhaustivity caseyCtx (buildCaseInex n)
+    ===
+    Left (L.take n (L.repeat (InexhaustiveCase () [ Constructor "Foo" ] )))
+
+
+buildCase :: Int -> Expr TestLitT ()
+buildCase n = case n of
+  0 -> var_ "x"
+  m -> case_ (con (Constructor "Casey") (TypeName "Casey") [lit (VBool True)]) [
+      (pcon_ "Casey" [pvar_ "x"], buildCase (m `div` 2))
+    , (pcon_ "Foo" [pcon_ "Casey" [pvar_ "x"]], buildCase (m `div` 2))
+    , (pvar_ "x", var_ "x")
+    ]
+
+buildCaseInex :: Int -> Expr TestLitT ()
+buildCaseInex n =
+  case n of
+    0 ->
+      var_ "x"
+    m ->
+      case_
+        (con (Constructor "Casey") (TypeName "Casey") [lit (VBool True)])
+        [ ( pcon_ "Casey" [pvar_ "x"] , var_ "x" )
+        , ( pcon_ "Foo" [pcon_ "Casey" [pvar_ "x"]]
+          , (if n == 0 then var_ "x" else buildCaseInex (m - 1)))
+        ]
+
+tcasey :: Decl TestLitT
+tcasey =
+  DVariant [
+      (Constructor "Casey", [TLit TBool])
+    , (Constructor "Foo", [TVar (TypeName "Casey")])
+    ]
+
+caseyCtx :: TypeDecls TestLitT
+caseyCtx =
+  declareType (TypeName "Casey") tcasey mempty
+
 
 
 return []

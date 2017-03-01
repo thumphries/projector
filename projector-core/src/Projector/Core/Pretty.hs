@@ -59,7 +59,7 @@ ppTypeError' err =
                , "' is not a constructor for"
                , tn
                , ". Perhaps you meant one of:"
-               , T.intercalate ", " (fmap (unConName . fst) cts)
+               , T.intercalate ", " (fmap (unConstructor . fst) cts)
                ])
     BadConstructorArity (Constructor c) (DVariant cts) i a ->
       WL.annotate a $
@@ -119,6 +119,8 @@ ppWarning' w =
     ShadowedName a (Name n) ->
       -- this message is probably not the most intuitive thing
       WL.annotate a (text ("This binding for '" <> n <> "' shadows an existing definition."))
+    InexhaustiveCase a cs ->
+      WL.annotate a (text ("Patterns not matched: " <> T.intercalate ", " (fmap unConstructor cs)))
 
 
 -- -----------------------------------------------------------------------------
