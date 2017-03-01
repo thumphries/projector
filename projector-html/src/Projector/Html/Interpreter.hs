@@ -126,9 +126,6 @@ value e =
       pure v
     EApp _ (EForeign _ (Name "concat") _) (EList _ as) ->
       fmap mconcat . mapM value $ as
-    ECase _ _ _ ->
-      -- FIX Not implemented, but this lets us test it without failures
-      pure "TODO"
     _ ->
       Left $ InterpretInvalidExpression e
 
