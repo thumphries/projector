@@ -57,6 +57,7 @@ data TypeError l a
   | MissingRecordField TypeName FieldName a
   | ExtraRecordField TypeName FieldName a
   | DuplicateRecordFields TypeName [FieldName] a
+  | RecordUnificationError [TypeError l a]
   | InferenceError a
   | RecordInferenceError [(FieldName, Type l)] a
   | InfiniteType (Type l, a) (Type l, a)
@@ -752,18 +753,9 @@ unifyFields ::
   -> Fields l a
   -> EitherT (TypeError l a) (ST s) (Fields l a)
 unifyFields points (Fields fs1) (Fields fs2) = do
-  -- TODO: Migrate to sequenceEither to extract all the errors
-  Fields <$> safeMapUnionA unify fs1 fs2
-  where
-    unify _fn t1 t2 = mguST points t1 t2
-
--- | Union, performing some monadic action on duplicates.
-safeMapUnionA :: (Ord k, Applicative f) => (k -> a -> a -> f a) -> Map k a -> Map k a -> f (Map k a)
-safeMapUnionA combine =
-  M.mergeA
-    M.preserveMissing
-    M.preserveMissing
-    (M.zipWithAMatched combine)
+  let intersect = M.intersectionWith (\t1 t2 -> firstT pure (mguST points t1 t2)) fs1 fs2
+  fs3 <- firstT RecordUnificationError (ET.sequenceEitherT intersect)
+  pure (Fields (fs3 <> fs1 <> fs2))
 
 solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
 solveConstraints constraints =
