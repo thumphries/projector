@@ -53,10 +53,10 @@ prop_warn_exhaustivity_casey_pos =
     warnExhaustivity caseyCtx (buildCase n) === Right ()
 
 prop_warn_exhaustivity_casey_neg =
-  gamble (chooseInt (0, 1000)) $ \n ->
+  gamble (chooseInt (1, 1000)) $ \n ->
     warnExhaustivity caseyCtx (buildCaseInex n)
     ===
-    Left [ InexhaustiveCase () [ Constructor "Foo" ] ]
+    Left (L.take n (L.repeat (InexhaustiveCase () [ Constructor "Foo" ] )))
 
 
 buildCase :: Int -> Expr TestLitT ()
@@ -70,10 +70,16 @@ buildCase n = case n of
 
 buildCaseInex :: Int -> Expr TestLitT ()
 buildCaseInex n =
-  case_ (con (Constructor "Casey") (TypeName "Casey") [lit (VBool True)]) [
-      (pcon_ "Casey" [pvar_ "x"], (if n == 0 then var_ "x" else buildCaseInex (n-1)))
-    , (pcon_ "Foo" [pcon_ "Casey" [pvar_ "x"]], (if n == 0 then var_ "x" else buildCaseInex (n-1)))
-    ]
+  case n of
+    0 ->
+      var_ "x"
+    m ->
+      case_
+        (con (Constructor "Casey") (TypeName "Casey") [lit (VBool True)])
+        [ ( pcon_ "Casey" [pvar_ "x"] , var_ "x" )
+        , ( pcon_ "Foo" [pcon_ "Casey" [pvar_ "x"]]
+          , (if n == 0 then var_ "x" else buildCaseInex (m - 1)))
+        ]
 
 tcasey :: Decl TestLitT
 tcasey =

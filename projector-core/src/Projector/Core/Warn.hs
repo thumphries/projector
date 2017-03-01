@@ -13,6 +13,7 @@ module Projector.Core.Warn (
 
 import           Control.Monad.Trans.State (runState, modify')
 
+import qualified Data.DList as D
 import           Data.Set (Set)
 import qualified Data.Set as S
 
@@ -21,6 +22,8 @@ import           P
 import           Projector.Core.Match
 import           Projector.Core.Syntax
 import           Projector.Core.Type
+
+import           X.Control.Monad.Trans.Either as XE
 
 
 data Warning l a
@@ -71,12 +74,13 @@ warnShadowing bound expr =
 
 warnExhaustivity :: Ground l => TypeDecls l -> Expr l a -> Either [Warning l a] ()
 warnExhaustivity decls =
-  foldlExprM
-    (const (checkExhaustivity decls))
-    (\_ _ -> pure ())
-    ()
+  void . first D.toList . sequenceEither .
+    foldrExpr
+      (\e xs -> first D.singleton (checkExhaustivity decls e) : xs)
+      (\_ xs -> xs)
+      []
 
-checkExhaustivity :: Ground l => TypeDecls l -> Expr l a -> Either [Warning l a] ()
+checkExhaustivity :: Ground l => TypeDecls l -> Expr l a -> Either (Warning l a) ()
 checkExhaustivity decls expr =
   case expr of
     ECase a _ pes ->
@@ -84,11 +88,11 @@ checkExhaustivity decls expr =
     _ ->
       pure ()
 
-checkPatternExhaustivity :: Ground l => a -> TypeDecls l -> [Pattern a] -> Either [Warning l a] ()
+checkPatternExhaustivity :: Ground l => a -> TypeDecls l -> [Pattern a] -> Either (Warning l a) ()
 checkPatternExhaustivity a decls pats =
   exhaustiveMatchTree a decls (buildMatchTree pats)
 
-exhaustiveMatchTree :: Ground l => a -> TypeDecls l -> MatchTree -> Either [Warning l a] ()
+exhaustiveMatchTree :: Ground l => a -> TypeDecls l -> MatchTree -> Either (Warning l a) ()
 exhaustiveMatchTree a decls mt@(MatchTree mtt) =
   -- If this tier contains a PVar, stop.
   mcase (matchTier mt) (pure ()) $ \seen -> do
@@ -116,13 +120,13 @@ matchTier (MatchTree mt) =
     mempty
     mt
 
-checkSet :: Ground l => a -> TypeDecls l -> Set Constructor -> Either [Warning l a] ()
+checkSet :: Ground l => a -> TypeDecls l -> Set Constructor -> Either (Warning l a) ()
 checkSet a decls seen =
-  fromMaybe (Left [InexhaustiveCase a []]) $ do
+  fromMaybe (Left (InexhaustiveCase a [])) $ do
     witness <- head seen
     (tn, _tys) <- lookupConstructor witness decls
     defn <- lookupType tn decls
     pure $ case defn of
       DVariant cts ->
         let missing = S.difference (S.fromList (fmap fst cts)) seen
-        in if missing == S.empty then pure () else Left [InexhaustiveCase a (toList missing)]
+        in if missing == S.empty then pure () else Left (InexhaustiveCase a (toList missing))
