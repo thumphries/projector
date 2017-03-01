@@ -44,7 +44,7 @@ prop_hello_world =
     (=== "Hello, world!<div class=\"table\"> </div>")
   where
     (name, text) =
-      renderModule haskellBackend (ModuleName "Main") $ Module {
+      either (fail . show) id . renderModule haskellBackend (ModuleName "Main") $ Module {
           moduleTypes = mempty
         , moduleImports = M.fromList [
               (htmlRuntime, OpenImport)
@@ -65,9 +65,9 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType PrimT a -> Property
+moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Property
 moduleProp mn =
-  uncurry ghcProp . renderModule haskellBackend mn
+  uncurry ghcProp . either (fail . show) id . renderModule haskellBackend mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
 ghcProp mname modl =

@@ -11,7 +11,8 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Check
-import           Projector.Core.Syntax (extractAnnotation)
+import           Projector.Core.Syntax
+import           Projector.Core.Type
 
 import           Test.Projector.Core.Arbitrary
 
@@ -46,18 +47,84 @@ prop_illtyped_shrink =
   jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
     property (isLeft (typeCheck ctx e))
 
-{-
 -- these are disabled until we can represent type schemes
 -- (sometimes functions will simplify into id, which we can't type)
 
 -- prop_nf_consistent =
-  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    typeCheck ctx (nf mempty e) === pure ty
-
+--   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+--     typeCheck ctx (nf mempty e) === pure ty
+--
 -- prop_whnf_consistent =
-  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    typeCheck ctx (whnf mempty e) === pure ty
--}
+--   gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+--     typeCheck ctx (whnf mempty e) === pure ty
+
+-- -----------------------------------------------------------------------------
+-- Unit tests
+
+-- these should go away when the ill typed generator is cleaned up a bit
+-- (was having problems with ensuring there's a record in scope)
+
+nRecord :: TypeName
+nRecord =
+  TypeName "Record"
+
+tRecord :: Decl TestLitT
+tRecord =
+  DRecord [
+      (FieldName "foo", TLit TBool)
+    , (FieldName "bar", TLit TString)
+    , (FieldName "baz", TLit TInt)
+    ]
+
+dRecord :: TypeDecls TestLitT
+dRecord =
+  declareType nRecord tRecord mempty
+
+prop_record_unit_empty =
+  once $
+    first (const ()) (typeCheck dRecord expr)
+    ===
+    Left ()
+  where
+    expr = ERec () nRecord [
+      ]
+
+prop_record_unit_missing =
+  once $
+    typeCheck dRecord expr
+    ===
+    Left [ MissingRecordField nRecord (FieldName "bar") () ]
+  where
+    expr = ERec () nRecord [
+        (FieldName "foo", lit (VBool True))
+      , (FieldName "baz", lit (VInt 43))
+      ]
+
+prop_record_unit_complete =
+  once $
+    typeCheck dRecord expr
+    ===
+    Right (TVar nRecord)
+  where
+    expr = ERec () nRecord [
+        (FieldName "bar", lit (VString "bar!"))
+      , (FieldName "foo", lit (VBool True))
+      , (FieldName "baz", lit (VInt 43))
+      ]
+
+prop_record_unit_duplicate =
+  once $
+    typeCheck dRecord expr
+    ===
+    Left [ DuplicateRecordFields nRecord [ FieldName "bar" ] () ]
+  where
+    expr = ERec () nRecord [
+        (FieldName "bar", lit (VString "bar!"))
+      , (FieldName "foo", lit (VBool True))
+      , (FieldName "baz", lit (VInt 43))
+      , (FieldName "bar", lit (VString "bar!"))
+      ]
+
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

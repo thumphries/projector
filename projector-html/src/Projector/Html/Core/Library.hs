@@ -58,7 +58,7 @@ types =
     , (nHtml, dHtml)
     ]
 
-exprs :: Map Name (HtmlType, HtmlExpr ())
+exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, ()))
 exprs =
   M.fromList [
       (nHtmlText, (tHtmlText, eHtmlText))
@@ -162,10 +162,10 @@ tHtmlText :: HtmlType
 tHtmlText =
   TArrow (TLit TString) tHtml
 
-eHtmlText :: HtmlExpr ()
+eHtmlText :: HtmlExpr (HtmlType, ())
 eHtmlText =
-  ELam () (Name "t") (Just (TLit TString))
-    (ECon () (Constructor "Plain") nHtml [EVar () (Name "t")])
+  ELam (tHtmlText, ()) (Name "t") (Just (TLit TString))
+    (ECon (tHtml, ()) (Constructor "Plain") nHtml [EVar (TLit TString, ()) (Name "t")])
 
 -- -----------------------------------------------------------------------------
 
@@ -177,10 +177,10 @@ tHtmlAttrValue :: HtmlType
 tHtmlAttrValue =
   TArrow (TLit TString) tAttributeValue
 
-eHtmlAttrValue :: HtmlExpr ()
+eHtmlAttrValue :: HtmlExpr (HtmlType, ())
 eHtmlAttrValue =
-  lam (Name "t") (Just (TLit TString))
-    (con (Constructor "AttributeValue") nAttributeValue [var (Name "t")])
+  ELam (tHtmlAttrValue, ()) (Name "t") (Just (TLit TString))
+    (ECon (tAttributeValue, ()) (Constructor "AttributeValue") nAttributeValue [EVar (TLit TString, ()) (Name "t")])
 
 -- -----------------------------------------------------------------------------
 
@@ -192,9 +192,9 @@ tHtmlBlank :: HtmlType
 tHtmlBlank =
   tHtml
 
-eHtmlBlank :: HtmlExpr ()
+eHtmlBlank :: HtmlExpr (HtmlType, ())
 eHtmlBlank =
-  con (Constructor "Nested") nHtml
-    [list []]
+  ECon (tHtml, ()) (Constructor "Nested") nHtml
+    [EList (TList tHtml, ()) []]
 
 -- -----------------------------------------------------------------------------

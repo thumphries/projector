@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 module Test.IO.Projector.Html.Backend.Property where
 
 
@@ -47,25 +48,25 @@ fileProp mname modl f g =
     fmap g (f path')
 
 
-helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr ()))
+helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr (Prim.HtmlType, ())))
 helloWorld =
   ( Name "helloWorld"
   , ( Lib.tHtml
-    , con (Constructor "Nested") Lib.nHtml [
-        list [
-            con (Constructor "Plain") Lib.nHtml [lit (Prim.VString "Hello,")]
-          , con (Constructor "Whitespace") Lib.nHtml []
-          , app (var Lib.nHtmlText) (lit (Prim.VString "world!"))
-          , con (Constructor "Element") Lib.nHtml [
-                con (Constructor "Tag") Lib.nTag [lit (Prim.VString "div")]
-              , list [
-                    con (Constructor "Attribute") Lib.nAttribute [
-                      con (Constructor "AttributeKey") Lib.nAttributeKey [lit (Prim.VString "class")]
-                    , app (var Lib.nHtmlAttrValue) (lit (Prim.VString "table"))
+    , fmap (,()) $ ECon Lib.tHtml (Constructor "Nested") Lib.nHtml [
+        EList (TList Lib.tHtml) [
+            ECon Lib.tHtml (Constructor "Plain") Lib.nHtml [ELit (TLit Prim.TString) (Prim.VString "Hello,")]
+          , ECon Lib.tHtml (Constructor "Whitespace") Lib.nHtml []
+          , EApp Lib.tHtml (EVar Lib.tHtmlText Lib.nHtmlText) (ELit (TLit Prim.TString) (Prim.VString "world!"))
+          , ECon Lib.tHtml (Constructor "Element") Lib.nHtml [
+                ECon Lib.tTag (Constructor "Tag") Lib.nTag [ELit (TLit Prim.TString) (Prim.VString "div")]
+              , EList (TList Lib.tAttribute) [
+                    ECon Lib.tAttribute (Constructor "Attribute") Lib.nAttribute [
+                      ECon Lib.tAttributeKey (Constructor "AttributeKey") Lib.nAttributeKey [ELit (TLit Prim.TString) (Prim.VString "class")]
+                    , EApp Lib.tAttributeValue (EVar Lib.tHtmlAttrValue Lib.nHtmlAttrValue) (ELit (TLit Prim.TString) (Prim.VString "table"))
                     ]
                   ]
-              , con (Constructor "Nested") Lib.nHtml [list [con (Constructor "Whitespace") Lib.nHtml []]]
+              , ECon Lib.tHtml (Constructor "Nested") Lib.nHtml [EList (TList Lib.tHtml) [ECon Lib.tHtml (Constructor "Whitespace") Lib.nHtml []]]
               ]
-          , var Lib.nHtmlBlank
+          , EVar Lib.tHtml Lib.nHtmlBlank
           ]
       ]))

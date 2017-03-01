@@ -24,6 +24,7 @@ import           Disorder.Jack
 
 import           P
 
+import           Projector.Core.Eval (whnf)
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
@@ -78,6 +79,12 @@ genExpr n t v =
 
         ECase _ e pes ->
           e : fmap snd pes
+
+        ERec _ _ fes ->
+          fmap snd fes
+
+        EPrj _ e _ ->
+          [e]
 
         EList _ es ->
           es
@@ -141,15 +148,13 @@ genPattern c n =
 genTypeDecls ::
      Ground l
   => TypeDecls l
-  -> Jack TypeName
-  -> Jack Constructor
   -> Jack l
   -> Jack (TypeDecls l)
-genTypeDecls tc tn cs gt = do
+genTypeDecls tc gt = do
   nTypes <- chooseInt (0, 20)
   nCons <- chooseInt (0, 100)
-  types <- S.toList <$> genSizedSet nTypes tn
-  constructors <- S.toList <$> genSizedSet nCons cs
+  allNames <- S.toList <$> genSizedSet (nTypes + nCons) (fmap T.toTitle (genIdent 10))
+  let (types, constructors) = bimap (fmap TypeName) (fmap Constructor) (L.splitAt nTypes allNames)
   genTypeDecls' gt types constructors tc
 
 genTypeDecls' ::
@@ -163,10 +168,30 @@ genTypeDecls' _ [] _ tc =
   pure tc
 genTypeDecls' _ _ [] tc =
   pure tc
-genTypeDecls' g (t:ts) (c:cs) tc = do
-  (vars, cs') <- genVariantsFromContext' g c cs tc
-  let ty = DVariant vars
-  genTypeDecls' g ts cs' (declareType t ty tc)
+genTypeDecls' g tts@(t:ts) (c:cs) tc =
+  oneOf [
+      do
+       (vars, cs') <- genVariantsFromContext' g c cs tc
+       let ty = DVariant vars
+       genTypeDecls' g ts cs' (declareType t ty tc)
+    , do
+       fts <- genRecordFromContext' g tc
+       let ty = DRecord fts
+           tn = TypeName (unConstructor c)
+       genTypeDecls' g tts cs (declareType tn ty tc)
+    ]
+
+genRecordFromContext' :: Ground l => Jack l -> TypeDecls l -> Jack [(FieldName, Type l)]
+genRecordFromContext' g tc = do
+  k <- chooseInt (0, 5)
+  fns <- fmap toList (genSizedSet k genFieldName)
+  fts <- listOfN 0 k (genTypeFromContext tc g)
+  pure (L.zip fns fts)
+
+-- field names are not globally unique so we can do whatever
+genFieldName :: Jack FieldName
+genFieldName =
+  FieldName <$> elements waters
 
 genVariantsFromContext' ::
      Ground l
@@ -255,11 +280,12 @@ pinsert ctx (Context ns p) n t =
     Type (TVarF x) ->
       maybe p (declPaths n t p) (lookupType x ctx)
 
+-- figure out all the types we can reach via this type declaration
 declPaths :: Ord l => Name -> Type l -> Paths l -> Decl l -> Paths l
 declPaths n t p ty =
   case ty of
     DVariant cts ->
-      -- break it apart just one tier
+      -- break it apart just one tier (top level types in in our constructors)
       -- TODO: try recursing, might be cool
       foldl'
         (\p' (_, ts) ->
@@ -270,6 +296,8 @@ declPaths n t p ty =
             ts)
         p
         cts
+    DRecord fts ->
+      foldl' (\m (_fn, ft) -> mcons ft (n, t) m) p fts
 
 mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
 mcons k v =
@@ -284,7 +312,7 @@ genWellTypedExpr ::
   -> Jack (Expr l ())
 genWellTypedExpr ctx ty genty genval =
   sized $ \n -> do
-    k <- choose (0, n)
+    k <- choose (1, n+1)
     genWellTypedExpr' k ty ctx centy genty genval
 
 genWellTypedExpr' ::
@@ -310,11 +338,15 @@ genWellTypedExpr' n ty ctx names genty genval =
               (conn, tys) <- elements cts
               con conn x <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
 
+            Just (DRecord fts) -> do
+              rec_ x
+                <$> traverse (traverse (\t -> genWellTypedExpr' (n `div` (max 1 (length fts))) t ctx names genty genval)) fts
+
             Nothing ->
               fail "free type variable!"
 
         Type (TArrowF t1 t2) ->
-          genWellTypedLam n t1 t2 ctx names genty genval
+          genWellTypedLam (max 1 (n `div` 2)) t1 t2 ctx names genty genval
 
         Type (TListF lty) -> do
           k <- chooseInt (1, n+1)
@@ -330,6 +362,9 @@ genWellTypedExpr' n ty ctx names genty genval =
          in (oneOfOr . fmap genPath) $ if n <= 1 then nonrec else recc
 
 -- Separate simple paths from complicated ones. should probably do this structurally
+-- a simple path is any that leads directly to a literal
+-- this doesn't say much about its size, only that it will halt pretty quickly and
+-- without calling other sized generators
 partitionPaths :: [(Name, Type l)] -> ([(Name, Type l)], [(Name, Type l)])
 partitionPaths =
   L.partition $ \(_, ty) ->
@@ -370,6 +405,10 @@ genWellTypedPath ctx names more want x have =
         case lookupType n ctx of
           Just (DVariant cts) ->
             case_ (var x) <$> genAlternatives ctx names more cts want
+          Just (DRecord fts) ->
+            maybe (fail "invariant fail: can't find type in record!")
+              (\(fn, _ft) -> pure (prj (var x) fn))
+              (P.find (\(_fn,ft) -> ft == want) fts)
           Nothing ->
             fail "free type variable!"
 
@@ -431,9 +470,8 @@ genWellTypedApp n ty ctx names genty genval = do
     _ ->
       pure fun
   arg <- genWellTypedExpr' (n `div` 2) bnd ctx names genty genval
-  -- TODO reinstate the good shrink when evaluator is back
-  -- reshrink (\x -> [whnf x]) $
-  pure (app fun' arg)
+  reshrink (\x -> [whnf mempty x]) $
+    pure (app fun' arg)
 
 genWellTypedLetrec ::
      (Ground l, Ord l)
@@ -496,7 +534,12 @@ genIllTypedExpr' n ctx names genty genval =
       badCase1 = do
         -- generate patterns and alternatives for a known variant,
         -- then put some bound variable of a different type in the case statement
-        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
+        (tn, decl) <- elements (M.toList (unTypeDecls ctx))
+        let cts = case decl of
+              DVariant dts ->
+                dts
+              DRecord fts ->
+                [(Constructor (unTypeName tn), fmap snd fts)]
         nty <- genty `suchThat` (/= TVar tn)
         na <- fmap Name (elements muppets) -- name for the value of Variant type
         nn <- fmap Name (elements southpark) -- name for the new bound variable
@@ -516,7 +559,13 @@ genIllTypedExpr' n ctx names genty genval =
         -- Create a valid case statement, then swap one of the
         -- branches for one of a different type.
 
-        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
+        (tn, decl) <- elements (M.toList (unTypeDecls ctx))
+        let cts = case decl of
+              DVariant dts ->
+                dts
+              DRecord fts ->
+                [(Constructor (unTypeName tn), fmap snd fts)]
+
         nn <- fmap Name (elements muppets)
         let names' = cextend ctx names (TVar tn) nn
 
@@ -534,7 +583,13 @@ genIllTypedExpr' n ctx names genty genval =
 
       badCon = do
         -- grab some variant
-        (tn, DVariant cts) <- elements (M.toList (unTypeDecls ctx))
+        (tn, decl) <- elements (M.toList (unTypeDecls ctx))
+        let cts = case decl of
+              DVariant dts ->
+                dts
+              DRecord fts ->
+                [(Constructor (unTypeName tn), fmap snd fts)]
+
 
         -- construct it wrong
         (conn, tys) <- elements cts
@@ -710,7 +765,7 @@ genIllTypedTestExpr' = do
 
 genTestTypeDecls :: Jack (TypeDecls TestLitT)
 genTestTypeDecls
-  = genTypeDecls mempty genTypeName genConstructor genTestLitT
+  = genTypeDecls mempty genTestLitT
 
 genTestType :: TypeDecls TestLitT -> Jack (Type TestLitT)
 genTestType tc =

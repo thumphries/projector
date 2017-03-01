@@ -103,6 +103,10 @@ interpret' e =
       Left $ InterpretInvalidExpression e
     ECase _ _ _ ->
       Left $ InterpretInvalidExpression e
+    ERec _ _ _ ->
+      Left $ InterpretInvalidExpression e
+    EPrj _ _ _ ->
+      Left $ InterpretInvalidExpression e
     EList _ _ ->
       Left $ InterpretInvalidExpression e
     EMap _ _ _ ->

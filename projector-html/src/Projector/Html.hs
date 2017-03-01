@@ -18,6 +18,8 @@ module Projector.Html (
   , HB.ModuleName (..)
   , HB.BackendT (..)
   -- * Useful template and module utils
+  , checkExpr
+  , checkExprIncremental
   , parseTemplate
   , checkTemplate
   , checkTemplateIncremental
@@ -107,19 +109,33 @@ checkTemplateIncremental ::
   -> Map Text (HtmlType, SrcAnnotation)
   -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
-checkTemplateIncremental decls known ast =
+checkTemplateIncremental decls known =
+  checkExprIncremental decls known . Elab.elaborate
+
+checkExpr ::
+     HtmlDecls
+  -> HtmlExpr SrcAnnotation
+  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
+checkExpr decls =
+  checkExprIncremental decls mempty
+
+checkExprIncremental ::
+     HtmlDecls
+  -> Map Text (HtmlType, SrcAnnotation)
+  -> HtmlExpr SrcAnnotation
+  -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
+checkExprIncremental decls known =
     first HtmlCoreError
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
   . HC.typeCheckIncremental decls (HC.constructorFunctionTypes decls <> libraryExprs <> (M.mapKeys PC.Name known))
   . M.singleton (PC.Name "it")
-  $ Elab.elaborate ast
 
 checkModule ::
      HtmlDecls
-  -> HB.Module () PrimT SrcAnnotation
+  -> HB.Module a PrimT SrcAnnotation
   -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 checkModule decls (HB.Module typs imps exps) = do
-  exps' <- first HtmlCoreError (HC.typeCheckAll (decls <> typs) (fmap snd exps))
+  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) (HC.constructorFunctionTypes decls) (fmap snd exps))
   pure (HB.Module typs imps exps')
 
 -- | Figure out the dependency order of a set of modules, then
@@ -127,7 +143,7 @@ checkModule decls (HB.Module typs imps exps) = do
 checkModules ::
      HtmlDecls
   -> Map PC.Name (HtmlType, SrcAnnotation)
-  -> Map HB.ModuleName (HB.Module () PrimT SrcAnnotation)
+  -> Map HB.ModuleName (HB.Module a PrimT SrcAnnotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names
@@ -139,7 +155,7 @@ checkModules decls known exprs =
       maybe (pure (res, acc)) (\mo -> doit n mo res acc) (M.lookup n exprs)
     --
     doit n (HB.Module types imports exps) res acc = do
-      exps' <- HC.typeCheckIncremental decls acc (fmap snd exps)
+      exps' <- HC.typeCheckIncremental (decls <> types) acc (fmap snd exps)
       let result = HB.Module types imports exps'
           newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
       pure (M.insert n result res, newacc)
@@ -148,9 +164,9 @@ codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
   -> HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)
-  -> (FilePath, Text)
-codeGenModule backend =
-  HB.renderModule (HB.getBackend backend)
+  -> Either HtmlError (FilePath, Text)
+codeGenModule backend mn =
+  first HtmlBackendError . HB.renderModule (HB.getBackend backend) mn
 
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
@@ -210,7 +226,8 @@ runBuildIncremental (Build mb mnr mdm) (UserDataTypes decls) hms rts = do
   case mb of
     Just backend -> do
       validateModules backend checked
-      pure (BuildArtefacts (M.elems (M.mapWithKey (codeGenModule backend) checked)) checked)
+      gen <- first pure (M.traverseWithKey (codeGenModule backend) checked)
+      pure (BuildArtefacts (M.elems gen) checked)
     Nothing ->
       pure (BuildArtefacts [] checked)
 

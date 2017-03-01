@@ -99,7 +99,7 @@ htmlTypes =
 
 libraryExprs :: Map PC.Name (HtmlType, ())
 libraryExprs =
-  fmap (fmap PC.extractAnnotation) Library.exprs
+  fmap (fmap (snd . PC.extractAnnotation)) Library.exprs
 
 extractType :: HtmlExpr (HtmlType, a) -> HtmlType
 extractType =
@@ -113,6 +113,8 @@ constructorFunctions (PC.TypeDecls m) =
       PC.DVariant cts ->
         with cts $ \(c@(PC.Constructor cn), ts) ->
           (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, mkCon (DataConstructor c tn) c tn ts))
+      PC.DRecord fts ->
+        [(PC.Name (PC.unTypeName tn), (foldr PC.TArrow (PC.TVar tn) (fmap snd fts), mkRec (RecordConstructor tn) tn fts))]
 
 mkCon :: a -> PC.Constructor -> PC.TypeName -> [PC.Type l] -> PC.Expr l (PC.Type l, a)
 mkCon a c tn ts =
@@ -121,6 +123,14 @@ mkCon a c tn ts =
     (\(name, ty) expr -> PC.ELam (PC.TArrow ty (fst (PC.extractAnnotation expr)), a) name (Just ty) expr)
     (PC.ECon (PC.TVar tn, a) c tn (L.zipWith (\v t -> PC.EVar (t, a) v) vars ts))
     (L.zip vars ts)
+
+mkRec :: a -> PC.TypeName -> [(PC.FieldName, PC.Type l)] -> PC.Expr l (PC.Type l, a)
+mkRec a tn fts =
+  let vars = fmap intVar [1..(length fts)] in
+  foldr
+    (\(name, ty) expr -> PC.ELam (PC.TArrow ty (fst (PC.extractAnnotation expr)), a) name (Just ty) expr)
+    (PC.ERec (PC.TVar tn, a) tn (L.zipWith (\(fn, t) v -> (fn, PC.EVar (t, a) v)) fts vars))
+    (L.zip vars (fmap snd fts))
 
 -- produce a, z, a1, z26 style names from integers
 intVar :: Int -> PC.Name

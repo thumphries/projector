@@ -32,6 +32,7 @@ import           P
 
 import           Projector.Core.Match
 import           Projector.Core.Syntax
+import           Projector.Core.Type (Constructor (..), TypeName (..))
 
 import           Umami.Monad.FixT (FixT (..))
 import qualified Umami.Monad.FixT as U
@@ -89,6 +90,10 @@ nf' expr = do
       ECon a c tn <$> traverse nf' es
     ECase a e pes ->
       ECase a <$> nf' e <*> traverse (traverse nf') pes
+    ERec a tn fes ->
+      ERec a tn <$> traverse (traverse nf') fes
+    EPrj a e fn ->
+      EPrj a <$> nf' e <*> pure fn
     EList a es ->
       EList a <$> traverse nf' es
     EMap a f g ->
@@ -139,6 +144,19 @@ beta expr =
           -- try to get the scrutinee to a redex
           ECase a <$> beta e <*> pure pes
 
+    -- projections out of records
+    EPrj a e fn ->
+      case e of
+        ERec _a _tn fes ->
+          case find ((== fn) . fst) fes of
+            Just (_fn, f) ->
+              U.progress f
+            Nothing ->
+              pure expr
+        _ ->
+          -- Try to get to a redex
+          EPrj a <$> beta e <*> pure fn
+
     -- Not reducible:
     EVar _ _ ->
       pure expr
@@ -149,6 +167,8 @@ beta expr =
     EForeign _ _ _ ->
       pure expr
     ECon _ _ _ _ ->
+      pure expr
+    ERec _ _ _ ->
       pure expr
     EList _ _ ->
       pure expr
@@ -178,6 +198,17 @@ matchSubs (MatchTree mt') expr' =
 
     go True ((Var x, _) : _) expr@(ECon _ _ _ _) =
       -- Scrutinee is a con, so it's always safe to bind
+      pure (M.singleton x expr)
+
+    -- Repeating the two cases above for records.
+    go _ ((Con c, nt) : tt) expr@(ERec _ (TypeName tn) fes) =
+      -- If constructors match and are well-formed, we bind!
+      if c == (Constructor tn) && length nt == length fes
+        then fmap fold (zipWithM (go False) (fmap unMatchTree nt) (fmap snd fes))
+        else go True tt expr
+
+    go True ((Var x, _) : _) expr@(ERec _ _ _) =
+      -- Scrutinee is a record, so it's always safe to bind
       pure (M.singleton x expr)
 
     go False ((Var x, _) : _) y =
@@ -248,6 +279,10 @@ subst' subs free expr =
     -- plain ol recursion
     ECon a c tn es ->
       ECon a c tn <$> traverse (subst' subs free) es
+    ERec a tn fes ->
+      ERec a tn <$> traverse (traverse (subst' subs free)) fes
+    EPrj a e fn ->
+      EPrj a <$> subst' subs free e <*> pure fn
     EList a es ->
       EList a <$> traverse (subst' subs free) es
     EApp a f g ->

@@ -18,7 +18,7 @@ library
                      , ambiata-x-eithert
                      , transformers                    >= 0.4        && < 0.6
                      , dlist                           == 0.8.*
-                     , containers                      == 0.5.*
+                     , containers                      >= 0.5.9      && < 0.7
                      , text                            == 1.2.*
                      , annotated-wl-pprint             == 0.7.*
                      , union-find                      == 0.2.*

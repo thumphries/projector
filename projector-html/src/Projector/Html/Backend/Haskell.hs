@@ -22,6 +22,7 @@ module Projector.Html.Backend.Haskell (
   ) where
 
 
+import qualified Data.Char as Char
 import qualified Data.Map.Strict as M
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -40,15 +41,17 @@ import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 import           Projector.Html.Backend.Haskell.Prim
 import           Projector.Html.Backend.Haskell.Rewrite
-import           Projector.Html.Backend.Haskell.TH
 
 import           System.IO (FilePath)
+
+import           X.Language.Haskell.TH.Syntax
 
 
 -- -----------------------------------------------------------------------------
 
 data HaskellError
   = HtmlCase -- TODO should really return decorated parameterised error here
+  | RecordTypeInvariant
   deriving (Eq, Ord, Show)
 
 renderHaskellError :: HaskellError -> Text
@@ -56,6 +59,8 @@ renderHaskellError e =
   case e of
     HtmlCase ->
       "Don't case on Html, pal!"
+    RecordTypeInvariant ->
+      "BUG: Invariant failure - expected a record type, but found something else."
 
 predicates :: [Predicate a HaskellError]
 predicates = [
@@ -68,22 +73,28 @@ predicates = [
         PredOk
   ]
 
+-- | The set of constructors used for the Html library type.
 htmlConstructors :: Set Constructor
 htmlConstructors =
   case dHtml of
     DVariant cts ->
       S.fromList (fmap fst cts)
+    DRecord _ ->
+      mempty
 
+-- | The set of constructors used for the HtmlNode library type.
 htmlNodeConstructors :: Set Constructor
 htmlNodeConstructors =
   case dHtml of
     DVariant cts ->
       S.fromList (fmap fst cts)
+    DRecord _ ->
+      mempty
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType PrimT a -> (FilePath, Text)
-renderModule mn@(ModuleName n) m =
+renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either HaskellError (FilePath, Text)
+renderModule mn@(ModuleName n) m = do
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
@@ -96,18 +107,17 @@ renderModule mn@(ModuleName n) m =
       modName = T.unwords ["module", n, "where"]
 
       imports = fmap (uncurry genImport) (M.toList (moduleImports m'))
-      decls = fmap (T.pack . TH.pprint) (genModule m')
+  decls <- fmap (fmap (T.pack . TH.pprint)) (genModule m')
+  pure (genFileName mn, T.unlines $ mconcat [
+       pragmas
+     , [modName]
+     , imports
+     , decls
+     ])
 
-  in (genFileName mn, T.unlines $ mconcat [
-         pragmas
-       , [modName]
-       , imports
-       , decls
-       ])
-
-renderExpr :: Name -> HtmlExpr a -> Text
+renderExpr :: Name -> HtmlExpr (HtmlType, a) -> Either HaskellError Text
 renderExpr n =
-  T.pack . TH.pprint . genExpDec n . toHaskellExpr . rewriteExpr
+  fmap (T.pack . TH.pprint) . genExpDec n . toHaskellExpr . rewriteExpr
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =
@@ -121,11 +131,13 @@ genImport (ModuleName n) imports =
           "(" <> T.intercalate ", " (fmap unName quals) <> ")"
     ]
 
-genModule :: HaskellModule a -> [TH.Dec]
-genModule (Module ts _ es) =
-     genTypeDecs ts
-  <> (mconcat . with (M.toList es) $ \(n, (ty, e)) ->
-       [genTypeSig n ty, genExpDec n e])
+genModule :: HaskellModule (HtmlType, a) -> Either HaskellError [TH.Dec]
+genModule (Module ts _ es) = do
+  let tdecs = genTypeDecs ts
+  decs <- for (M.toList es) $ \(n, (ty, e)) -> do
+    d <- genExpDec n e
+    pure [genTypeSig n ty, d]
+  pure (tdecs <> fold decs)
 
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
@@ -136,6 +148,7 @@ genFileName (ModuleName n) =
 --
 -- This should be done via Machinator eventually.
 -- They shouldn't even be a field in 'Module'.
+-- We only use this for testing: we generate a lot of datatypes for our expressions.
 
 genTypeDecs :: HaskellDecls -> [TH.Dec]
 genTypeDecs =
@@ -146,11 +159,29 @@ genTypeDec (TypeName n) ty =
   case ty of
     DVariant cts ->
       data_ (mkName_ n) [] (fmap (uncurry genCon) cts)
+    DRecord fts ->
+      data_ (mkName_ n) [] [recordCon (Constructor n) fts]
 
 -- | Constructor declarations.
 genCon :: Constructor -> [HaskellType] -> TH.Con
 genCon (Constructor n) ts =
   normalC_' (mkName_ n) (fmap genType ts)
+
+-- | Record declarations.
+recordCon :: Constructor -> [(FieldName, HaskellType)] -> TH.Con
+recordCon c@(Constructor n) fts =
+  recC_' (mkName_ n) (fmap (uncurry (genRecordField c)) fts)
+
+genRecordField :: Constructor -> FieldName -> HaskellType -> (TH.Name, TH.Type)
+genRecordField c fn ft =
+  (fieldNameHeuristic c fn, genType ft)
+
+-- | Decide on a field name.
+-- TODO this should probably be customisable.
+-- TODO this has to line up with machinator, dedupe needed
+fieldNameHeuristic :: Constructor -> FieldName -> TH.Name
+fieldNameHeuristic (Constructor c) (FieldName n) =
+  mkName_ (T.singleton (Char.toLower (T.head c)) <> T.drop 1 c <> (T.toTitle n))
 
 -- | Types.
 genType :: HaskellType -> TH.Type
@@ -171,9 +202,9 @@ genType (Type ty) =
 -- -----------------------------------------------------------------------------
 
 -- | Expression declarations.
-genExpDec :: Name -> HaskellExpr a -> TH.Dec
+genExpDec :: Name -> HaskellExpr (HtmlType, a) -> Either HaskellError TH.Dec
 genExpDec (Name n) expr =
-  val_ (varP (mkName_ n)) (genExp expr)
+  val_ (varP (mkName_ n)) <$> genExp expr
 
 genTypeSig :: Name -> HaskellType -> TH.Dec
 genTypeSig (Name n) ty =
@@ -181,43 +212,67 @@ genTypeSig (Name n) ty =
 
 
 -- | Expressions.
-genExp :: HaskellExpr a -> TH.Exp
+genExp :: HaskellExpr (HtmlType, a) -> Either HaskellError TH.Exp
 genExp expr =
   case expr of
     ELit _ v ->
-      litE (genLit v)
+      pure (litE (genLit v))
 
     EVar _ (Name x) ->
-      varE (mkName_ x)
+      pure (varE (mkName_ x))
 
     ELam _ (Name n) _ body ->
-      lamE [varP (mkName_ n)] (genExp body)
+      lamE [varP (mkName_ n)] <$> genExp body
 
     EApp _ fun arg ->
-      appE (genExp fun) (genExp arg)
+      appE <$> genExp fun <*> genExp arg
 
     ECon _ (Constructor c) _ es ->
-      applyE (conE (mkName_ c)) (fmap genExp es)
+      applyE (conE (mkName_ c)) <$> traverse genExp es
 
     ECase _ e pats ->
-      caseE (genExp e) (fmap (uncurry genMatch) pats)
+      caseE <$> genExp e <*> traverse (uncurry genMatch) pats
+
+    ERec _ (TypeName tn) fes -> do
+      recConE (mkName_ tn) <$> traverse (\(fn, fe) -> (fieldNameHeuristic (Constructor tn) fn,) <$> genExp fe) fes
+
+    EPrj _ e fn ->
+      genRecordPrj e fn
 
     EList _ es ->
-      listE (fmap genExp es)
+      listE <$> traverse genExp es
 
     EForeign _ (Name x) _ ->
-      varE (mkName_ x)
+      pure (varE (mkName_ x))
 
-    EMap _ f g ->
-      applyE (varE (mkName_ "fmap")) [genExp f, genExp g]
+    EMap _ f g -> do
+      f' <- genExp f
+      g' <- genExp g
+      pure (applyE (varE (mkName_ "fmap")) [f', g'])
+
+-- | Compile a Projector record projection to Haskell.
+--
+-- This is type-directed, unlike everything else in this compiler!
+-- We need to look at the type of the expr, and use it to apply 'fieldNameHeuristic'.
+--
+-- This is partial, but the failing branch can only occur if the
+-- typechecker doesn't work.
+genRecordPrj :: HaskellExpr (HtmlType, a) -> FieldName -> Either HaskellError TH.Exp
+genRecordPrj e fn =
+  case extractAnnotation e of
+    (TVar (TypeName recName), _) ->
+      appE (varE (fieldNameHeuristic (Constructor recName) fn)) <$> genExp e
+
+    (_, _) ->
+      Left RecordTypeInvariant
 
 -- | Case alternatives.
-genMatch :: Pattern a -> HaskellExpr a -> TH.Match
+genMatch :: Pattern (HtmlType, a) -> HaskellExpr (HtmlType, a) -> Either HaskellError TH.Match
 genMatch p e =
-  match_ (genPat p) (genExp e)
+  match_ (genPat p) <$> genExp e
 
 -- | Patterns.
-genPat :: Pattern a -> TH.Pat
+genPat :: Pattern (HtmlType, a) -> TH.Pat
 genPat p = case p of
   PVar _ (Name n) ->
     varP (mkName_ n)

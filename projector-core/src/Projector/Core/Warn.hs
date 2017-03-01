@@ -63,6 +63,10 @@ warnShadowing bound expr =
                 shad = S.intersection bnds bound'
             when (shad /= mempty) (for_ (toList shad) (warn . ShadowedName a))
             go (bnds <> bound') alt
+        ERec _ _ fes -> do
+          traverse_ (go bound') (fmap snd fes)
+        EPrj _ e _ ->
+          go bound e
         EList _ es -> do
           traverse_ (go bound') es
         EMap _ f g -> do
@@ -126,7 +130,12 @@ checkSet a decls seen =
     witness <- head seen
     (tn, _tys) <- lookupConstructor witness decls
     defn <- lookupType tn decls
-    pure $ case defn of
-      DVariant cts ->
-        let missing = S.difference (S.fromList (fmap fst cts)) seen
-        in if missing == S.empty then pure () else Left (InexhaustiveCase a (toList missing))
+    let missing = case defn of
+          DVariant cts ->
+            S.difference (S.fromList (fmap fst cts)) seen
+          DRecord _ ->
+            S.difference (S.singleton (Constructor (unTypeName tn))) seen
+    pure $
+      if missing == S.empty
+        then pure ()
+        else Left (InexhaustiveCase a (toList missing))
