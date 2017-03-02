@@ -71,8 +71,11 @@ pop =
 
 data LexerMode =
     HtmlMode
+  | HtmlCommentMode
   | TagMode
   | ExprMode
+  | ExprCommentMode
+  | StringMode
   deriving (Eq, Ord, Show)
 
 satisfyMode :: LexerMode -> Parser ()
@@ -146,8 +149,11 @@ template =
 token :: Parser Token
 token =
       (satisfyMode HtmlMode *> htmlToken)
+  <|> (satisfyMode HtmlCommentMode *> htmlCommentToken)
   <|> (satisfyMode TagMode *> tagToken)
   <|> (satisfyMode ExprMode *> exprToken)
+  <|> (satisfyMode ExprCommentMode *> exprCommentToken)
+  <|> (satisfyMode StringMode *> stringToken)
 
 
 -- -----------------------------------------------------------------------------
@@ -157,6 +163,7 @@ htmlToken :: Parser Token
 htmlToken =
       whitespace
   <|> newline
+  <|> tagCommentStart
   <|> tagOpen
   <|> exprStart
   <|> plainText
@@ -167,25 +174,34 @@ tagOpen =
 
 plainText :: Parser Token
 plainText =
-  Plain . T.pack <$> some (P.try plainChar)
-
-plainChar :: Parser Char
-plainChar = do
-  let breaks p =
-        -- characters that begin rules at the same level
-        p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}'
-  c <- P.anyChar
-  if c == '\\'
-    then do
-      d <- optional P.anyChar
-      maybe empty (\p -> if breaks p then pure p else empty) d
-    else
-      if breaks c then empty else pure c
+  fmap Plain . escaping $ \p ->
+    -- characters that begin rules at the same level
+    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}'
 
 exprStart :: Parser Token
 exprStart =
   char '{' *> pure ExprStart <* push ExprMode
 
+tagCommentStart :: Parser Token
+tagCommentStart =
+  string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
+
+-- -----------------------------------------------------------------------------
+-- HTML comments
+
+htmlCommentToken :: Parser Token
+htmlCommentToken =
+      tagCommentEnd
+  <|> tagCommentChunk
+
+tagCommentChunk :: Parser Token
+tagCommentChunk =
+  TagCommentChunk <$> someTill P.anyChar (string "--")
+
+tagCommentEnd :: Parser Token
+tagCommentEnd =
+  -- We actually break on -- and expect TagClose
+  string "--" *> pure TagCommentEnd <* pop <* push TagMode
 
 -- -----------------------------------------------------------------------------
 -- Tag mode
@@ -228,12 +244,14 @@ exprToken =
   <|> exprListStart
   <|> exprListSep
   <|> exprListEnd
-  <|> exprEnd
+  <|> exprStringStart
   <|> exprCaseStart
   <|> exprCaseOf
   <|> exprCaseSep
   <|> exprLamStart
   <|> exprArrow
+  <|> exprCommentStart
+  <|> exprEnd
 
 exprLParen :: Parser Token
 exprLParen =
@@ -254,6 +272,10 @@ exprListSep =
 exprListEnd :: Parser Token
 exprListEnd =
   char ']' *> pure ExprListEnd
+
+exprStringStart :: Parser Token
+exprStringStart =
+  char '"' *> pure StringStart <* push StringMode
 
 exprEnd :: Parser Token
 exprEnd =
@@ -279,6 +301,53 @@ exprArrow :: Parser Token
 exprArrow =
   string "->" *> pure ExprArrow
 
+exprCommentStart :: Parser Token
+exprCommentStart =
+  string "{-" *> pure ExprCommentStart <* push ExprCommentMode
+
+-- -----------------------------------------------------------------------------
+-- Expr comments
+
+exprCommentToken :: Parser Token
+exprCommentToken =
+      exprCommentEnd
+  <|> exprCommentStart
+  <|> exprCommentChunk
+
+exprCommentChunk :: Parser Token
+exprCommentChunk =
+  ExprCommentChunk <$> someTill P.anyChar (string "{-" <|> string "-}")
+
+exprCommentEnd :: Parser Token
+exprCommentEnd =
+  string "-}" *> pure ExprCommentEnd <* pop
+
+-- -----------------------------------------------------------------------------
+-- String mode
+
+stringToken :: Parser Token
+stringToken =
+      stringChunk
+  <|> stringExprStart
+  <|> stringEnd
+
+stringEnd :: Parser Token
+stringEnd =
+  char '"' *> pure StringEnd <* pop
+
+stringExprStart :: Parser Token
+stringExprStart =
+  char '{' *> pure ExprStart <* push ExprMode
+
+stringChunk :: Parser Token
+stringChunk =
+  StringChunk <$> stringChunkText
+
+stringChunkText :: Parser Text
+stringChunkText =
+  escaping $ \p ->
+    -- characters that begin rules at the same level
+    p == '"' || p == '{'
 
 -- -----------------------------------------------------------------------------
 -- General tokens
@@ -293,6 +362,32 @@ newline =
 
 
 -- -----------------------------------------------------------------------------
+
+someTill' :: Parser m -> Parser end -> Parser [m]
+someTill' m end =
+  P.someTill m (P.lookAhead end)
+
+someTill :: Parser Char -> Parser a -> Parser Text
+someTill m end =
+  T.pack <$> someTill' m end
+
+escaping' :: Char -> (Char -> Bool) -> Parser Char
+escaping' echar breaks = do
+  c <- P.anyChar
+  if c == echar
+    then do
+      d <- optional P.anyChar
+      maybe empty (\p -> if breaks p then pure p else empty) d
+    else
+      if breaks c then empty else pure c
+
+escapeChar :: Char
+escapeChar =
+  '\\'
+
+escaping :: (Char -> Bool) -> Parser Text
+escaping breaks =
+  T.pack <$> some (P.try (escaping' escapeChar breaks))
 
 char :: Char -> Parser ()
 char =
