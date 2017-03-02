@@ -60,10 +60,15 @@ library
 
                        Projector.Html.ModuleGraph
 
-                       Projector.Html.Parser
-                       Projector.Html.Parser.QQ
-
                        Projector.Html.Pretty
+
+                       Projector.Html.Syntax
+                       Projector.Html.Syntax.Lexer
+                       Projector.Html.Syntax.Lexer.Tokenise
+                       Projector.Html.Syntax.Lexer.Layout
+                       Projector.Html.Syntax.Parser
+                       Projector.Html.Syntax.Token
+                       Projector.Html.Syntax.QQ
 
 
 test-suite test

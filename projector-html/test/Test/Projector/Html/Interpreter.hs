@@ -15,7 +15,7 @@ import           Projector.Core
 import           Projector.Html
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Interpreter
-import           Projector.Html.Parser.QQ  (template)
+import           Projector.Html.Syntax.QQ  (template)
 
 import           Test.QuickCheck.Jack
 
