@@ -65,6 +65,12 @@ library
 
                        Projector.Html.Pretty
 
+                       Projector.Html.Syntax
+                       Projector.Html.Syntax.Lexer
+                       Projector.Html.Syntax.Lexer.Tokenise
+                       Projector.Html.Syntax.Lexer.Layout
+                       Projector.Html.Syntax.Parser
+
 
 test-suite test
   type:                exitcode-stdio-1.0
