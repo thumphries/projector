@@ -33,7 +33,8 @@ data Token =
   | ExprCaseOf            -- of
   | ExprArrow             -- ->
   | ExprCaseSep           -- ;
-  | ExprIdent Text        -- id, Maybe
+  | ExprConId Text        -- Maybe
+  | ExprVarId Text        -- id
   | ExprLamStart          -- \
   | ExprCommentStart      -- {-
   | ExprCommentChunk Text -- foo
