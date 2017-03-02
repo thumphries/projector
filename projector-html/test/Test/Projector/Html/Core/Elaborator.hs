@@ -14,7 +14,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Html
-import           Projector.Html.Parser.QQ  (template)
+import           Projector.Html.Syntax.QQ  (template)
 
 
 elabProp :: Template Range -> Property
