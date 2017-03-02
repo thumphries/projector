@@ -164,13 +164,19 @@ htmlToken =
       whitespace
   <|> newline
   <|> tagCommentStart
+  <|> tagCloseOpen
   <|> tagOpen
   <|> exprStart
+  <|> htmlExprEnd
   <|> plainText
 
 tagOpen :: Parser Token
 tagOpen =
   char '<' *> pure TagOpen <* push TagMode
+
+tagCloseOpen :: Parser Token
+tagCloseOpen =
+  string "</" *> pure TagCloseOpen <* push TagMode
 
 plainText :: Parser Token
 plainText =
@@ -181,6 +187,10 @@ plainText =
 exprStart :: Parser Token
 exprStart =
   char '{' *> pure ExprStart <* push ExprMode
+
+htmlExprEnd :: Parser Token
+htmlExprEnd =
+  char '}' *> pure ExprEnd <* pop <* pop
 
 tagCommentStart :: Parser Token
 tagCommentStart =
@@ -214,6 +224,7 @@ tagToken =
   <|> tagClose
   <|> tagSelfClose
   <|> tagIdent
+  <|> tagStringStart
 
 tagIdent :: Parser Token
 tagIdent =
@@ -231,6 +242,9 @@ tagSelfClose :: Parser Token
 tagSelfClose =
   string "/>" *> pure TagSelfClose <* pop
 
+tagStringStart :: Parser Token
+tagStringStart =
+  char '"' *> pure StringStart <* push StringMode
 
 -- -----------------------------------------------------------------------------
 -- Expression tokens
@@ -251,7 +265,12 @@ exprToken =
   <|> exprLamStart
   <|> exprArrow
   <|> exprCommentStart
+  <|> exprStart
   <|> exprEnd
+  <|> exprHtmlStart
+  <|> exprConId
+  <|> exprVarId
+
 
 exprLParen :: Parser Token
 exprLParen =
@@ -305,6 +324,18 @@ exprCommentStart :: Parser Token
 exprCommentStart =
   string "{-" *> pure ExprCommentStart <* push ExprCommentMode
 
+exprConId :: Parser Token
+exprConId =
+  fmap (ExprConId . T.pack) ((:) <$> P.upperChar <*> many P.alphaNumChar)
+
+exprVarId :: Parser Token
+exprVarId =
+  fmap (ExprVarId . T.pack) ((:) <$> P.lowerChar <*> many P.alphaNumChar)
+
+exprHtmlStart :: Parser Token
+exprHtmlStart =
+  char '<' *> pure TagOpen <* push HtmlMode <* push TagMode
+
 -- -----------------------------------------------------------------------------
 -- Expr comments
 
@@ -321,6 +352,7 @@ exprCommentChunk =
 exprCommentEnd :: Parser Token
 exprCommentEnd =
   string "-}" *> pure ExprCommentEnd <* pop
+
 
 -- -----------------------------------------------------------------------------
 -- String mode
@@ -348,6 +380,7 @@ stringChunkText =
   escaping $ \p ->
     -- characters that begin rules at the same level
     p == '"' || p == '{'
+
 
 -- -----------------------------------------------------------------------------
 -- General tokens
