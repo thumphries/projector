@@ -19,9 +19,7 @@ import           P
 import           Projector.Html.Data.Position
 import           Projector.Html.Syntax.Token
 
-import           Text.Megaparsec (label)
 import qualified Text.Megaparsec as P
-import qualified Text.Megaparsec.Lexer as L
 
 import           System.IO  (FilePath)
 
@@ -143,11 +141,10 @@ failWith err =
 
 template :: Parser [Positioned Token]
 template =
-  push HtmlMode *> many token
+  push HtmlMode *> many (withPosition token)
 
-token :: Parser (Positioned Token)
+token :: Parser Token
 token =
-  withPosition $
       (satisfyMode HtmlMode *> htmlToken)
   <|> (satisfyMode TagMode *> tagToken)
   <|> (satisfyMode ExprMode *> exprToken)
@@ -170,7 +167,7 @@ tagOpen =
 
 plainText :: Parser Token
 plainText =
-  fmap (Plain . T.pack) (some (P.try plainChar))
+  Plain . T.pack <$> some (P.try plainChar)
 
 plainChar :: Parser Char
 plainChar = do
@@ -197,8 +194,18 @@ tagToken :: Parser Token
 tagToken =
       whitespace
   <|> newline
+  <|> tagEquals
   <|> tagClose
   <|> tagSelfClose
+  <|> tagIdent
+
+tagIdent :: Parser Token
+tagIdent =
+  TagIdent . T.pack <$> some P.letterChar
+
+tagEquals :: Parser Token
+tagEquals =
+  char '=' *> pure TagEquals
 
 tagClose :: Parser Token
 tagClose =
@@ -216,11 +223,61 @@ exprToken :: Parser Token
 exprToken =
       whitespace
   <|> newline
+  <|> exprLParen
+  <|> exprRParen
+  <|> exprListStart
+  <|> exprListSep
+  <|> exprListEnd
   <|> exprEnd
+  <|> exprCaseStart
+  <|> exprCaseOf
+  <|> exprCaseSep
+  <|> exprLamStart
+  <|> exprArrow
+
+exprLParen :: Parser Token
+exprLParen =
+  char '(' *> pure ExprLParen
+
+exprRParen :: Parser Token
+exprRParen =
+  char ')' *> pure ExprRParen
+
+exprListStart :: Parser Token
+exprListStart =
+  char '[' *> pure ExprListStart
+
+exprListSep :: Parser Token
+exprListSep =
+  char ',' *> pure ExprListSep
+
+exprListEnd :: Parser Token
+exprListEnd =
+  char ']' *> pure ExprListEnd
 
 exprEnd :: Parser Token
 exprEnd =
   char '}' *> pure ExprEnd <* pop
+
+exprCaseStart :: Parser Token
+exprCaseStart =
+  string "case" *> pure ExprCaseStart
+
+exprCaseOf :: Parser Token
+exprCaseOf =
+  string "of" *> pure ExprCaseOf
+
+exprCaseSep :: Parser Token
+exprCaseSep =
+  char ';' *> pure ExprCaseSep
+
+exprLamStart :: Parser Token
+exprLamStart =
+  char '\\' *> pure ExprLamStart
+
+exprArrow :: Parser Token
+exprArrow =
+  string "->" *> pure ExprArrow
 
 
 -- -----------------------------------------------------------------------------
