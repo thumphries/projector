@@ -19,6 +19,7 @@ data Token =
   | TagIdent Text    -- a, href, true
   | TagEquals        -- =
   | Plain Text       -- hello world
+  | ExprStart        -- {
 
   -- Expr mode
   | ExprLParen       -- (
@@ -33,12 +34,11 @@ data Token =
   | ExprIdent Text   -- id, Maybe
   | ExprLamStart     -- \
   | ExprComment Text -- {- foo -}
+  | ExprEnd          -- }
 
   -- General ambiguous
   | Whitespace Int   -- "   "
   | Newline          -- \n
-  | ExprStart        -- {
-  | ExprEnd          -- }
   | StringDelimiter  -- "
   | StringChunk Text -- foo
   deriving (Eq, Ord, Show)
