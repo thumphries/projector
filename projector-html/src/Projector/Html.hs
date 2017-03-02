@@ -57,7 +57,8 @@ import           Projector.Html.Data.Position  (Range, renderRange)
 import           Projector.Html.Data.Prim
 import           Projector.Html.Data.Template  (Template)
 import           Projector.Html.ModuleGraph
-import           Projector.Html.Parser (ParseError (..), renderParseError, parse)
+import           Projector.Html.Syntax (SyntaxError (..), renderSyntaxError)
+import qualified Projector.Html.Syntax as Syntax
 
 import qualified System.FilePath.Posix as FilePath
 import           System.IO  (FilePath)
@@ -69,7 +70,7 @@ import           X.Control.Monad.Trans.Either (sequenceEither)
 -- Top-level errors
 
 data HtmlError
-  = HtmlParseError ParseError
+  = HtmlSyntaxError SyntaxError
   | HtmlCoreError (CoreError SrcAnnotation)
   | HtmlCoreWarning (HtmlWarning SrcAnnotation)
   | HtmlModuleGraphError GraphError
@@ -79,8 +80,8 @@ data HtmlError
 renderHtmlError :: HtmlError -> Text
 renderHtmlError he =
   case he of
-    HtmlParseError e ->
-      renderParseError e
+    HtmlSyntaxError e ->
+      renderSyntaxError e
     HtmlCoreError e ->
       HC.renderCoreErrorAnnotation renderRange e
     HtmlCoreWarning e ->
@@ -95,7 +96,7 @@ renderHtmlError he =
 
 parseTemplate :: FilePath -> Text -> Either HtmlError (Template Range)
 parseTemplate f =
-  first HtmlParseError . parse f
+  first HtmlSyntaxError . Syntax.templateFromText f
 
 checkTemplate ::
      HtmlDecls
