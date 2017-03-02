@@ -341,7 +341,7 @@ exprChunk =
   label "string expression fragment" $ do
     _ :@ a <- lexemeRN (token ExprStart)
     e <- lexemeRN expr
-    _ :@ b <- lexemeRN (token ExprEnd)
+    _ :@ b <- token ExprEnd
     pure (TExprChunk (a <> b) e)
 
 
