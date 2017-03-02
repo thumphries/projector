@@ -71,6 +71,12 @@ library
 
                        Projector.Html.Pretty
 
+                       Projector.Html.Syntax
+                       Projector.Html.Syntax.Lexer
+                       Projector.Html.Syntax.Lexer.Tokenise
+                       Projector.Html.Syntax.Lexer.Layout
+                       Projector.Html.Syntax.Parser
+
 
 executable cinema
   hs-source-dirs:     gen
