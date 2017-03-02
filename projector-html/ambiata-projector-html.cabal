@@ -73,6 +73,7 @@ library
                        Projector.Html.Syntax.Lexer.Tokenise
                        Projector.Html.Syntax.Lexer.Layout
                        Projector.Html.Syntax.Parser
+                       Projector.Html.Syntax.Token
                        Projector.Html.Syntax.QQ
 
 
