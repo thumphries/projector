@@ -36,6 +36,7 @@ data Token =
   | ExprConId Text        -- Maybe
   | ExprVarId Text        -- id
   | ExprLamStart          -- \
+  | ExprDot               -- .
   | ExprCommentStart      -- {-
   | ExprCommentChunk Text -- foo
   | ExprCommentEnd        -- -}

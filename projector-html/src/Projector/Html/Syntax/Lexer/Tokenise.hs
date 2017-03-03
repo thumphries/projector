@@ -264,6 +264,7 @@ exprToken =
   <|> exprCaseSep
   <|> exprLamStart
   <|> exprArrow
+  <|> exprDot
   <|> exprCommentStart
   <|> exprStart
   <|> exprEnd
@@ -311,6 +312,10 @@ exprCaseOf =
 exprCaseSep :: Parser Token
 exprCaseSep =
   char ';' *> pure ExprCaseSep
+
+exprDot :: Parser Token
+exprDot =
+  char '.' *> pure ExprDot
 
 exprLamStart :: Parser Token
 exprLamStart =
@@ -395,6 +400,7 @@ newline =
 
 
 -- -----------------------------------------------------------------------------
+-- low level parsers
 
 someTill' :: Parser m -> Parser end -> Parser [m]
 someTill' m end =
