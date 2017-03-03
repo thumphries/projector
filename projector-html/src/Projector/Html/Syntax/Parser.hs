@@ -38,10 +38,12 @@ parse :: [Positioned Token] -> Either ParseError (Expr Range)
 parse toks =
   let (results, report) = E.fullParses (E.parser template) toks
   in case results of
-       [] ->
-         Left (ParseError (T.pack (ppShow report)))
-       (x:_) ->
+       [x] ->
          pure x
+       _ ->
+         Left (ParseError (T.pack (ppShow report) <> " (ambiguous - " <> renderIntegral (length results) <> " parses)"))
+--       (x:_) ->
+--         pure x
 
 -- -----------------------------------------------------------------------------
 
@@ -98,10 +100,12 @@ html expr' =
 expr :: Grammar r (Expr Range)
 expr = mdo
   expr' <- E.rule $
+        exprApp expr' expr''
+    <|> expr''
+  expr'' <- E.rule $
         exprParens expr'
-    <|> exprApp expr'
     <|> exprLam expr'
-    <|> exprPrj expr'
+    <|> exprPrj expr''
     <|> exprVar
   pure expr'
 
@@ -109,11 +113,11 @@ exprParens :: Rule r (Expr Range) -> Rule r (Expr Range)
 exprParens =
   delimited ExprLParen ExprRParen (\a b -> setAnnotation (a <> b))
 
-exprApp :: Rule r (Expr Range) -> Rule r (Expr Range)
-exprApp expr' =
+exprApp :: Rule r (Expr Range) -> Rule r (Expr Range) -> Rule r (Expr Range)
+exprApp expr' expr'' =
   (\e1 e2 -> EApp (extractAnnotation e1 <> extractAnnotation e2) e1 e2)
     <$> expr'
-    <*> expr'
+    <*> expr''
 
 exprPrj :: Rule r (Expr Range) -> Rule r (Expr Range)
 exprPrj expr' =
