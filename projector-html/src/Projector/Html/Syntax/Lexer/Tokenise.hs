@@ -199,7 +199,7 @@ tagCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
 
 -- -----------------------------------------------------------------------------
--- HTML comments
+-- HTML comments - these can't be nested, they halt on the first '-->'
 
 htmlCommentToken :: Parser Token
 htmlCommentToken =
@@ -360,7 +360,7 @@ exprHtmlStart =
   char '<' *> pure TagOpen <* push TagOpenMode
 
 -- -----------------------------------------------------------------------------
--- Expr comments
+-- Expr comments - unlike HTML, these can be nested {- foo {- bar -} baz -}
 
 exprCommentToken :: Parser Token
 exprCommentToken =
