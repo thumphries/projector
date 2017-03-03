@@ -10,7 +10,9 @@ module Projector.Html.Data.Template (
   -- * AST internals
   -- ** Type signatures
   , TTypeSig (..)
+  , setTTypeSigAnnotation
   , TType (..)
+  , setTTypeAnnotation
   -- ** Html
   , THtml (..)
   , TNode (..)
@@ -18,8 +20,10 @@ module Projector.Html.Data.Template (
   , TAttrValue (..)
   -- ** Expressions
   , TExpr (..)
+  , setTExprAnnotation
   , TAlt (..)
   , TPattern (..)
+  , setTPatAnnotation
   , TIString (..)
   , TIChunk (..)
   -- ** Strings
@@ -56,6 +60,12 @@ data TTypeSig a
   = TTypeSig a (NonEmpty (TId, TType a))
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
+setTTypeSigAnnotation :: a -> TTypeSig a -> TTypeSig a
+setTTypeSigAnnotation a ts =
+  case ts of
+    TTypeSig _ b ->
+      TTypeSig a b
+
 instance Comonad TTypeSig where
   extract (TTypeSig a _) =
     a
@@ -67,6 +77,12 @@ data TType a
 --  | TTList a (TType a)
 --  | TTApp a (TType a) (TType a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+setTTypeAnnotation :: a -> TType a -> TType a
+setTTypeAnnotation a ty =
+  case ty of
+    TTVar _ b ->
+      TTVar a b
 
 instance Comonad TType where
   extract ty =
@@ -225,6 +241,26 @@ instance Comonad TExpr where
       TEList _ es ->
         TEList (f expr) (fmap (extend f) es)
 
+setTExprAnnotation :: a -> TExpr a -> TExpr a
+setTExprAnnotation a expr =
+  case expr of
+    TEVar _ b ->
+      TEVar a b
+    TELam _ b c ->
+      TELam a b c
+    TEApp _ b c ->
+      TEApp a b c
+    TECase _ b c ->
+      TECase a b c
+    TEEach _ b c ->
+      TEEach a b c
+    TENode _ b ->
+      TENode a b
+    TEString _ b ->
+      TEString a b
+    TEList _ b ->
+      TEList a b
+
 data TIString a = TIString a [TIChunk a]
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
@@ -282,6 +318,14 @@ instance Comonad TPattern where
         TPVar (f pat) a
       TPCon _ a b ->
         TPCon (f pat) a (fmap (extend f) b)
+
+setTPatAnnotation :: a -> TPattern a -> TPattern a
+setTPatAnnotation a pat =
+  case pat of
+    TPVar _ b ->
+      TPVar a b
+    TPCon _ b c ->
+      TPCon a b c
 
 data TTag a = TTag a Text
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)

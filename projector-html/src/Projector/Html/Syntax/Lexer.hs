@@ -4,6 +4,7 @@ module Projector.Html.Syntax.Lexer (
     LexError (..)
   , renderLexError
   , lex
+  , lexDebug
   ) where
 
 
@@ -30,3 +31,7 @@ renderLexError le =
 lex :: FilePath -> Text -> Either LexError [Positioned Token]
 lex file =
   bimap LexTokenError layout . tokenise file
+
+lexDebug :: FilePath -> Text -> Either LexError [(Maybe Layout, Positioned Token)]
+lexDebug file =
+  bimap LexTokenError layoutDebug . tokenise file

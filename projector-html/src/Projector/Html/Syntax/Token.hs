@@ -9,9 +9,16 @@ import           P
 
 
 data Token =
-  -- Type signatures
+  -- Type signatures (OLD FORMAT)
+    TypeSigStart          -- \
+  | TypeSigSep            -- ;
+  | TypeSigEnd            -- ->
+  | TypeSig               -- :
+  | TypeIdent Text        -- foo | Foo
+  | TypeLParen            -- (
+  | TypeRParen            -- )
   -- HTML mode
-    TagOpen               -- <
+  | TagOpen               -- <
   | TagClose              -- >
   | TagCloseOpen          -- </
   | TagSelfClose          -- />
