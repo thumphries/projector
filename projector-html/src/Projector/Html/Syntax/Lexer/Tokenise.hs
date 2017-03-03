@@ -72,7 +72,8 @@ pop =
 data LexerMode =
     HtmlMode
   | HtmlCommentMode
-  | TagMode
+  | TagOpenMode
+  | TagCloseMode
   | ExprMode
   | ExprCommentMode
   | StringMode
@@ -150,7 +151,8 @@ token :: Parser Token
 token =
       (satisfyMode HtmlMode *> htmlToken)
   <|> (satisfyMode HtmlCommentMode *> htmlCommentToken)
-  <|> (satisfyMode TagMode *> tagToken)
+  <|> (satisfyMode TagOpenMode *> tagOpenToken)
+  <|> (satisfyMode TagCloseMode *> tagCloseToken)
   <|> (satisfyMode ExprMode *> exprToken)
   <|> (satisfyMode ExprCommentMode *> exprCommentToken)
   <|> (satisfyMode StringMode *> stringToken)
@@ -172,11 +174,11 @@ htmlToken =
 
 tagOpen :: Parser Token
 tagOpen =
-  char '<' *> pure TagOpen <* push TagMode
+  char '<' *> pure TagOpen <* push TagOpenMode
 
 tagCloseOpen :: Parser Token
 tagCloseOpen =
-  string "</" *> pure TagCloseOpen <* push TagMode
+  string "</" *> pure TagCloseOpen <* push TagCloseMode
 
 plainText :: Parser Token
 plainText =
@@ -211,20 +213,21 @@ tagCommentChunk =
 tagCommentEnd :: Parser Token
 tagCommentEnd =
   -- We actually break on -- and expect TagClose
-  string "--" *> pure TagCommentEnd <* pop <* push TagMode
+  string "--" *> pure TagCommentEnd <* pop <* push TagCloseMode
 
 -- -----------------------------------------------------------------------------
--- Tag mode
+-- Tag Open mode (e.g. <a href>)
 
-tagToken :: Parser Token
-tagToken =
+tagOpenToken :: Parser Token
+tagOpenToken =
       whitespace
   <|> newline
   <|> tagEquals
-  <|> tagClose
+  <|> tagOpenClose
   <|> tagSelfClose
   <|> tagIdent
   <|> tagStringStart
+
 
 tagIdent :: Parser Token
 tagIdent =
@@ -234,8 +237,8 @@ tagEquals :: Parser Token
 tagEquals =
   char '=' *> pure TagEquals
 
-tagClose :: Parser Token
-tagClose =
+tagOpenClose :: Parser Token
+tagOpenClose =
   char '>' *> pure TagClose <* pop <* push HtmlMode
 
 tagSelfClose :: Parser Token
@@ -245,6 +248,21 @@ tagSelfClose =
 tagStringStart :: Parser Token
 tagStringStart =
   char '"' *> pure StringStart <* push StringMode
+
+
+-- -----------------------------------------------------------------------------
+-- Tag Close mode (e.g. </a>
+
+tagCloseToken :: Parser Token
+tagCloseToken =
+      whitespace
+  <|> newline
+  <|> tagCloseClose
+  <|> tagIdent
+
+tagCloseClose :: Parser Token
+tagCloseClose =
+  char '>'*> pure TagClose <* pop <* pop
 
 -- -----------------------------------------------------------------------------
 -- Expression tokens
@@ -339,7 +357,7 @@ exprVarId =
 
 exprHtmlStart :: Parser Token
 exprHtmlStart =
-  char '<' *> pure TagOpen <* push HtmlMode <* push TagMode
+  char '<' *> pure TagOpen <* push TagOpenMode
 
 -- -----------------------------------------------------------------------------
 -- Expr comments
