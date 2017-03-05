@@ -16,7 +16,7 @@ import qualified Data.Text as T
 import           P
 
 import           Projector.Html.Data.Position
--- import           Projector.Html.Data.Template
+import           Projector.Html.Data.Template
 import           Projector.Html.Syntax.Token
 
 import qualified Text.Earley as E
@@ -40,10 +40,15 @@ parse toks =
   in case results of
        [x] ->
          pure x
+       [] ->
+         -- TODO extract location
+         -- TODO pretty-print report
+         Left (ParseError (T.pack (ppShow report)))
        _ ->
-         Left (ParseError (T.pack (ppShow report) <> " (ambiguous - " <> renderIntegral (length results) <> " parses)"))
---       (x:_) ->
---         pure x
+         Left . ParseError . T.unlines $ [
+             T.pack (ppShow report)
+           , "(grammar ambiguity - " <> renderIntegral (length results) <> " parses)"
+           ]
 
 -- -----------------------------------------------------------------------------
 
