@@ -59,7 +59,7 @@ type Grammar r a = E.Grammar r (Rule r a)
 
 template :: Grammar r (Template Range)
 template = mdo
-  expr' <- expr
+  expr' <- expr html'
   html' <- html expr'
   E.rule $
     (\thtml -> Template (extract thtml) Nothing thtml)
@@ -72,7 +72,7 @@ html expr' = mdo
   node1 <- E.rule (htmlNode expr' html1)
   html1 <- E.rule $
     (\(a, es) -> (THtml a (toList es)))
-      <$> (someNodes (node1 <|> htmlLeafNode))
+      <$> (someNodes (node1 <|> htmlPlain))
   pure html1
 
 someNodes :: Rule r (TNode Range) -> Rule r (Range, NonEmpty (TNode Range))
@@ -86,10 +86,6 @@ htmlNode expr' html' =
   <|> htmlElement expr' html'
   <|> htmlComment
   <|> htmlExpr expr'
-
-htmlLeafNode :: Rule r (TNode Range)
-htmlLeafNode =
-      htmlPlain
   <|> htmlWhitespace
 
 htmlPlain :: Rule r (TNode Range)
@@ -212,26 +208,31 @@ htmlCommentText =
 
 -- -----------------------------------------------------------------------------
 
-expr :: Grammar r (TExpr Range)
-expr = mdo
+expr :: Rule r (THtml Range) -> Grammar r (TExpr Range)
+expr html' = mdo
   expr3 <- E.rule $
-        exprApp expr3 expr2
-    <|> exprCase expr3 pat1
+        exprLam expr3
+    <|> exprHtml expr3 html'
     <|> expr2
   expr2 <- E.rule $
+        exprApp expr2 expr1
+    <|> expr1
+  expr1 <- E.rule $
         exprParens expr3
+    <|> exprCase expr3 pat1
     <|> exprList expr3
     <|> exprString expr3
     <|> exprVar
-    <|> expr1
-  expr1 <- E.rule $
-        exprLam expr3
   pat1 <- pattern
-  pure expr1
+  pure expr3
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
   delimited ExprLParen ExprRParen (\a b -> setTExprAnnotation (a <> b))
+
+exprHtml :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TExpr Range)
+exprHtml expr' html' =
+  empty
 
 exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
