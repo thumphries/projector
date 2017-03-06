@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -30,7 +31,11 @@ import qualified Data.DList as D
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+#if MIN_VERSION_containers(0, 5, 9)
 import qualified Data.Map.Merge.Strict as M
+#else
+import qualified Data.Map.Strict.Merge as M
+#endif
 import qualified Data.Set as S
 import           Data.STRef (STRef)
 import qualified Data.STRef as ST
