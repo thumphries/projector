@@ -11,6 +11,7 @@ module Projector.Html.Syntax.Parser (
 
 import           Control.Comonad
 
+import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 
 import           P
@@ -34,7 +35,7 @@ renderParseError pe =
     ParseError t ->
       "Parse error: " <> t
 
-parse :: [Positioned Token] -> Either ParseError (Expr Range)
+parse :: [Positioned Token] -> Either ParseError (Template Range)
 parse toks =
   let (results, report) = E.fullParses (E.parser template) toks
   in case results of
@@ -52,57 +53,35 @@ parse toks =
 
 -- -----------------------------------------------------------------------------
 
-data Expr a =
-    EApp a (Expr a) (Expr a)
-  | ELam a Text (Expr a)
-  | EPrj a (Expr a) Text
-  | EVar a Text
-  deriving (Eq, Ord, Show)
-
-extractAnnotation :: Expr a -> a
-extractAnnotation e =
-  case e of
-    EApp a _ _ ->
-      a
-    ELam a _ _ ->
-      a
-    EPrj a _ _ ->
-      a
-    EVar a _ ->
-      a
-
-setAnnotation :: a -> Expr a -> Expr a
-setAnnotation a e =
-  case e of
-    EApp _ b c ->
-      EApp a b c
-    ELam _ b c ->
-      ELam a b c
-    EPrj _ b c ->
-      EPrj a b c
-    EVar _ b ->
-      EVar a b
-
--- -----------------------------------------------------------------------------
-
 type Rule r = E.Prod r Text (Positioned Token)
 type Grammar r a = E.Grammar r (Rule r a)
 
-template :: Grammar r (Expr Range)
+template :: Grammar r (Template Range)
 template = mdo
   expr' <- expr
   html' <- E.rule (html expr')
-  pure (html' <* optional (token Newline))
+  E.rule $
+        (\thtml -> Template (extract thtml) Nothing thtml)
+    <$> (html' <* optional (token Newline))
+
 
 -- -----------------------------------------------------------------------------
 
-html :: Rule r (Expr Range) -> Rule r (Expr Range)
+html :: Rule r (TExpr Range) -> Rule r (THtml Range)
 html expr' =
-  token ExprStart *> expr' <* token ExprEnd
+  (\(a, es) -> THtml a es)
+    <$> fmap (\e -> (extract e, [e])) (htmlExpr expr')
+
+htmlExpr :: Rule r (TExpr Range) -> Rule r (TNode Range)
+htmlExpr expr' =
+  (\a e b -> TExprNode (a <> b) e)
+    <$> token ExprStart
+    <*> expr'
+    <*> token ExprEnd
 
 -- -----------------------------------------------------------------------------
 
-expr :: Grammar r (Expr Range)
+expr :: Grammar r (TExpr Range)
 expr = mdo
   expr' <- E.rule $
         exprApp expr' expr''
@@ -110,42 +89,43 @@ expr = mdo
   expr'' <- E.rule $
         exprParens expr'
     <|> exprLam expr'
-    <|> exprPrj expr''
+--    <|> exprPrj expr''
     <|> exprVar
   pure expr'
 
-exprParens :: Rule r (Expr Range) -> Rule r (Expr Range)
+exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
-  delimited ExprLParen ExprRParen (\a b -> setAnnotation (a <> b))
+  delimited ExprLParen ExprRParen (\a b -> setTExprAnnotation (a <> b))
 
-exprApp :: Rule r (Expr Range) -> Rule r (Expr Range) -> Rule r (Expr Range)
+exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
-  (\e1 e2 -> EApp (extractAnnotation e1 <> extractAnnotation e2) e1 e2)
+  (\e1 e2 -> TEApp (extract e1 <> extract e2) e1 e2)
     <$> expr'
     <*> expr''
-
-exprPrj :: Rule r (Expr Range) -> Rule r (Expr Range)
+{-
+exprPrj :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprPrj expr' =
-  (\e _ (f :@ b) -> EPrj (extractAnnotation e <> b) e f)
+  (\e _ (f :@ b) -> TEPrj (extract e <> b) e f)
     <$> expr'
     <*> token ExprDot
     <*> exprVarId
+-}
 
-exprLam :: Rule r (Expr Range) -> Rule r (Expr Range)
+exprLam :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprLam expr' =
-  (\a x _ e -> ELam (a <> extractAnnotation e) x e)
+  (\a xs _ e -> TELam (a <> extract e) (fmap TId xs) e)
     <$> token ExprLamStart
-    <*> fmap extractPositioned exprVarId
+    <*> some' (fmap extractPositioned exprVarId)
     <*> token ExprArrow
     <*> expr'
 
-exprVar :: Rule r (Expr Range)
+exprVar :: Rule r (TExpr Range)
 exprVar =
   E.terminal $ \case
     ExprVarId t :@ a ->
-      pure (EVar a t)
+      pure (TEVar a (TId t))
     ExprConId t :@ a ->
-      pure (EVar a t)
+      pure (TEVar a (TId t))
     _ ->
       empty
 
@@ -158,6 +138,26 @@ exprVarId =
       empty
 
 -- -----------------------------------------------------------------------------
+
+listRange :: Comonad w => [w a] -> Maybe (a, a)
+listRange ls =
+  case ls of
+    (x:xs) ->
+      pure (go x xs)
+    [] ->
+      empty
+  where
+    go x [] =
+      (extract x, extract x)
+    go x [y] =
+      (extract x, extract y)
+    go x (_:ys) =
+      go x ys
+{-# INLINEABLE listRange #-}
+
+some' :: Alternative f => f a -> f (NonEmpty a)
+some' f =
+  (:|) <$> f <*> many f
 
 delimited :: Token -> Token -> (Range -> Range -> a -> b) -> Rule r a -> Rule r b
 delimited start end apply thing =

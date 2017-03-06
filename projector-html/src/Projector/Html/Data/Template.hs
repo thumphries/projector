@@ -18,6 +18,7 @@ module Projector.Html.Data.Template (
   , TAttrValue (..)
   -- ** Expressions
   , TExpr (..)
+  , setTExprAnnotation
   , TAlt (..)
   , TPattern (..)
   , TIString (..)
@@ -224,6 +225,26 @@ instance Comonad TExpr where
         TEString (f expr) (extend (const (f expr)) s)
       TEList _ es ->
         TEList (f expr) (fmap (extend f) es)
+
+setTExprAnnotation :: a -> TExpr a -> TExpr a
+setTExprAnnotation a expr =
+  case expr of
+    TEVar _ b ->
+      TEVar a b
+    TELam _ b c ->
+      TELam a b c
+    TEApp _ b c ->
+      TEApp a b c
+    TECase _ b c ->
+      TECase a b c
+    TEEach _ b c ->
+      TEEach a b c
+    TENode _ b ->
+      TENode a b
+    TEString _ b ->
+      TEString a b
+    TEList _ b ->
+      TEList a b
 
 data TIString a = TIString a [TIChunk a]
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
