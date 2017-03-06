@@ -31,5 +31,5 @@ renderSyntaxError se =
       renderParseError pe
 
 templateFromText :: FilePath -> Text -> Either SyntaxError (Template Range)
-templateFromText =
-  undefined
+templateFromText file =
+  (first SyntaxParseError . parse) <=< (first SyntaxLexError . lex file)

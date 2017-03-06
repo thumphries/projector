@@ -220,14 +220,12 @@ expr = mdo
     <|> expr2
   expr2 <- E.rule $
         exprParens expr3
-
     <|> exprList expr3
     <|> exprString expr3
     <|> exprVar
     <|> expr1
   expr1 <- E.rule $
         exprLam expr3
-
   pat1 <- pattern
   pure expr1
 
