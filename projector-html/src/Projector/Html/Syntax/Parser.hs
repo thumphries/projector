@@ -69,11 +69,11 @@ template = mdo
 
 html :: Rule r (TExpr Range) -> Grammar r (THtml Range)
 html expr' = mdo
-  node' <- E.rule (htmlNode expr' html')
-  html' <- E.rule $
+  node1 <- E.rule (htmlNode expr' html1)
+  html1 <- E.rule $
     (\(a, es) -> (THtml a (toList es)))
-      <$> (someNodes node')
-  pure html'
+      <$> (someNodes (node1 <|> htmlLeafNode))
+  pure html1
 
 someNodes :: Rule r (TNode Range) -> Rule r (Range, NonEmpty (TNode Range))
 someNodes node' =
@@ -86,7 +86,10 @@ htmlNode expr' html' =
   <|> htmlElement expr' html'
   <|> htmlComment
   <|> htmlExpr expr'
-  <|> htmlPlain
+
+htmlLeafNode :: Rule r (TNode Range)
+htmlLeafNode =
+      htmlPlain
   <|> htmlWhitespace
 
 htmlPlain :: Rule r (TNode Range)
@@ -211,17 +214,22 @@ htmlCommentText =
 
 expr :: Grammar r (TExpr Range)
 expr = mdo
+  expr3 <- E.rule $
+        exprApp expr3 expr2
+    <|> exprCase expr3 pat1
+    <|> expr2
   expr2 <- E.rule $
-        exprApp expr2 expr1
-    <|> exprCase expr2 pat1
+        exprParens expr3
+
+    <|> exprList expr3
+    <|> exprString expr3
+    <|> exprVar
     <|> expr1
   expr1 <- E.rule $
-        exprParens expr2
-    <|> exprLam expr2
-    <|> exprString expr2
-    <|> exprVar
+        exprLam expr3
+
   pat1 <- pattern
-  pure expr2
+  pure expr1
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
@@ -250,6 +258,13 @@ exprVar =
       pure (TEVar a (TId t))
     _ ->
       empty
+
+exprList :: Rule r (TExpr Range) -> Rule r (TExpr Range)
+exprList expr' =
+  (\a es b -> TEList (a <> b) es)
+    <$> token ExprListStart
+    <*> sepBy expr' (token ExprListSep)
+    <*> token ExprListEnd
 
 exprCase :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TExpr Range)
 exprCase expr' pat' =
@@ -344,11 +359,15 @@ patConId =
 
 -- -----------------------------------------------------------------------------
 
-sepBy1 :: Alternative f => f a -> f s -> f (NonEmpty a)
+sepBy1 :: Alternative f => f a -> f sep -> f (NonEmpty a)
 sepBy1 f sep =
   (:|)
     <$> f
     <*> many (sep *> f)
+
+sepBy :: Alternative f => f a -> f sep -> f [a]
+sepBy f sep =
+  (toList <$> sepBy1 f sep) <|> pure []
 
 someRange :: (Comonad w, Monoid a) => NonEmpty (w a) -> a
 someRange ws =
