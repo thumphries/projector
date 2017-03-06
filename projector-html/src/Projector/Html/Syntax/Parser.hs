@@ -218,11 +218,11 @@ expr html' = mdo
         exprApp expr2 expr1
     <|> expr1
   expr1 <- E.rule $
-        exprParens expr3
-    <|> exprCase expr3 pat1
+        exprCase expr3 pat1
     <|> exprList expr3
     <|> exprString expr3
     <|> exprVar
+    <|> exprParens expr3
   pat1 <- pattern
   pure expr3
 
