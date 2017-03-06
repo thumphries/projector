@@ -211,16 +211,17 @@ htmlCommentText =
 
 expr :: Grammar r (TExpr Range)
 expr = mdo
-  expr' <- E.rule $
-        exprApp expr' expr''
-    <|> expr''
-  expr'' <- E.rule $
-        exprParens expr'
-    <|> exprLam expr'
---    <|> exprPrj expr''
+  expr2 <- E.rule $
+        exprApp expr2 expr1
+    <|> exprCase expr2 pat1
+    <|> expr1
+  expr1 <- E.rule $
+        exprParens expr2
+    <|> exprLam expr2
+    <|> exprString expr2
     <|> exprVar
-    <|> exprString expr'
-  pure expr'
+  pat1 <- pattern
+  pure expr2
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
@@ -231,14 +232,6 @@ exprApp expr' expr'' =
   (\e1 e2 -> TEApp (extract e1 <> extract e2) e1 e2)
     <$> expr'
     <*> expr''
-{-
-exprPrj :: Rule r (TExpr Range) -> Rule r (TExpr Range)
-exprPrj expr' =
-  (\e _ (f :@ b) -> TEPrj (extract e <> b) e f)
-    <$> expr'
-    <*> token ExprDot
-    <*> exprVarId
--}
 
 exprLam :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprLam expr' =
@@ -257,6 +250,25 @@ exprVar =
       pure (TEVar a (TId t))
     _ ->
       empty
+
+exprCase :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TExpr Range)
+exprCase expr' pat' =
+  (\a e _ alts -> TECase (a <> someRange alts) e alts)
+    <$> token ExprCaseStart
+    <*> expr'
+    <*> token ExprCaseOf
+    <*> exprAlts expr' pat'
+
+exprAlts :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (NonEmpty (TAlt Range))
+exprAlts expr' pat' =
+  sepBy1 (exprAlt expr' pat') (token ExprCaseSep)
+
+exprAlt :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TAlt Range)
+exprAlt expr' pat' =
+  (\p _ e -> TAlt (extract p <> extract e) p e)
+    <$> pat'
+    <*> token ExprArrow
+    <*> expr'
 
 exprString :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprString expr' =
@@ -295,6 +307,49 @@ exprChunk expr' =
 
 -- -----------------------------------------------------------------------------
 
+pattern :: Grammar r (TPattern Range)
+pattern = mdo
+  pat1 <- E.rule $
+        patParen pat1
+    <|> patCon pat1
+    <|> patVar
+  pure pat1
+
+patParen :: Rule r (TPattern Range) -> Rule r (TPattern Range)
+patParen =
+  delimited ExprLParen ExprRParen (\a b -> setTPatAnnotation (a <> b))
+
+patVar :: Rule r (TPattern Range)
+patVar =
+  E.terminal $ \case
+    ExprVarId t :@ a ->
+      pure (TPVar a (TId t))
+    _ ->
+      empty
+
+patCon :: Rule r (TPattern Range) -> Rule r (TPattern Range)
+patCon pat' =
+  (\(c :@ a) ps -> TPCon (fold (a : fmap extract ps)) (TConstructor c) ps)
+    <$> patConId
+    <*> many pat'
+
+patConId :: Rule r (Positioned Text)
+patConId =
+  E.terminal $ \case
+    ExprConId t :@ a ->
+      pure (t :@ a)
+    _ ->
+      empty
+
+
+-- -----------------------------------------------------------------------------
+
+sepBy1 :: Alternative f => f a -> f s -> f (NonEmpty a)
+sepBy1 f sep =
+  (:|)
+    <$> f
+    <*> many (sep *> f)
+
 someRange :: (Comonad w, Monoid a) => NonEmpty (w a) -> a
 someRange ws =
   uncurry (<>) (someRange' ws)
@@ -309,7 +364,6 @@ someRange' (l :| ls) =
   where
     go a b [] = (a, b)
     go a _ (x:xs) = go a (extract x) xs
-{-# INLINEABLE someRange #-}
 
 some' :: Alternative f => f a -> f (NonEmpty a)
 some' f =

@@ -21,6 +21,7 @@ module Projector.Html.Data.Template (
   , setTExprAnnotation
   , TAlt (..)
   , TPattern (..)
+  , setTPatAnnotation
   , TIString (..)
   , TIChunk (..)
   -- ** Strings
@@ -303,6 +304,14 @@ instance Comonad TPattern where
         TPVar (f pat) a
       TPCon _ a b ->
         TPCon (f pat) a (fmap (extend f) b)
+
+setTPatAnnotation :: a -> TPattern a -> TPattern a
+setTPatAnnotation a pat =
+  case pat of
+    TPVar _ b ->
+      TPVar a b
+    TPCon _ b c ->
+      TPCon a b c
 
 data TTag a = TTag a Text
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
