@@ -97,6 +97,8 @@ interpret' e =
     EApp _ (EVar _ (Name "text")) v ->
       Plain
         <$> value v
+    EApp _ (EVar _ (Name "blank")) _ ->
+      pure $ Nested []
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
