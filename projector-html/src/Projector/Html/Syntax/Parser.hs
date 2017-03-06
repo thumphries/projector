@@ -49,6 +49,7 @@ parse toks =
          Left . ParseError . T.unlines $ [
              T.pack (ppShow report)
            , "(grammar ambiguity - " <> renderIntegral (length results) <> " parses)"
+           , T.pack (ppShow results)
            ]
 
 -- -----------------------------------------------------------------------------
@@ -59,18 +60,50 @@ type Grammar r a = E.Grammar r (Rule r a)
 template :: Grammar r (Template Range)
 template = mdo
   expr' <- expr
-  html' <- E.rule (html expr')
+  html' <- html expr'
   E.rule $
-        (\thtml -> Template (extract thtml) Nothing thtml)
-    <$> (html' <* optional (token Newline))
-
+    (\thtml -> Template (extract thtml) Nothing thtml)
+      <$> html'
 
 -- -----------------------------------------------------------------------------
 
-html :: Rule r (TExpr Range) -> Rule r (THtml Range)
-html expr' =
-  (\(a, es) -> THtml a es)
-    <$> fmap (\e -> (extract e, [e])) (htmlExpr expr')
+html :: Rule r (TExpr Range) -> Grammar r (THtml Range)
+html expr' = mdo
+  node' <- E.rule (htmlNode expr' html')
+  html' <- E.rule $
+    (\(a, es) -> (THtml a (toList es)))
+      <$> (someNodes node')
+  pure html'
+
+someNodes :: Rule r (TNode Range) -> Rule r (Range, NonEmpty (TNode Range))
+someNodes node' =
+  (\nss -> (someRange nss, nss))
+    <$> some' node'
+
+htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
+htmlNode expr' html' =
+      htmlVoidElement expr'
+  <|> htmlElement expr' html'
+  <|> htmlComment
+  <|> htmlExpr expr'
+  <|> htmlPlain
+  <|> htmlWhitespace
+
+htmlPlain :: Rule r (TNode Range)
+htmlPlain =
+  (\ne -> TPlain (foldMap extractPosition ne) (TPlainText (foldMap extractPositioned ne)))
+    <$> some' htmlText
+
+htmlWhitespace :: Rule r (TNode Range)
+htmlWhitespace =
+  -- TODO this is bug-for-bug, it's safe to merge these into plaintext now
+  E.terminal $ \case
+    Whitespace _ :@ a ->
+      pure (TWhiteSpace a)
+    Newline :@ a ->
+      pure (TWhiteSpace a)
+    _ ->
+      empty
 
 htmlExpr :: Rule r (TExpr Range) -> Rule r (TNode Range)
 htmlExpr expr' =
@@ -78,6 +111,101 @@ htmlExpr expr' =
     <$> token ExprStart
     <*> expr'
     <*> token ExprEnd
+
+htmlElement :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
+htmlElement expr' html' =
+  -- FIX FIX FIX FIX closetag needs to be recorded and checked
+  (\a (tag :@ ta) attrs b subt close ->
+    TElement (a <> extract close) (TTag ta tag) attrs (fromMaybe (THtml b []) subt))
+    <$> token TagOpen
+    <*> htmlTagIdent
+    <*> many (htmlAttribute expr')
+    <*> token TagClose
+    <*> optional html'
+    <*> htmlTagClose
+
+htmlTagClose :: Rule r (TTag Range)
+htmlTagClose =
+  (\a (tag :@ _) b -> TTag (a <> b) tag)
+    <$> token TagCloseOpen
+    <*> htmlTagIdent
+    <*> token TagClose
+
+htmlVoidElement :: Rule r (TExpr Range) -> Rule r (TNode Range)
+htmlVoidElement expr' =
+  (\a (tag :@ ta) attrs b -> TVoidElement (a <> b) (TTag ta tag) attrs)
+    <$> token TagOpen
+    <*> htmlTagIdent
+    <*> many (htmlAttribute expr')
+    <*> token TagSelfClose
+
+htmlComment :: Rule r (TNode Range)
+htmlComment =
+  (\a (t :@ _) _ b -> TComment (a <> b) (TPlainText t))
+    <$> token TagCommentStart
+    <*> htmlCommentText
+    <*> token TagCommentEnd
+    <*> token TagClose
+
+htmlAttribute :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
+htmlAttribute expr' =
+      htmlAttributeKV expr'
+  <|> htmlAttributeEmpty
+
+htmlAttributeKV :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
+htmlAttributeKV expr' =
+  (\(t :@ a) _ val -> TAttribute (a <> extract val) (TAttrName t) val)
+    <$> htmlTagIdent
+    <*> token TagEquals
+    <*> htmlAttributeValue expr'
+
+htmlAttributeValue :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
+htmlAttributeValue expr' =
+      htmlAttributeValueQuoted expr'
+  <|> htmlAttributeValueExpr expr'
+
+htmlAttributeValueQuoted :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
+htmlAttributeValueQuoted expr' =
+  (\str -> TQuotedAttrValue (extract str) str)
+    <$> interpolatedString expr'
+
+htmlAttributeValueExpr :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
+htmlAttributeValueExpr expr' =
+  (\a e b -> TAttrExpr (a <> b) e)
+    <$> token ExprStart
+    <*> expr'
+    <*> token ExprEnd
+
+htmlAttributeEmpty :: Rule r (TAttribute Range)
+htmlAttributeEmpty =
+  (\(t :@ a) -> TEmptyAttribute a (TAttrName t))
+    <$> htmlTagIdent
+
+htmlTagIdent :: Rule r (Positioned Text)
+htmlTagIdent =
+  E.terminal $ \case
+    TagIdent t :@ a ->
+      pure (t :@ a)
+    _ ->
+      empty
+
+htmlText :: Rule r (Positioned Text)
+htmlText =
+  E.terminal $ \case
+    Plain t :@ a ->
+      pure (t :@ a)
+    -- TODO match Whitespace and Newline
+    _ ->
+      empty
+
+htmlCommentText :: Rule r (Positioned Text)
+htmlCommentText =
+  E.terminal $ \case
+    TagCommentChunk t :@ a ->
+      pure (t :@ a)
+    _ ->
+      empty
+
 
 -- -----------------------------------------------------------------------------
 
@@ -91,6 +219,7 @@ expr = mdo
     <|> exprLam expr'
 --    <|> exprPrj expr''
     <|> exprVar
+    <|> exprString expr'
   pure expr'
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
@@ -129,6 +258,11 @@ exprVar =
     _ ->
       empty
 
+exprString :: Rule r (TExpr Range) -> Rule r (TExpr Range)
+exprString expr' =
+  (\str -> TEString (extract str) str)
+    <$> interpolatedString expr'
+
 exprVarId :: Rule r (Positioned Text)
 exprVarId =
   E.terminal $ \case
@@ -137,23 +271,45 @@ exprVarId =
     _ ->
       empty
 
+interpolatedString :: Rule r (TExpr Range) -> Rule r (TIString Range)
+interpolatedString expr' =
+  (\a ss b -> TIString (a <> b) ss)
+    <$> token StringStart
+    <*> many (stringChunk <|> exprChunk expr')
+    <*> token StringEnd
+
+stringChunk :: Rule r (TIChunk Range)
+stringChunk =
+  E.terminal $ \case
+    StringChunk t :@ a ->
+      pure (TStringChunk a t)
+    _ ->
+      empty
+
+exprChunk :: Rule r (TExpr Range) -> Rule r (TIChunk Range)
+exprChunk expr' =
+  (\a e b -> TExprChunk (a <> b) e)
+    <$> token ExprStart
+    <*> expr'
+    <*> token ExprEnd
+
 -- -----------------------------------------------------------------------------
 
-listRange :: Comonad w => [w a] -> Maybe (a, a)
-listRange ls =
+someRange :: (Comonad w, Monoid a) => NonEmpty (w a) -> a
+someRange ws =
+  uncurry (<>) (someRange' ws)
+
+someRange' :: Comonad w => NonEmpty (w a) -> (a, a)
+someRange' (l :| ls) =
   case ls of
     (x:xs) ->
-      pure (go x xs)
+      go (extract l) (extract x) xs
     [] ->
-      empty
+      (extract l, extract l)
   where
-    go x [] =
-      (extract x, extract x)
-    go x [y] =
-      (extract x, extract y)
-    go x (_:ys) =
-      go x ys
-{-# INLINEABLE listRange #-}
+    go a b [] = (a, b)
+    go a _ (x:xs) = go a (extract x) xs
+{-# INLINEABLE someRange #-}
 
 some' :: Alternative f => f a -> f (NonEmpty a)
 some' f =
