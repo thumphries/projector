@@ -70,14 +70,12 @@ template = mdo
 html :: Rule r (TExpr Range) -> Grammar r (THtml Range)
 html expr' = mdo
   node1 <- E.rule (htmlNode expr' html1)
-  html1 <- E.rule $
-    (\(a, es) -> (THtml a (toList es)))
-      <$> (someNodes (node1 <|> htmlPlain))
+  html1 <- E.rule (someHtml (node1 <|> htmlPlain))
   pure html1
 
-someNodes :: Rule r (TNode Range) -> Rule r (Range, NonEmpty (TNode Range))
-someNodes node' =
-  (\nss -> (someRange nss, nss))
+someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
+someHtml node' =
+  (\nss -> THtml (someRange nss) (toList nss))
     <$> some' node'
 
 htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
@@ -212,7 +210,7 @@ expr :: Rule r (THtml Range) -> Grammar r (TExpr Range)
 expr html' = mdo
   expr3 <- E.rule $
         exprLam expr3
-    <|> exprHtml expr3 html'
+    <|> exprHtml html'
     <|> expr2
   expr2 <- E.rule $
         exprApp expr2 expr1
@@ -230,8 +228,9 @@ exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
   delimited ExprLParen ExprRParen (\a b -> setTExprAnnotation (a <> b))
 
-exprHtml :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TExpr Range)
-exprHtml expr' html' =
+exprHtml :: Rule r (THtml Range) -> Rule r (TExpr Range)
+exprHtml html' =
+  -- TODO need to update type in template TExpr for this
   empty
 
 exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
