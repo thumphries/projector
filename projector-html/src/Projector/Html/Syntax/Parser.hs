@@ -60,8 +60,9 @@ type Grammar r a = E.Grammar r (Rule r a)
 
 template :: Grammar r (Template Range)
 template = mdo
-  expr' <- expr html'
-  html' <- html expr'
+  expr' <- expr node'
+  node' <- E.rule (htmlNode expr' html')
+  html' <- html node'
   E.rule $
     (\thtml -> Template (extract thtml) Nothing thtml)
       <$> html'
@@ -69,16 +70,14 @@ template = mdo
 
 -- -----------------------------------------------------------------------------
 
-html :: Rule r (TExpr Range) -> Grammar r (THtml Range)
-html expr' = mdo
-  node1 <- E.rule (htmlNode expr' html1)
-  html1 <- E.rule (someHtml (node1 <|> htmlPlain) <?> "HTML")
-  pure html1
+html :: Rule r (TNode Range) -> Grammar r (THtml Range)
+html node' = mdo
+  E.rule (someHtml node' <?> "HTML")
 
 someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
 someHtml node' =
   (\nss -> THtml (someRange nss) (toList nss))
-    <$> some' node'
+    <$> some' (node' <|> htmlPlain)
 
 htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
 htmlNode expr' html' =
@@ -215,17 +214,17 @@ htmlCommentText =
 
 -- -----------------------------------------------------------------------------
 
-expr :: Rule r (THtml Range) -> Grammar r (TExpr Range)
-expr html' = mdo
+expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
+expr node' = mdo
   expr3 <- E.rule $
         exprLam expr3
-    <|> exprHtml html'
     <|> expr2
   expr2 <- E.rule $
         exprApp expr2 expr1
     <|> expr1
   expr1 <- E.rule $
         exprCase expr3 pat1
+    <|> exprHtml node'
     <|> exprList expr3
     <|> exprString expr3
     <|> exprVar
@@ -237,10 +236,10 @@ exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
   delimited ExprLParen ExprRParen (\a b -> setTExprAnnotation (a <> b))
 
-exprHtml :: Rule r (THtml Range) -> Rule r (TExpr Range)
-exprHtml html' =
-  -- TODO need to update type in template TExpr for this
-  empty
+exprHtml :: Rule r (TNode Range) -> Rule r (TExpr Range)
+exprHtml node' =
+  (\n -> TENode (extract n) n)
+    <$> node'
 
 exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
