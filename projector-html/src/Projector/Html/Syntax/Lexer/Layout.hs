@@ -81,6 +81,7 @@ yieldToken tok =
 
 data Layout =
     ExprLayout
+  | ExprPrecLayout
   | HtmlLayout
   | TagOpenLayout
   | TagCloseLayout
@@ -107,6 +108,8 @@ applyLayout' tok = do
   mcase mode (yieldToken tok) $ \case
     ExprLayout ->
       applyExprLayout tok
+    ExprPrecLayout ->
+      applyExprLayout tok
     HtmlLayout ->
       applyHtmlLayout tok
     TagOpenLayout ->
@@ -125,26 +128,46 @@ applyLayout' tok = do
 applyExprLayout :: Positioned Token -> State LayoutState ()
 applyExprLayout tok =
   case tok of
-    ExprEnd :@ _ -> do
-      popLayout
+    ExprEnd :@ a -> do
+      closePrec a
       yieldToken tok
     Whitespace _ :@ _ ->
       pure ()
     Newline :@ _ ->
       pure ()
+    ExprLamStart :@ a -> do
+      pushLayout ExprPrecLayout
+      yieldToken (ExprLParen :@ a)
+      yieldToken tok
     TagOpen :@ _ -> do
       pushLayout TagOpenLayout
       yieldToken tok
     _ ->
       yieldToken tok
 
+-- inject a close-paren for every max-precedence layout
+closePrec :: Range -> State LayoutState ()
+closePrec a = do
+  ml <- peekLayout
+  case ml of
+    Just ExprPrecLayout -> do
+      yieldToken (ExprRParen :@ a)
+      popLayout
+      closePrec a
+    Just ExprLayout -> do
+      yieldToken (ExprRParen :@ a)
+      popLayout
+    _ ->
+      pure ()
+
 -- - dispatch into other layouts
 applyHtmlLayout :: Positioned Token -> State LayoutState ()
 applyHtmlLayout tok =
   case tok of
-    ExprStart :@ _ -> do
+    ExprStart :@ a -> do
       pushLayout ExprLayout
       yieldToken tok
+      yieldToken (ExprLParen :@ a)
     TagOpen :@ _ -> do
       pushLayout TagOpenLayout
       yieldToken tok

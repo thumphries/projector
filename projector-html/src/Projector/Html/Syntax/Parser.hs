@@ -27,7 +27,7 @@ import qualified Text.Earley as E
 data ParseError =
     EndOfInput [Text]
   | Unexpected Range [Text] Token
-  | AmbiguousParse Int
+  | AmbiguousParse Int [Template Range]
   deriving (Eq, Ord, Show)
 
 renderParseError :: ParseError -> Text
@@ -45,7 +45,7 @@ renderParseError pe =
         , "  " <> "Unexpected " <> T.pack (show got)
         , "  " <> renderExpected expect
         ]
-    AmbiguousParse x ->
+    AmbiguousParse x _ts ->
       T.unlines [
           "Parse error:"
         , "  " <> "BUG: Grammar ambiguity (" <> renderIntegral x <> " parses)"
@@ -71,7 +71,7 @@ parse toks =
              Left (EndOfInput (E.expected report))
        xs ->
          -- TODO would be helpful to diff these
-         Left (AmbiguousParse (length xs))
+         Left (AmbiguousParse (length xs) xs)
 
 -- -----------------------------------------------------------------------------
 
@@ -287,7 +287,7 @@ expr node' = mdo
         exprLam expr3
     <|> expr2
   expr2 <- E.rule $
-        exprApp expr2 expr1
+        exprApp expr2 expr3
     <|> expr1
   expr1 <- E.rule $
         exprCase expr3 pat1
