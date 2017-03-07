@@ -83,7 +83,8 @@ yieldToken tok =
 data Layout =
     ExprLayout
   | HtmlLayout
-  | TagLayout
+  | TagOpenLayout
+  | TagCloseLayout
   deriving (Eq, Ord, Show)
 
 
@@ -101,8 +102,10 @@ applyLayout' tok = do
       applyExprLayout tok
     HtmlLayout ->
       applyHtmlLayout tok
-    TagLayout ->
-      applyTagLayout tok
+    TagOpenLayout ->
+      applyTagOpenLayout tok
+    TagCloseLayout ->
+      applyTagCloseLayout tok
 
 -- - Discard whitespace
 -- - Discard newlines
@@ -118,6 +121,9 @@ applyExprLayout tok =
       pure ()
     Newline :@ _ ->
       pure ()
+    TagOpen :@ _ -> do
+      pushLayout TagOpenLayout
+      yieldToken tok
     _ ->
       yieldToken tok
 
@@ -129,17 +135,17 @@ applyHtmlLayout tok =
       pushLayout ExprLayout
       yieldToken tok
     TagOpen :@ _ -> do
-      pushLayout TagLayout
+      pushLayout TagOpenLayout
       yieldToken tok
     TagCloseOpen :@ _ -> do
-      pushLayout TagLayout
+      pushLayout TagCloseLayout
       yieldToken tok
     _ ->
       yieldToken tok
 
 -- - discard whitespace
-applyTagLayout :: Positioned Token -> State LayoutState ()
-applyTagLayout tok =
+applyTagOpenLayout :: Positioned Token -> State LayoutState ()
+applyTagOpenLayout tok =
   case tok of
     Whitespace _ :@ _ ->
       pure ()
@@ -148,6 +154,17 @@ applyTagLayout tok =
       pushLayout HtmlLayout
       yieldToken tok
     TagSelfClose :@ _ -> do
+      popLayout
+      yieldToken tok
+    _ ->
+      yieldToken tok
+
+applyTagCloseLayout :: Positioned Token -> State LayoutState ()
+applyTagCloseLayout tok =
+  case tok of
+    Whitespace _ :@ _ ->
+      pure ()
+    TagClose :@ _ -> do
       popLayout
       yieldToken tok
     _ ->

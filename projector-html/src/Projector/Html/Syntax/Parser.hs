@@ -89,8 +89,8 @@ htmlNode expr' html' =
 
 htmlPlain :: Rule r (TNode Range)
 htmlPlain =
-  (\ne -> TPlain (foldMap extractPosition ne) (TPlainText (foldMap extractPositioned ne)))
-    <$> some' htmlText
+  (\ne -> TPlain (extractPosition ne) (TPlainText (extractPositioned ne)))
+    <$> htmlText
 
 htmlWhitespace :: Rule r (TNode Range)
 htmlWhitespace =
