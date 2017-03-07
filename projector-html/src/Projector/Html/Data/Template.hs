@@ -74,8 +74,7 @@ instance Comonad TTypeSig where
 
 data TType a
   = TTVar a TId
---  | TTList a (TType a)
---  | TTApp a (TType a) (TType a)
+  | TTApp a (TType a) (TType a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 setTTypeAnnotation :: a -> TType a -> TType a
@@ -83,24 +82,22 @@ setTTypeAnnotation a ty =
   case ty of
     TTVar _ b ->
       TTVar a b
+    TTApp _ b c ->
+      TTApp a b c
 
 instance Comonad TType where
   extract ty =
     case ty of
       TTVar a _ ->
         a
---      TTApp a _ _ ->
---        a
---      TTList a _ ->
---        a
+      TTApp a _ _ ->
+        a
   extend f ty =
     case ty of
       TTVar _ x ->
         TTVar (f ty) x
---      TTApp _ t1 t2 ->
---        TTApp (f ty) (extend f t1) (extend f t2)
---      TTList _ t ->
---        TTList (f ty) (extend f t)
+      TTApp _ t1 t2 ->
+        TTApp (f ty) (extend f t1) (extend f t2)
 
 data THtml a
   = THtml a [TNode a]

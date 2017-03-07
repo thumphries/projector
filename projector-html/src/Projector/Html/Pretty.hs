@@ -120,19 +120,13 @@ typeTokens ty =
   case ty of
     TTVar _ (TId t) ->
       [TypeIdent t]
---    TTList _ t ->
---      mconcat [
---          [TypeLSquare]
---        , typeTokens t
---        , [TypeRSquare]
---        ]
---    TTApp _ t1 t2 ->
---      mconcat [
---          [TypeLParen]
---        , typeTokens t1
---        , typeTokens t2
---        , [TypeRParen]
---        ]
+    TTApp _ t1 t2 ->
+      mconcat [
+          [TypeLParen]
+        , typeTokens t1
+        , typeTokens t2
+        , [TypeRParen]
+        ]
 
 htmlTokens :: THtml a -> DList (Token)
 htmlTokens (THtml _ nodes) =
