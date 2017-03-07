@@ -93,11 +93,12 @@ data Layout =
 
 applyLayout :: [Positioned Token] -> State LayoutState ()
 applyLayout xs = do
+  pushLayout HtmlLayout
   case head xs of
     Just (TypeSigStart :@ _) ->
       pushLayout TypeSigsLayout
     _ ->
-      pushLayout HtmlLayout
+      pure ()
   traverse_ applyLayout' xs
 
 applyLayout' :: Positioned Token -> State LayoutState ()
@@ -205,5 +206,9 @@ applyTypeSigLayout tok =
     TypeSigSep :@ _ -> do
       yieldToken tok
       popLayout
+    TypeSigEnd :@ _ -> do
+      popLayout
+      popLayout
+      yieldToken tok
     _ ->
       yieldToken tok

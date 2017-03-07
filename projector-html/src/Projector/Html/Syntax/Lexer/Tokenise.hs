@@ -264,7 +264,7 @@ tagCommentChunk =
 tagCommentEnd :: Parser Token
 tagCommentEnd =
   -- We actually break on -- and expect TagClose
-  string "--" *> pure TagCommentEnd <* pop <* push TagCloseMode
+  string "--" *> pure TagCommentEnd <* push TagCloseMode
 
 -- -----------------------------------------------------------------------------
 -- Tag Open mode (e.g. <a href>)
@@ -278,6 +278,7 @@ tagOpenToken =
   <|> tagSelfClose
   <|> tagIdent
   <|> tagStringStart
+  <|> exprStart
 
 
 tagIdent :: Parser Token
