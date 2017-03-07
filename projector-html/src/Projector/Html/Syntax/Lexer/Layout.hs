@@ -84,6 +84,7 @@ data Layout =
   | HtmlLayout
   | TagOpenLayout
   | TagCloseLayout
+  | TypeSigsLayout
   | TypeSigLayout
   deriving (Eq, Ord, Show)
 
@@ -94,7 +95,7 @@ applyLayout :: [Positioned Token] -> State LayoutState ()
 applyLayout xs = do
   case head xs of
     Just (TypeSigStart :@ _) ->
-      pushLayout TypeSigLayout
+      pushLayout TypeSigsLayout
     _ ->
       pushLayout HtmlLayout
   traverse_ applyLayout' xs
@@ -111,6 +112,8 @@ applyLayout' tok = do
       applyTagOpenLayout tok
     TagCloseLayout ->
       applyTagCloseLayout tok
+    TypeSigsLayout ->
+      applyTypeSigsLayout tok
     TypeSigLayout ->
       applyTypeSigLayout tok
 
@@ -177,15 +180,30 @@ applyTagCloseLayout tok =
     _ ->
       yieldToken tok
 
+applyTypeSigsLayout :: Positioned Token -> State LayoutState ()
+applyTypeSigsLayout tok =
+  case tok of
+    Whitespace _ :@ _ ->
+      pure ()
+    Newline :@ _ ->
+      pure ()
+    TypeSigEnd :@ _ -> do
+      popLayout
+      yieldToken tok
+    _ -> do
+      pushLayout TypeSigLayout
+      applyLayout' tok
+
 applyTypeSigLayout :: Positioned Token -> State LayoutState ()
 applyTypeSigLayout tok =
   case tok of
     Whitespace _ :@ _ ->
       pure ()
-    Newline :@ b ->
+    Newline :@ b -> do
       yieldToken (TypeSigSep :@ b)
-    TypeSigEnd :@ _ -> do
       popLayout
+    TypeSigSep :@ _ -> do
       yieldToken tok
+      popLayout
     _ ->
       yieldToken tok
