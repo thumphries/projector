@@ -1,0 +1,37 @@
+name:                  ambiata-projector-html-test
+version:               0.0.1
+license:               AllRightsReserved
+author:                Ambiata <info@ambiata.com>
+maintainer:            Ambiata <info@ambiata.com>
+copyright:             (c) 2016 Ambiata.
+synopsis:              ambiata-projector-html-test
+category:              System
+cabal-version:         >= 1.8
+build-type:            Simple
+description:           ambiata-projector-html-test
+
+library
+  ghc-options:
+                       -Wall
+
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-core-test
+                     , ambiata-projector-html
+                     , ambiata-disorder-core
+                     , ambiata-disorder-corpus
+                     , ambiata-disorder-jack
+                     , containers
+                     , directory
+                     , filepath
+                     , quickcheck-text                 == 0.1.*
+                     , semigroups
+                     , syb
+                     , text
+                     , temporary                       == 1.2.*
+
+  exposed-modules:
+                     Test.IO.Projector.Html.Backend.Property
+                     Test.Projector.Html.Arbitrary

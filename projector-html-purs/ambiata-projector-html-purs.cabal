@@ -1,0 +1,57 @@
+name:                  ambiata-projector-html-purs
+version:               0.0.1
+license:               AllRightsReserved
+author:                Ambiata <info@ambiata.com>
+maintainer:            Ambiata <info@ambiata.com>
+copyright:             (c) 2016 Ambiata.
+synopsis:              ambiata-projector-html-purs
+category:              System
+cabal-version:         >= 1.8
+build-type:            Custom
+description:           ambiata-projector-html-purs
+
+library
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , annotated-wl-pprint             == 0.7.*
+                     , containers                      == 0.5.*
+                     , text                            == 1.2.*
+
+  ghc-options:
+                       -Wall
+
+  hs-source-dirs:
+                       src
+
+  exposed-modules:
+                       Paths_ambiata_projector_html_purs
+
+                       Projector.Html.Backend.Purescript
+
+
+test-suite test-io
+  type:                exitcode-stdio-1.0
+
+  main-is:             test-io.hs
+
+  ghc-options:         -Wall -threaded -O2
+
+  hs-source-dirs:
+                       test
+
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-disorder-core
+                     , ambiata-disorder-jack
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-core-test
+                     , ambiata-projector-html
+                     , ambiata-projector-html-purs
+                     , ambiata-projector-html-test
+                     , QuickCheck                      >= 2.8.2      && < 2.9
+                     , containers
+                     , process

@@ -1,7 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Backend.Purescript (
-    renderModule
+    purescriptBackend
+  ---
+  , renderModule
   , renderExpr
   , predicates
   , PurescriptError
@@ -19,6 +21,7 @@ import           Projector.Core
 
 import           Projector.Html.Core
 import           Projector.Html.Data.Backend hiding (Backend (..))
+import qualified Projector.Html.Data.Backend as BE
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 
@@ -27,6 +30,14 @@ import           System.IO  (FilePath)
 import           Text.PrettyPrint.Annotated.Leijen  (Doc, (<+>), (</>))
 import qualified Text.PrettyPrint.Annotated.Leijen as WL
 
+
+purescriptBackend :: BE.Backend a PurescriptError
+purescriptBackend =
+  BE.Backend {
+      BE.renderModule = renderModule
+    , BE.renderExpr = renderExpr
+    , BE.predicates = predicates
+    }
 
 -- -----------------------------------------------------------------------------
 
@@ -40,7 +51,7 @@ renderPurescriptError e =
     RecordTypeInvariant ->
       "BUG: Invariant failure - expected a record type, but found something else."
 
-predicates :: [Predicate a PurescriptError]
+predicates :: [Predicate PurescriptError]
 predicates = [
   ]
 

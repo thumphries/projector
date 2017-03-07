@@ -27,15 +27,3 @@
 [build.branches-8-0]
   GHC_VERSION = "8.0.1"
   CABAL_VERSION = "1.24.0.0"
-
-[build.dist-doc]
-  AMBIATA_DOC = "$AMBIATA_DOC_MASTER"
-  AMBIATA_DOC_URL = "http://doc.engineering.ambiata.com/master"
-  [build.dist-doc.master]
-    runner = "./bin/ci.doc"
-
-[build.branches-doc]
-  AMBIATA_DOC = "$AMBIATA_DOC_BRANCHES"
-  AMBIATA_DOC_URL = "http://doc.engineering.ambiata.com/branches"
-  [build.branches-doc.master]
-    runner = "./bin/ci.doc"

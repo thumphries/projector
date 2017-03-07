@@ -20,7 +20,9 @@ import qualified Projector.Core as Core
 import           Projector.Html
 import qualified Projector.Html as Html
 import           Projector.Html.Data.Annotation
-import           Projector.Html.Backend as Backend
+import qualified Projector.Html.Backend as Backend
+import           Projector.Html.Backend.Haskell
+import           Projector.Html.Backend.Purescript
 import qualified Projector.Html.Pretty as HP
 
 import           System.Console.Haskeline as HL
@@ -121,7 +123,8 @@ data ReplCommand
 
 data ReplError
   = ReplError HtmlError
-  | ReplBackendError HtmlBackendError
+  | ReplHaskellError HaskellError
+  | ReplPurescriptError PurescriptError
   | ReplUnbound Text
   | ReplNotATemplate Text
   | ReplBadCommand
@@ -132,8 +135,10 @@ renderReplError re =
   case re of
     ReplError h ->
       renderHtmlError h
-    ReplBackendError h ->
-      renderHtmlBackendError h
+    ReplHaskellError h ->
+      renderHaskellError h
+    ReplPurescriptError h ->
+      renderPurescriptError h
     ReplUnbound v ->
       "'" <> v <> "' is not bound"
     ReplNotATemplate b ->
@@ -271,17 +276,17 @@ parseTemplate' f t =
 
 renderHaskellExpr :: Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
 renderHaskellExpr =
-  renderExpr' Backend.Haskell
+  renderExpr' ReplHaskellError haskellBackend
 
 renderPurescriptExpr :: Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
 renderPurescriptExpr =
-  renderExpr' Backend.Purescript
+  renderExpr' ReplPurescriptError purescriptBackend
 
-renderExpr' :: Backend.BackendT -> Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
-renderExpr' b n expr =
+renderExpr' :: (e -> ReplError) -> Backend.Backend SrcAnnotation e -> Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
+renderExpr' e b n expr =
   Repl $ do
-    lift (hoistEither (bimap (ReplBackendError . HtmlBackendError) ReplSuccess
-      (Backend.renderExpr (Backend.getBackend b) n expr)))
+    lift (hoistEither (bimap e ReplSuccess
+      (Backend.renderExpr b n expr)))
 
 
 err :: ReplError -> Repl a

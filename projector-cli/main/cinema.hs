@@ -3,8 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-import           BuildInfo_ambiata_projector_html
-import           DependencyInfo_ambiata_projector_html
+import           BuildInfo_ambiata_projector_cli
+import           DependencyInfo_ambiata_projector_cli
 
 import           Control.Monad.IO.Class (MonadIO(..))
 
@@ -19,6 +19,9 @@ import qualified Machinator.Core as MC
 import           P
 
 import           Projector.Html
+import           Projector.Html.Backend
+import           Projector.Html.Backend.Haskell
+import           Projector.Html.Backend.Purescript
 import qualified Projector.Html.Core.Machinator as HMC
 
 import           System.Directory
@@ -33,10 +36,20 @@ import           X.Options.Applicative (dispatch, safeCommand, RunType (..), Saf
 import qualified X.Options.Applicative as XO
 
 
+data BackendT
+  = Haskell
+  | Purescript
+  deriving (Eq, Ord, Show)
+
+data BackendError
+  = HaskellBackendError HaskellError
+  | PurescriptBackendError PurescriptError
+  deriving (Eq, Ord, Show)
+
 data CinemaError
   = GlobError Text
   | BuildError [HtmlError]
-  | BackendError [HtmlBackendError]
+  | BackendError [BackendError]
   | DataError Text -- MC.MachinatorError FIX
   deriving (Eq, Show)
 
@@ -48,9 +61,17 @@ renderCinemaError ce =
     BuildError h ->
       "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
     BackendError h ->
-      "Build errors:\n" <> T.unlines (fmap renderHtmlBackendError h)
+      "Build errors:\n" <> T.unlines (fmap renderBackendError h)
     DataError me ->
       "Data errors:\n" <> me -- FIX
+
+renderBackendError :: BackendError -> Text
+renderBackendError e =
+  case e of
+    HaskellBackendError he ->
+      renderHaskellError he
+    PurescriptBackendError pe ->
+      renderPurescriptError pe
 
 data CinemaArgs = CinemaArgs {
     caBackend :: Maybe BackendT
@@ -112,7 +133,7 @@ cinemaBuild b mb msp tg mdg o = do
     pure (stripPrefix, body)
   -- Run the build
   ba <- hoistEither (first BuildError (runBuild b udts rts))
-  out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen b' ba))) mb
+  out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen (getBackend b') ba))) mb
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
@@ -128,6 +149,15 @@ parseDataFiles fps = do
     MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
     pure defs
   pure (UserDataTypes (HMC.machinatorDecls (fold defs)))
+
+getBackend :: BackendT -> Backend a BackendError
+getBackend b =
+  case b of
+    Haskell ->
+      fmap HaskellBackendError haskellBackend
+
+    Purescript ->
+      fmap PurescriptBackendError purescriptBackend
 
 -- -----------------------------------------------------------------------------
 

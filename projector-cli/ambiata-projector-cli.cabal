@@ -1,0 +1,53 @@
+name:                  ambiata-projector-cli
+version:               0.0.1
+license:               AllRightsReserved
+author:                Ambiata <info@ambiata.com>
+maintainer:            Ambiata <info@ambiata.com>
+copyright:             (c) 2016 Ambiata.
+synopsis:              ambiata-projector-cli
+category:              System
+cabal-version:         >= 1.8
+build-type:            Custom
+description:           ambiata-projector-cli
+
+executable cinema
+  hs-source-dirs:     gen
+  main-is:            ../main/cinema.hs
+  ghc-options:         -Wall -threaded -O2
+
+  build-depends:
+                       base
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , ambiata-projector-html-haskell
+                     , ambiata-projector-html-purs
+                     , ambiata-machinator-core
+                     , ambiata-x-eithert
+                     , ambiata-x-optparse
+                     , containers
+                     , directory                       == 1.2.*
+                     , filepath                        == 1.4.*
+                     , Glob                            == 0.7.*
+                     , optparse-applicative            == 0.12.*
+                     , text                            == 1.2.*
+                     , transformers
+
+
+executable slideshow
+  hs-source-dirs:     gen
+  main-is:            ../main/slideshow.hs
+  ghc-options:         -Wall -threaded -O2
+
+  build-depends:
+                       base
+                     , ambiata-p
+                     , ambiata-projector-core
+                     , ambiata-projector-html
+                     , ambiata-projector-html-haskell
+                     , ambiata-projector-html-purs
+                     , ambiata-x-eithert
+                     , containers
+                     , haskeline                       == 0.7.*
+                     , text
+                     , transformers
