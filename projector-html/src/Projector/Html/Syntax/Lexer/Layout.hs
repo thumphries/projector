@@ -23,9 +23,8 @@ import           Projector.Html.Syntax.Token
 -- * Discarding or collapsing whitespace we no longer care about
 -- * Throwing errors when the indent is completely wrong
 layout :: [Positioned Token] -> [Positioned Token]
-layout toks =
-  toList . layoutResult . snd . flip runState defaultLayoutState $
-    pushLayout HtmlLayout *> applyLayout toks
+layout =
+  toList . layoutResult . snd . flip runState defaultLayoutState . applyLayout
 
 -- -----------------------------------------------------------------------------
 
@@ -85,14 +84,20 @@ data Layout =
   | HtmlLayout
   | TagOpenLayout
   | TagCloseLayout
+  | TypeSigLayout
   deriving (Eq, Ord, Show)
 
 
 -- -----------------------------------------------------------------------------
 
 applyLayout :: [Positioned Token] -> State LayoutState ()
-applyLayout =
-  traverse_ applyLayout'
+applyLayout xs = do
+  case head xs of
+    Just (TypeSigStart :@ _) ->
+      pushLayout TypeSigLayout
+    _ ->
+      pushLayout HtmlLayout
+  traverse_ applyLayout' xs
 
 applyLayout' :: Positioned Token -> State LayoutState ()
 applyLayout' tok = do
@@ -106,6 +111,8 @@ applyLayout' tok = do
       applyTagOpenLayout tok
     TagCloseLayout ->
       applyTagCloseLayout tok
+    TypeSigLayout ->
+      applyTypeSigLayout tok
 
 -- - Discard whitespace
 -- - Discard newlines
@@ -165,6 +172,19 @@ applyTagCloseLayout tok =
     Whitespace _ :@ _ ->
       pure ()
     TagClose :@ _ -> do
+      popLayout
+      yieldToken tok
+    _ ->
+      yieldToken tok
+
+applyTypeSigLayout :: Positioned Token -> State LayoutState ()
+applyTypeSigLayout tok =
+  case tok of
+    Whitespace _ :@ _ ->
+      pure ()
+    Newline :@ b ->
+      yieldToken (TypeSigSep :@ b)
+    TypeSigEnd :@ _ -> do
       popLayout
       yieldToken tok
     _ ->

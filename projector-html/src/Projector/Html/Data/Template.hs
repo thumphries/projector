@@ -10,7 +10,9 @@ module Projector.Html.Data.Template (
   -- * AST internals
   -- ** Type signatures
   , TTypeSig (..)
+  , setTTypeSigAnnotation
   , TType (..)
+  , setTTypeAnnotation
   -- ** Html
   , THtml (..)
   , TNode (..)
@@ -58,6 +60,12 @@ data TTypeSig a
   = TTypeSig a (NonEmpty (TId, TType a))
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
+setTTypeSigAnnotation :: a -> TTypeSig a -> TTypeSig a
+setTTypeSigAnnotation a ts =
+  case ts of
+    TTypeSig _ b ->
+      TTypeSig a b
+
 instance Comonad TTypeSig where
   extract (TTypeSig a _) =
     a
@@ -69,6 +77,12 @@ data TType a
 --  | TTList a (TType a)
 --  | TTApp a (TType a) (TType a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+setTTypeAnnotation :: a -> TType a -> TType a
+setTTypeAnnotation a ty =
+  case ty of
+    TTVar _ b ->
+      TTVar a b
 
 instance Comonad TType where
   extract ty =

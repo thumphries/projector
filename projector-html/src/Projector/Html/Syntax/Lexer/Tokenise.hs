@@ -77,6 +77,7 @@ data LexerMode =
   | ExprMode
   | ExprCommentMode
   | StringMode
+  | TypeSigMode
   deriving (Eq, Ord, Show)
 
 satisfyMode :: LexerMode -> Parser ()
@@ -145,7 +146,12 @@ failWith err =
 
 template :: Parser [Positioned Token]
 template =
-  push HtmlMode *> many (withPosition token)
+  start *> many (withPosition token)
+
+start :: Parser ()
+start =
+      (P.lookAhead (P.try (typeSigStart)) *> push TypeSigMode)
+  <|> push HtmlMode
 
 token :: Parser Token
 token =
@@ -156,6 +162,51 @@ token =
   <|> (satisfyMode ExprMode *> exprToken)
   <|> (satisfyMode ExprCommentMode *> exprCommentToken)
   <|> (satisfyMode StringMode *> stringToken)
+  <|> (satisfyMode TypeSigMode *> typeSigToken)
+
+
+-- -----------------------------------------------------------------------------
+-- Type sig mode
+
+typeSigToken :: Parser Token
+typeSigToken =
+      whitespace
+  <|> newline
+  <|> typeIdent
+  <|> typeLParen
+  <|> typeRParen
+  <|> typeSig
+  <|> typeSigStart
+  <|> typeSigSep
+  <|> typeSigEnd
+
+typeSigStart :: Parser Token
+typeSigStart =
+  char '\\' *> pure TypeSigStart
+
+typeIdent :: Parser Token
+typeIdent =
+  fmap (TypeIdent . T.pack) (some P.alphaNumChar)
+
+typeLParen :: Parser Token
+typeLParen =
+  char '(' *> pure TypeLParen
+
+typeRParen :: Parser Token
+typeRParen =
+  char ')' *> pure TypeRParen
+
+typeSig :: Parser Token
+typeSig =
+  char ':' *> pure TypeSig
+
+typeSigSep :: Parser Token
+typeSigSep =
+  char ';' *> pure TypeSigSep
+
+typeSigEnd :: Parser Token
+typeSigEnd =
+  string "->" *> pure TypeSigEnd <* pop
 
 
 -- -----------------------------------------------------------------------------

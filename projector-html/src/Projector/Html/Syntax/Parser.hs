@@ -60,13 +60,58 @@ type Grammar r a = E.Grammar r (Rule r a)
 
 template :: Grammar r (Template Range)
 template = mdo
+  tsig' <- typeSignatures
   expr' <- expr node'
   node' <- E.rule (htmlNode expr' html')
   html' <- html node'
   E.rule $
-    (\thtml -> Template (extract thtml) Nothing thtml)
-      <$> html'
+    (\tsig thtml -> Template (extract thtml) tsig thtml)
+      <$> optional tsig'
+      <*> html'
       <?> "template"
+
+-- -----------------------------------------------------------------------------
+
+typeSignatures :: Grammar r (TTypeSig Range)
+typeSignatures = mdo
+  sigs <- E.rule (typeSigN sig)
+  sig <- E.rule (typeSig1 type1)
+  type1 <- E.rule (typeSigType type1)
+  E.rule $
+    delimited TypeSigStart TypeSigEnd (\a b tsig -> setTTypeSigAnnotation (a <> b) tsig) sigs
+
+typeSig1 :: Rule r (TType Range) -> Rule r (TId, TType Range)
+typeSig1 type' =
+  (\a _ b -> (a, b))
+    <$> fmap (TId . extractPositioned) sigIdent
+    <*> token TypeSig
+    <*> type'
+
+typeSigN :: Rule r (TId, TType Range) -> Rule r (TTypeSig Range)
+typeSigN sig' =
+  (\ss -> TTypeSig (foldMap (extract . snd) ss) ss)
+    <$> sepBy1 sig' (token TypeSigSep)
+
+typeSigType :: Rule r (TType Range) -> Rule r (TType Range)
+typeSigType type' =
+      typeParens type'
+  <|> typeVar
+
+typeVar :: Rule r (TType Range)
+typeVar =
+  fmap (\(t :@ a) -> TTVar a (TId t)) sigIdent
+
+typeParens :: Rule r (TType Range) -> Rule r (TType Range)
+typeParens =
+  delimited TypeLParen TypeRParen (\a b ty -> setTTypeAnnotation (a <> b) ty)
+
+sigIdent :: Rule r (Positioned Text)
+sigIdent =
+  E.terminal $ \case
+    TypeIdent t :@ a ->
+      pure (t :@ a)
+    _ ->
+      empty
 
 -- -----------------------------------------------------------------------------
 
