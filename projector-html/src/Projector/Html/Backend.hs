@@ -2,12 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Backend (
     Backend (..)
-  , BackendT (..)
-  , getBackend
-  , BackendError (..)
-  , renderBackendError
-  , haskellBackend
-  , purescriptBackend
   , checkModule
   , runPredicates
   ) where
@@ -21,52 +15,11 @@ import           Projector.Core
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
-import qualified Projector.Html.Backend.Haskell as Hs
-import qualified Projector.Html.Backend.Purescript as Purs
-
-
-data BackendError
-  = HaskellBackendError Hs.HaskellError
-  | PurescriptBackendError Purs.PurescriptError
-  deriving (Eq, Ord, Show)
-
-renderBackendError :: BackendError -> Text
-renderBackendError e =
-  case e of
-    HaskellBackendError he ->
-      Hs.renderHaskellError he
-    PurescriptBackendError pe ->
-      Purs.renderPurescriptError pe
-
-getBackend :: BackendT -> Backend a BackendError
-getBackend b =
-  case b of
-    Haskell ->
-      fmap HaskellBackendError haskellBackend
-
-    Purescript ->
-      fmap PurescriptBackendError purescriptBackend
-
-haskellBackend :: Backend a Hs.HaskellError
-haskellBackend =
-  Backend {
-      renderModule = Hs.renderModule
-    , renderExpr = Hs.renderExpr
-    , predicates = Hs.predicates
-    }
-
-purescriptBackend :: Backend a Purs.PurescriptError
-purescriptBackend =
-  Backend {
-      renderModule = Purs.renderModule
-    , renderExpr = Purs.renderExpr
-    , predicates = Purs.predicates
-    }
 
 -- -----------------------------------------------------------------------------
 -- Per-backend warnings and linting
 
-checkModule :: Backend a e -> Module HtmlType PrimT a -> Either [e] ()
+checkModule :: Backend a e -> Module HtmlType PrimT b -> Either [e] ()
 checkModule b m =
   case predModule (predicates b) m of
     PredOk ->
@@ -74,11 +27,11 @@ checkModule b m =
     PredError es ->
       Left es
 
-predModule :: [Predicate a e] -> Module HtmlType PrimT a -> PredResult [e]
+predModule :: [Predicate e] -> Module HtmlType PrimT b -> PredResult [e]
 predModule preds =
   fmap fold . predResults . fmap (runPredicates preds . snd) . M.elems . moduleExprs
 
-runPredicates :: [Predicate a e] -> HtmlExpr a -> PredResult [e]
+runPredicates :: [Predicate e] -> HtmlExpr a -> PredResult [e]
 runPredicates preds expr =
   predResults . with preds $ \pred ->
     case pred of

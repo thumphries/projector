@@ -14,7 +14,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core.Eval (whnf)
-import           Projector.Html.Backend (purescriptBackend)
+import           Projector.Html.Backend.Purescript (purescriptBackend)
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module

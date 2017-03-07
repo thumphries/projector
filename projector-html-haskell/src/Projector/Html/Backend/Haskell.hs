@@ -4,7 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 module Projector.Html.Backend.Haskell (
-    renderModule
+    haskellBackend
+  ---
+  , renderModule
   , renderExpr
   , predicates
   , HaskellError (..)
@@ -37,6 +39,7 @@ import           Projector.Core
 import           Projector.Html.Core
 import           Projector.Html.Core.Library
 import           Projector.Html.Data.Backend hiding (Backend(..))
+import qualified Projector.Html.Data.Backend as BE
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 import           Projector.Html.Backend.Haskell.Prim
@@ -46,6 +49,14 @@ import           System.IO (FilePath)
 
 import           X.Language.Haskell.TH.Syntax
 
+
+haskellBackend :: BE.Backend a HaskellError
+haskellBackend =
+  BE.Backend {
+      BE.renderModule = renderModule
+    , BE.renderExpr = renderExpr
+    , BE.predicates = predicates
+    }
 
 -- -----------------------------------------------------------------------------
 
@@ -62,7 +73,7 @@ renderHaskellError e =
     RecordTypeInvariant ->
       "BUG: Invariant failure - expected a record type, but found something else."
 
-predicates :: [Predicate a HaskellError]
+predicates :: [Predicate HaskellError]
 predicates = [
     PatPredicate $ \case
       PCon _ c _ ->

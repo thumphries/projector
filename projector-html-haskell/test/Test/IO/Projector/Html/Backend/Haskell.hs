@@ -13,7 +13,8 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend (checkModule, haskellBackend)
+import           Projector.Html.Backend (checkModule)
+import           Projector.Html.Backend.Haskell (haskellBackend)
 import           Projector.Html.Core
 import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module

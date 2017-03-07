@@ -4,9 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Projector.Html (
     HtmlError (..)
-  , HtmlBackendError (..)
   , renderHtmlError
-  , renderHtmlBackendError
   -- * Builds
   , Build (..)
   , runBuild
@@ -18,7 +16,6 @@ module Projector.Html (
   , ModuleNamer (..)
   , ModuleGraph (..)
   , HB.ModuleName (..)
-  , HB.BackendT (..)
   -- * Useful template and module utils
   , checkExpr
   , checkExprIncremental
@@ -79,10 +76,6 @@ data HtmlError
   | HtmlModuleGraphError GraphError
   deriving (Eq, Show)
 
-data HtmlBackendError
-  = HtmlBackendError HB.BackendError
-  deriving (Eq, Show)
-
 renderHtmlError :: HtmlError -> Text
 renderHtmlError he =
   case he of
@@ -94,12 +87,6 @@ renderHtmlError he =
       HC.renderCoreWarningAnnotation renderRange e
     HtmlModuleGraphError e ->
       renderGraphError e
-
-renderHtmlBackendError :: HtmlBackendError -> Text
-renderHtmlBackendError he =
-  case he of
-    HtmlBackendError e ->
-      HB.renderBackendError e
 
 -- -----------------------------------------------------------------------------
 -- Interfaces for doing things with templates
@@ -171,19 +158,19 @@ checkModules decls known exprs =
           newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
       pure (M.insert n result res, newacc)
 
-codeGen :: HB.BackendT -> BuildArtefacts -> Either [HtmlBackendError] [(FilePath, Text)]
+codeGen :: HB.Backend SrcAnnotation e -> BuildArtefacts -> Either [e] [(FilePath, Text)]
 codeGen backend (BuildArtefacts checked) = do
   validateModules backend checked
   -- TODO this can be a lazy stream
   fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) checked)
 
 codeGenModule ::
-     HB.BackendT
+     HB.Backend a e
   -> HB.ModuleName
-  -> HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)
-  -> Either HtmlBackendError (FilePath, Text)
-codeGenModule backend mn =
-  first HtmlBackendError . HB.renderModule (HB.getBackend backend) mn
+  -> HB.Module HtmlType PrimT (HtmlType, a)
+  -> Either e (FilePath, Text)
+codeGenModule =
+  HB.renderModule
 
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
@@ -244,9 +231,9 @@ libraryExprs =
   M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
-validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlBackendError] ()
+validateModules :: HB.Backend a e -> Map HB.ModuleName (HB.Module HtmlType PrimT b) -> Either [e] ()
 validateModules backend mods =
-  bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
+  fmap (const ()) (sequenceEither (with mods (HB.checkModule backend)))
 
 -- | Look for anything we can warn about.
 warnModules :: HtmlDecls -> HtmlModules -> Either [HtmlError] ()
