@@ -32,6 +32,7 @@ module Projector.Html (
   , Template
   , Range
   , HtmlType
+  , HtmlModules
   , HtmlExpr
   , moduleNamerSimple
   ) where
