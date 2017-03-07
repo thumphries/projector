@@ -25,6 +25,7 @@ module Projector.Html (
   , checkTemplateIncremental
   , checkModule
   , checkModules
+  , codeGen
   , codeGenModule
   , validateModules
   , warnModules
@@ -161,6 +162,12 @@ checkModules decls known exprs =
           newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
       pure (M.insert n result res, newacc)
 
+codeGen :: HB.BackendT -> BuildArtefacts -> Either [HtmlError] [(FilePath, Text)]
+codeGen backend (BuildArtefacts checked) = do
+  validateModules backend checked
+  -- TODO this can be a lazy stream
+  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) checked)
+
 codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
@@ -173,8 +180,7 @@ codeGenModule backend mn =
 -- Build interface, i.e. things an end user should use
 
 data Build = Build {
-    buildBackend :: Maybe HB.BackendT -- ^ The type of code to generate.
-  , buildModuleNamer :: ModuleNamer -- ^ A customisable way to name modules
+    buildModuleNamer :: ModuleNamer -- ^ A customisable way to name modules
   , buildDataModules :: [DataModuleName] -- ^ The modules containing user datatypes.
   }
 
@@ -189,8 +195,7 @@ newtype RawTemplates = RawTemplates {
   } deriving (Eq, Ord, Show)
 
 data BuildArtefacts = BuildArtefacts {
-    buildArtefactsTemplates :: [(FilePath, Text)]
-  , buildArtefactsHtmlModules :: HtmlModules
+    buildArtefactsHtmlModules :: HtmlModules
   } deriving (Eq, Show)
 
 type HtmlModules = Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
@@ -215,22 +220,14 @@ runBuild b udt rts =
   runBuildIncremental b udt mempty rts
 
 runBuildIncremental :: Build -> UserDataTypes -> HtmlModules -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuildIncremental (Build mb mnr mdm) (UserDataTypes decls) hms rts = do
+runBuildIncremental (Build mnr mdm) (UserDataTypes decls) hms rts = do
   -- Build the module map
   (mg, mmap) <- smush mdm mnr hms rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this can be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  checked <- first pure (checkModules decls (libraryExprs <> HB.extractModuleBindings hms) mmap)
-  -- If there's a backend, codegen (this can be a lazy stream)
-  case mb of
-    Just backend -> do
-      validateModules backend checked
-      gen <- first pure (M.traverseWithKey (codeGenModule backend) checked)
-      pure (BuildArtefacts (M.elems gen) checked)
-    Nothing ->
-      pure (BuildArtefacts [] checked)
+  fmap BuildArtefacts $ first pure (checkModules decls (libraryExprs <> HB.extractModuleBindings hms) mmap)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)

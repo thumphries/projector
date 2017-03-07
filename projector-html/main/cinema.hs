@@ -89,14 +89,15 @@ run :: CinemaArgs -> IO ()
 run args =
   orDie renderCinemaError $
     cinemaBuild
-      (Build (caBackend args) (moduleNamerSimple (caModulePrefix args)) (caDataModules args))
+      (Build (moduleNamerSimple (caModulePrefix args)) (caDataModules args))
+      (caBackend args)
       (caStripPrefix args)
       (caTemplateGlob args)
       (caDataGlob args)
       (caOutputPath args)
 
-cinemaBuild :: Build -> Maybe StripPrefix -> Glob -> Maybe Glob -> FilePath -> EitherT CinemaError IO ()
-cinemaBuild b msp tg mdg o = do
+cinemaBuild :: Build -> Maybe BackendT -> Maybe StripPrefix -> Glob -> Maybe Glob -> FilePath -> EitherT CinemaError IO ()
+cinemaBuild b mb msp tg mdg o = do
   -- Load all our datatypes from disk
   dfs <- maybe (pure []) globSafe mdg
   udts <- parseDataFiles dfs
@@ -107,7 +108,8 @@ cinemaBuild b msp tg mdg o = do
     let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
     pure (stripPrefix, body)
   -- Run the build
-  BuildArtefacts out _ <- hoistEither (first BuildError (runBuild b udts rts))
+  ba <- hoistEither (first BuildError (runBuild b udts rts))
+  out <- maybe (pure mempty) (\b' -> hoistEither (first BuildError (codeGen b' ba))) mb
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
