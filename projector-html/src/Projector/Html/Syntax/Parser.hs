@@ -77,8 +77,11 @@ typeSignatures = mdo
   sigs <- E.rule (typeSigN sig)
   sig <- E.rule (typeSig1 type1)
   type1 <- E.rule (typeSigType type1)
-  E.rule $
-    delimited TypeSigStart TypeSigEnd (\a b tsig -> setTTypeSigAnnotation (a <> b) tsig) sigs
+  E.rule (typeSig sigs)
+
+typeSig :: Rule r (TTypeSig Range) -> Rule r (TTypeSig Range)
+typeSig sigs' =
+  delimited TypeSigStart TypeSigEnd (\a b tsig -> setTTypeSigAnnotation (a <> b) tsig) sigs'
 
 typeSig1 :: Rule r (TType Range) -> Rule r (TId, TType Range)
 typeSig1 type' =
@@ -139,7 +142,6 @@ htmlPlain =
 
 htmlWhitespace :: Rule r (TNode Range)
 htmlWhitespace =
-  -- TODO this is bug-for-bug, it's safe to merge these into plaintext now
   E.terminal $ \case
     Whitespace _ :@ a ->
       pure (TWhiteSpace a)
