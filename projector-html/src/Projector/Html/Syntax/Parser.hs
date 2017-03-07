@@ -20,6 +20,7 @@ import           Projector.Html.Data.Position
 import           Projector.Html.Data.Template
 import           Projector.Html.Syntax.Token
 
+import           Text.Earley ((<?>))
 import qualified Text.Earley as E
 
 import Text.Show.Pretty
@@ -64,13 +65,14 @@ template = mdo
   E.rule $
     (\thtml -> Template (extract thtml) Nothing thtml)
       <$> html'
+      <?> "template"
 
 -- -----------------------------------------------------------------------------
 
 html :: Rule r (TExpr Range) -> Grammar r (THtml Range)
 html expr' = mdo
   node1 <- E.rule (htmlNode expr' html1)
-  html1 <- E.rule (someHtml (node1 <|> htmlPlain))
+  html1 <- E.rule (someHtml (node1 <|> htmlPlain) <?> "HTML")
   pure html1
 
 someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
@@ -108,6 +110,7 @@ htmlExpr expr' =
     <$> token ExprStart
     <*> expr'
     <*> token ExprEnd
+    <?> "expression"
 
 htmlElement :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
 htmlElement expr' html' =
@@ -120,6 +123,7 @@ htmlElement expr' html' =
     <*> token TagClose
     <*> optional html'
     <*> htmlTagClose
+    <?> "element"
 
 htmlTagClose :: Rule r (TTag Range)
 htmlTagClose =
@@ -127,6 +131,7 @@ htmlTagClose =
     <$> token TagCloseOpen
     <*> htmlTagIdent
     <*> token TagClose
+    <?> "tag close"
 
 htmlVoidElement :: Rule r (TExpr Range) -> Rule r (TNode Range)
 htmlVoidElement expr' =
@@ -135,6 +140,7 @@ htmlVoidElement expr' =
     <*> htmlTagIdent
     <*> many (htmlAttribute expr')
     <*> token TagSelfClose
+    <?> "void element"
 
 htmlComment :: Rule r (TNode Range)
 htmlComment =
@@ -143,11 +149,13 @@ htmlComment =
     <*> htmlCommentText
     <*> token TagCommentEnd
     <*> token TagClose
+    <?> "HTML comment"
 
 htmlAttribute :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
 htmlAttribute expr' =
       htmlAttributeKV expr'
   <|> htmlAttributeEmpty
+  <?> "attribute"
 
 htmlAttributeKV :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
 htmlAttributeKV expr' =
@@ -160,6 +168,7 @@ htmlAttributeValue :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
 htmlAttributeValue expr' =
       htmlAttributeValueQuoted expr'
   <|> htmlAttributeValueExpr expr'
+  <?> "attribute value"
 
 htmlAttributeValueQuoted :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
 htmlAttributeValueQuoted expr' =
