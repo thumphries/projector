@@ -23,18 +23,39 @@ import           Projector.Html.Syntax.Token
 import           Text.Earley ((<?>))
 import qualified Text.Earley as E
 
-import Text.Show.Pretty
-
 
 data ParseError =
-    ParseError Text
+    EndOfInput [Text]
+  | Unexpected Range [Text] Token
+  | AmbiguousParse Int
   deriving (Eq, Ord, Show)
 
 renderParseError :: ParseError -> Text
 renderParseError pe =
   case pe of
-    ParseError t ->
-      "Parse error: " <> t
+    EndOfInput expect ->
+      T.unlines [
+          "Parse error:"
+        , "  " <> "Unexpected end of input"
+        , "  " <> renderExpected expect
+        ]
+    Unexpected loc expect got ->
+      T.unlines [
+          renderRange loc <> ": Parse error:"
+        , "  " <> "Unexpected " <> T.pack (show got)
+        , "  " <> renderExpected expect
+        ]
+    AmbiguousParse x ->
+      T.unlines [
+          "Parse error:"
+        , "  " <> "BUG: Grammar ambiguity (" <> renderIntegral x <> " parses)"
+        ]
+
+renderExpected :: [Text] -> Text
+renderExpected [] =
+  T.empty
+renderExpected expects =
+  "Expected one of: [" <> T.intercalate ", " expects <> "]"
 
 parse :: [Positioned Token] -> Either ParseError (Template Range)
 parse toks =
@@ -43,15 +64,14 @@ parse toks =
        [x] ->
          pure x
        [] ->
-         -- TODO extract location
-         -- TODO pretty-print report
-         Left (ParseError (T.pack (ppShow report)))
-       _ ->
-         Left . ParseError . T.unlines $ [
-             T.pack (ppShow report)
-           , "(grammar ambiguity - " <> renderIntegral (length results) <> " parses)"
-           , T.pack (ppShow results)
-           ]
+         case head (E.unconsumed report) of
+           Just (x :@ a) ->
+             Left (Unexpected a (E.expected report) x)
+           Nothing ->
+             Left (EndOfInput (E.expected report))
+       xs ->
+         -- TODO would be helpful to diff these
+         Left (AmbiguousParse (length xs))
 
 -- -----------------------------------------------------------------------------
 
