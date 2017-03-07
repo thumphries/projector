@@ -121,6 +121,7 @@ data ReplCommand
 
 data ReplError
   = ReplError HtmlError
+  | ReplBackendError HtmlBackendError
   | ReplUnbound Text
   | ReplNotATemplate Text
   | ReplBadCommand
@@ -131,6 +132,8 @@ renderReplError re =
   case re of
     ReplError h ->
       renderHtmlError h
+    ReplBackendError h ->
+      renderHtmlBackendError h
     ReplUnbound v ->
       "'" <> v <> "' is not bound"
     ReplNotATemplate b ->
@@ -277,7 +280,7 @@ renderPurescriptExpr =
 renderExpr' :: Backend.BackendT -> Core.Name -> HtmlExpr (HtmlType, SrcAnnotation) -> Repl ReplResponse
 renderExpr' b n expr =
   Repl $ do
-    lift (hoistEither (bimap (ReplError . HtmlBackendError) ReplSuccess
+    lift (hoistEither (bimap (ReplBackendError . HtmlBackendError) ReplSuccess
       (Backend.renderExpr (Backend.getBackend b) n expr)))
 
 

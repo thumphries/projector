@@ -4,7 +4,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Projector.Html (
     HtmlError (..)
+  , HtmlBackendError (..)
   , renderHtmlError
+  , renderHtmlBackendError
   -- * Builds
   , Build (..)
   , runBuild
@@ -75,7 +77,10 @@ data HtmlError
   | HtmlCoreError (CoreError SrcAnnotation)
   | HtmlCoreWarning (HtmlWarning SrcAnnotation)
   | HtmlModuleGraphError GraphError
-  | HtmlBackendError HB.BackendError
+  deriving (Eq, Show)
+
+data HtmlBackendError
+  = HtmlBackendError HB.BackendError
   deriving (Eq, Show)
 
 renderHtmlError :: HtmlError -> Text
@@ -89,6 +94,10 @@ renderHtmlError he =
       HC.renderCoreWarningAnnotation renderRange e
     HtmlModuleGraphError e ->
       renderGraphError e
+
+renderHtmlBackendError :: HtmlBackendError -> Text
+renderHtmlBackendError he =
+  case he of
     HtmlBackendError e ->
       HB.renderBackendError e
 
@@ -162,7 +171,7 @@ checkModules decls known exprs =
           newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
       pure (M.insert n result res, newacc)
 
-codeGen :: HB.BackendT -> BuildArtefacts -> Either [HtmlError] [(FilePath, Text)]
+codeGen :: HB.BackendT -> BuildArtefacts -> Either [HtmlBackendError] [(FilePath, Text)]
 codeGen backend (BuildArtefacts checked) = do
   validateModules backend checked
   -- TODO this can be a lazy stream
@@ -172,7 +181,7 @@ codeGenModule ::
      HB.BackendT
   -> HB.ModuleName
   -> HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)
-  -> Either HtmlError (FilePath, Text)
+  -> Either HtmlBackendError (FilePath, Text)
 codeGenModule backend mn =
   first HtmlBackendError . HB.renderModule (HB.getBackend backend) mn
 
@@ -235,7 +244,7 @@ libraryExprs =
   M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
-validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlError] ()
+validateModules :: HB.BackendT -> Map HB.ModuleName (HB.Module HtmlType PrimT a) -> Either [HtmlBackendError] ()
 validateModules backend mods =
   bimap (fmap HtmlBackendError) (const ()) (sequenceEither (with mods (HB.checkModule (HB.getBackend backend))))
 

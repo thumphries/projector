@@ -36,6 +36,7 @@ import qualified X.Options.Applicative as XO
 data CinemaError
   = GlobError Text
   | BuildError [HtmlError]
+  | BackendError [HtmlBackendError]
   | DataError Text -- MC.MachinatorError FIX
   deriving (Eq, Show)
 
@@ -46,6 +47,8 @@ renderCinemaError ce =
       "Invalid glob: " <> t
     BuildError h ->
       "Build errors:\n" <> T.unlines (fmap renderHtmlError h)
+    BackendError h ->
+      "Build errors:\n" <> T.unlines (fmap renderHtmlBackendError h)
     DataError me ->
       "Data errors:\n" <> me -- FIX
 
@@ -109,7 +112,7 @@ cinemaBuild b mb msp tg mdg o = do
     pure (stripPrefix, body)
   -- Run the build
   ba <- hoistEither (first BuildError (runBuild b udts rts))
-  out <- maybe (pure mempty) (\b' -> hoistEither (first BuildError (codeGen b' ba))) mb
+  out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen b' ba))) mb
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f
