@@ -148,6 +148,10 @@ applyLayout' tok = do
 applyExprLayout :: Positioned Token -> State LayoutState ()
 applyExprLayout tok =
   case tok of
+    ExprStart :@ a -> do
+      pushLayout ExprLayout
+      yieldToken tok
+      yieldToken (ExprLParen :@ a)
     ExprEnd :@ a -> do
       closePrec a
       yieldToken tok
@@ -162,6 +166,9 @@ applyExprLayout tok =
     ExprCaseOf :@ _ -> do
       pushLayout PatternLayout
       yieldToken tok
+    ExprCaseSep :@ a -> do
+      closePrec a
+      applyLayout' tok
     TagOpen :@ _ -> do
       pushLayout TagOpenLayout
       yieldToken tok
@@ -186,6 +193,10 @@ applyPatternLayout tok =
 applyAltLayout :: Positioned Token -> State LayoutState ()
 applyAltLayout tok =
   case tok of
+    ExprStart :@ a -> do
+      pushLayout ExprLayout
+      yieldToken tok
+      yieldToken (ExprLParen :@ a)
     ExprEnd :@ a -> do
       popLayout
       yieldToken (ExprRParen :@ a)
@@ -195,6 +206,7 @@ applyAltLayout tok =
       popLayout
       yieldToken (ExprRParen :@ a)
       yieldToken tok
+      pushLayout PatternLayout
     Whitespace _ :@ _ ->
       pure ()
     Newline :@ _ ->
@@ -225,10 +237,6 @@ closePrec a = do
     Just ExprLayout -> do
       yieldToken (ExprRParen :@ a)
       popLayout
-    Just AltLayout -> do
-      yieldToken (ExprRParen :@ a)
-      popLayout
-      closePrec a
     _ ->
       pure ()
 

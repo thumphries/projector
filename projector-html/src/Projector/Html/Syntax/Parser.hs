@@ -283,21 +283,19 @@ htmlCommentText =
 
 expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
 expr node' = mdo
-  expr3 <- E.rule $
-        exprLam expr3
-    <|> expr2
   expr2 <- E.rule $
-        exprApp expr2 expr3
+        exprApp expr2 expr1
     <|> expr1
   expr1 <- E.rule $
-        exprCase expr3 pat1
+        exprLam expr2
+    <|> exprCase expr2 pat1
     <|> exprHtml node'
-    <|> exprList expr3
-    <|> exprString expr3
+    <|> exprList expr2
+    <|> exprString expr2
     <|> exprVar
-    <|> exprParens expr3
+    <|> exprParens expr2
   pat1 <- pattern
-  pure expr3
+  pure expr2
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
