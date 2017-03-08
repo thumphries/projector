@@ -204,8 +204,9 @@ newtype UserDataTypes = UserDataTypes {
     unUserDataTypes :: HtmlDecls
   } deriving (Eq, Ord, Show, Monoid)
 
-newtype ModuleNamer = ModuleNamer {
+data ModuleNamer = ModuleNamer {
     pathToModuleName :: FilePath -> HB.ModuleName
+  , filePathToExprName  :: FilePath -> PC.Name
   }
 
 -- | Run a complete build from start to finish, with no caching of artefacts.
@@ -265,7 +266,7 @@ smush mdm mnr hms (RawTemplates templates) = do
     ast <- first (:[]) (parseTemplate fp body)
     let core = Elab.elaborate ast
         modn = pathToModuleName mnr fp
-        expn = filePathToExprName fp
+        expn = filePathToExprName mnr fp
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
       , HB.moduleImports = M.fromList $
@@ -274,19 +275,23 @@ smush mdm mnr hms (RawTemplates templates) = do
       })
   pure (buildModuleGraph mmap, mmap)
 
+-- | Provide a default naming scheme for modules and function names
+moduleNamerSimple :: Maybe HB.ModuleName -> ModuleNamer
+moduleNamerSimple prefix =
+  ModuleNamer (filePathToModuleNameSimple prefix) filePathToExprNameSimple
+
 -- | Derive a module name from the relative 'FilePath'.
 --
 -- @
--- λ> filePathToModuleName "./path_to/my/favourite_Template_place.hs"
+-- λ> filePathToModuleNameSimple Nothing "./path_to/my/favourite_Template_place.hs"
 -- ModuleName {unModuleName = "PathTo.My.FavouriteTemplatePlace"}
 -- @
-moduleNamerSimple :: Maybe HB.ModuleName -> ModuleNamer
-moduleNamerSimple prefix =
-  ModuleNamer $ \fp ->
-    let
-      n = HB.ModuleName . T.pack . goUpper . FilePath.dropExtension $ fp
-    in
-      maybe n (flip HB.moduleNameAppend n) prefix
+filePathToModuleNameSimple :: Maybe HB.ModuleName -> FilePath -> HB.ModuleName
+filePathToModuleNameSimple prefix fp =
+  let
+    n = HB.ModuleName . T.pack . goUpper . FilePath.dropExtension $ fp
+  in
+    maybe n (flip HB.moduleNameAppend n) prefix
   where
     goUpper [] = []
     goUpper (x:xs)
@@ -304,8 +309,8 @@ moduleNamerSimple prefix =
 -- λ> 'filePathToExprName' "path/to/foo_bar_baz_bapGilPoilk.hsbc"
 -- Name {unName = "fooBarBazBapGilPoilk"}
 -- @
-filePathToExprName :: FilePath -> PC.Name
-filePathToExprName =
+filePathToExprNameSimple :: FilePath -> PC.Name
+filePathToExprNameSimple =
   PC.Name . T.pack . goLower . FilePath.dropExtension
   where
     go [] = []
