@@ -14,7 +14,6 @@ import           P
 
 import           Projector.Core.Map
 
-import           Test.Projector.Core.Arbitrary
 import           Test.QuickCheck.Jack ((===))
 import qualified Test.QuickCheck.Jack as J
 import           Test.QuickCheck.Instances ()
