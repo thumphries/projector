@@ -248,6 +248,11 @@ applyHtmlLayout tok =
       pushLayout ExprLayout
       yieldToken tok
       yieldToken (ExprLParen :@ a)
+    ExprEnd :@ a -> do
+      popLayout
+      yieldToken (ExprRParen :@ a)
+      closePrec a
+      yieldToken tok
     TagOpen :@ _ -> do
       pushLayout TagOpenLayout
       yieldToken tok
@@ -263,6 +268,12 @@ applyTagOpenLayout tok =
   case tok of
     Whitespace _ :@ _ ->
       pure ()
+    Newline :@ _ ->
+      pure ()
+    ExprStart :@ a -> do
+      pushLayout ExprLayout
+      yieldToken tok
+      yieldToken (ExprLParen :@ a)
     TagClose :@ _ -> do
       popLayout
       pushLayout HtmlLayout
@@ -278,7 +289,10 @@ applyTagCloseLayout tok =
   case tok of
     Whitespace _ :@ _ ->
       pure ()
+    Newline :@ _ ->
+      pure ()
     TagClose :@ _ -> do
+      popLayout
       popLayout
       yieldToken tok
     _ ->
