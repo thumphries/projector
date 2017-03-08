@@ -3,6 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Syntax.Lexer.Layout (
     layout
+  , layoutDebug
+  , Layout
   ) where
 
 
@@ -10,6 +12,7 @@ import           Control.Monad.Trans.State  (State, runState, gets, modify')
 
 import           Data.DList (DList)
 import qualified Data.DList as D
+import qualified Data.List as L
 
 import           P
 
@@ -25,6 +28,12 @@ import           Projector.Html.Syntax.Token
 layout :: [Positioned Token] -> [Positioned Token]
 layout =
   toList . layoutResult . snd . flip runState defaultLayoutState . applyLayout
+
+layoutDebug :: [Positioned Token] -> [(Maybe Layout, Positioned Token)]
+layoutDebug toks =
+  let result = snd . flip runState (defaultLayoutState {layoutDebugs = True}) $ applyLayout toks
+  in L.zip (toList (layoutsDebug result)) (toList (layoutResult result))
+
 
 -- -----------------------------------------------------------------------------
 
@@ -48,6 +57,8 @@ Layout rules:
 data LayoutState = LayoutState {
     layoutMode :: [Layout]
   , layoutResult :: DList (Positioned Token)
+  , layoutDebugs :: Bool
+  , layoutsDebug :: DList (Maybe Layout)
   } deriving (Eq, Ord, Show)
 
 defaultLayoutState :: LayoutState
@@ -55,20 +66,23 @@ defaultLayoutState =
   LayoutState {
       layoutMode = mempty
     , layoutResult = mempty
+    , layoutDebugs = False
+    , layoutsDebug = mempty
     }
 
 pushLayout :: Layout -> State LayoutState ()
 pushLayout mode =
-  modify' $ \(LayoutState modes result) -> LayoutState (mode : modes) result
+  modify' $ \(LayoutState modes result dbg ls) ->
+    LayoutState (mode : modes) result dbg ls
 
 popLayout :: State LayoutState ()
 popLayout =
-  modify' $ \(LayoutState modes result) ->
+  modify' $ \(LayoutState modes result dbg ls) ->
     case modes of
       (_:xs) ->
-        LayoutState xs result
+        LayoutState xs result dbg ls
       [] ->
-        LayoutState [] result
+        LayoutState [] result dbg ls
 
 peekLayout :: State LayoutState (Maybe Layout)
 peekLayout =
@@ -76,12 +90,14 @@ peekLayout =
 
 yieldToken :: Positioned Token -> State LayoutState ()
 yieldToken tok =
-  modify' $ \(LayoutState modes result) ->
-    LayoutState modes (D.snoc result tok)
+  modify' $ \(LayoutState modes result dbg ls) ->
+    LayoutState modes (D.snoc result tok) dbg (D.snoc ls (head modes))
 
 data Layout =
     ExprLayout
   | ExprPrecLayout
+  | PatternLayout
+  | AltLayout
   | HtmlLayout
   | TagOpenLayout
   | TagCloseLayout
@@ -110,6 +126,10 @@ applyLayout' tok = do
       applyExprLayout tok
     ExprPrecLayout ->
       applyExprLayout tok
+    PatternLayout ->
+      applyPatternLayout tok
+    AltLayout ->
+      applyAltLayout tok
     HtmlLayout ->
       applyHtmlLayout tok
     TagOpenLayout ->
@@ -139,11 +159,59 @@ applyExprLayout tok =
       pushLayout ExprPrecLayout
       yieldToken (ExprLParen :@ a)
       yieldToken tok
+    ExprCaseOf :@ _ -> do
+      pushLayout PatternLayout
+      yieldToken tok
     TagOpen :@ _ -> do
       pushLayout TagOpenLayout
       yieldToken tok
     _ ->
       yieldToken tok
+
+applyPatternLayout :: Positioned Token -> State LayoutState ()
+applyPatternLayout tok =
+  case tok of
+    Whitespace _ :@ _ ->
+      pure ()
+    Newline :@ _ ->
+      pure ()
+    ExprArrow :@ a -> do
+      popLayout
+      pushLayout AltLayout
+      yieldToken tok
+      yieldToken (ExprLParen :@ a)
+    _ ->
+      yieldToken tok
+
+applyAltLayout :: Positioned Token -> State LayoutState ()
+applyAltLayout tok =
+  case tok of
+    ExprEnd :@ a -> do
+      popLayout
+      yieldToken (ExprRParen :@ a)
+      closePrec a
+      yieldToken tok
+    ExprCaseSep :@ a -> do
+      popLayout
+      yieldToken (ExprRParen :@ a)
+      yieldToken tok
+    Whitespace _ :@ _ ->
+      pure ()
+    Newline :@ _ ->
+      pure ()
+    ExprLamStart :@ a -> do
+      pushLayout ExprPrecLayout
+      yieldToken (ExprLParen :@ a)
+      yieldToken tok
+    ExprCaseOf :@ _ -> do
+      pushLayout PatternLayout
+      yieldToken tok
+    TagOpen :@ _ -> do
+      pushLayout TagOpenLayout
+      yieldToken tok
+    _ ->
+      yieldToken tok
+
 
 -- inject a close-paren for every max-precedence layout
 closePrec :: Range -> State LayoutState ()
@@ -157,6 +225,10 @@ closePrec a = do
     Just ExprLayout -> do
       yieldToken (ExprRParen :@ a)
       popLayout
+    Just AltLayout -> do
+      yieldToken (ExprRParen :@ a)
+      popLayout
+      closePrec a
     _ ->
       pure ()
 
