@@ -303,7 +303,7 @@ tagStringStart =
 
 
 -- -----------------------------------------------------------------------------
--- Tag Close mode (e.g. </a>
+-- Tag Close mode (e.g. </a>)
 
 tagCloseToken :: Parser Token
 tagCloseToken =
