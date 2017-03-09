@@ -15,13 +15,19 @@ import           Projector.Html.Syntax.Token
 -- | Eliminates unimportant leading whitespace, creating indent/dedent tokens.
 deindent :: [Positioned Token] -> [Positioned Token]
 deindent =
-  deindent' []
+  deindent'' []
 
 newtype IndentLevel = IndentLevel {
     _unIndentLevel :: Int
   } deriving (Eq, Ord, Show)
 
 -- -----------------------------------------------------------------------------
+
+deindent'' :: [IndentLevel] -> [Positioned Token] -> [Positioned Token]
+deindent'' il (Whitespace x :@ b : xs) =
+  newline il b x xs
+deindent'' il xs =
+  deindent' il xs
 
 deindent' :: [IndentLevel] -> [Positioned Token] -> [Positioned Token]
 
@@ -30,8 +36,6 @@ deindent' il (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
 
 deindent' il (n@(Newline :@ _) : xs@(_ :@ b : _)) =
   n : newline il b 0 xs
-
--- other cases here?
 
 deindent' il (x : xs) =
   x : deindent' il xs
