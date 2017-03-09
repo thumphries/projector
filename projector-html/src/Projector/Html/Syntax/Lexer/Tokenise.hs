@@ -69,17 +69,6 @@ pop =
       [] ->
         LexerState []
 
-data LexerMode =
-    HtmlMode
-  | HtmlCommentMode
-  | TagOpenMode
-  | TagCloseMode
-  | ExprMode
-  | ExprCommentMode
-  | StringMode
-  | TypeSigMode
-  deriving (Eq, Ord, Show)
-
 satisfyMode :: LexerMode -> Parser ()
 satisfyMode m = do
   mmo <- peek

@@ -27,18 +27,11 @@ data Scope =
   | BlockScope Int -- an implicit scope
   deriving (Eq, Ord, Show)
 
-data Mode =
-    HtmlMode
-  | TagOpenMode
-  | TagCloseMode
-  | ExprMode
-  | TypeSigMode
-  deriving (Eq, Ord, Show)
 
 -- -----------------------------------------------------------------------------
 
 -- | Apply offside rule, remove redundant whitespace, etc.
-applyLayout :: [Mode] -> [Scope] -> [Positioned Token] -> [Positioned Token]
+applyLayout :: [LexerMode] -> [Scope] -> [Positioned Token] -> [Positioned Token]
 
 --
 -- start
@@ -165,7 +158,7 @@ applyLayout _ _ [] =
 -- -----------------------------------------------------------------------------
 
 -- | Close scopes
-closeScopes :: Range -> Scope -> [Mode] -> [Scope] -> [Positioned Token] -> [Positioned Token]
+closeScopes :: Range -> Scope -> [LexerMode] -> [Scope] -> [Positioned Token] -> [Positioned Token]
 closeScopes a s ms ss xs =
   fmap (:@ a) toks <> applyLayout ms sss xs
   where

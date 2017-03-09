@@ -2,11 +2,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Syntax.Token (
     Token (..)
+  , LexerMode (..)
   ) where
 
 
 import           P
 
+
+
+data LexerMode =
+    HtmlMode
+  | HtmlCommentMode
+  | TagOpenMode
+  | TagCloseMode
+  | ExprMode
+  | ExprCommentMode
+  | StringMode
+  | TypeSigMode
+  deriving (Eq, Ord, Show)
 
 data Token =
   -- Type signatures (OLD FORMAT)
