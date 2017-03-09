@@ -69,17 +69,6 @@ pop =
       [] ->
         LexerState []
 
-data LexerMode =
-    HtmlMode
-  | HtmlCommentMode
-  | TagOpenMode
-  | TagCloseMode
-  | ExprMode
-  | ExprCommentMode
-  | StringMode
-  | TypeSigMode
-  deriving (Eq, Ord, Show)
-
 satisfyMode :: LexerMode -> Parser ()
 satisfyMode m = do
   mmo <- peek
@@ -219,6 +208,7 @@ htmlToken =
   <|> tagCommentStart
   <|> tagCloseOpen
   <|> tagOpen
+  <|> exprCommentStart
   <|> exprStart
   <|> htmlExprEnd
   <|> plainText
@@ -235,7 +225,7 @@ plainText :: Parser Token
 plainText =
   fmap Plain . escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}'
+    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}' || p == '\\'
 
 exprStart :: Parser Token
 exprStart =
@@ -278,6 +268,7 @@ tagOpenToken =
   <|> tagSelfClose
   <|> tagIdent
   <|> tagStringStart
+  <|> exprCommentStart
   <|> exprStart
 
 
@@ -311,6 +302,7 @@ tagCloseToken =
   <|> newline
   <|> tagCloseClose
   <|> tagIdent
+  <|> exprCommentStart
 
 tagCloseClose :: Parser Token
 tagCloseClose =
@@ -331,6 +323,7 @@ exprToken =
   <|> exprStringStart
   <|> exprCaseStart
   <|> exprCaseOf
+  <|> exprEach
   <|> exprCaseSep
   <|> exprLamStart
   <|> exprArrow
@@ -373,15 +366,19 @@ exprEnd =
 
 exprCaseStart :: Parser Token
 exprCaseStart =
-  string "case" *> pure ExprCaseStart
+  reserved "case" *> pure ExprCaseStart
 
 exprCaseOf :: Parser Token
 exprCaseOf =
-  string "of" *> pure ExprCaseOf
+  reserved "of" *> pure ExprCaseOf
 
 exprCaseSep :: Parser Token
 exprCaseSep =
   char ';' *> pure ExprCaseSep
+
+exprEach :: Parser Token
+exprEach =
+  reserved "each" *> pure ExprEach
 
 exprDot :: Parser Token
 exprDot =
@@ -435,6 +432,7 @@ exprCommentEnd =
 stringToken :: Parser Token
 stringToken =
       stringChunk
+  <|> exprCommentStart
   <|> stringExprStart
   <|> stringEnd
 
@@ -454,7 +452,7 @@ stringChunkText :: Parser Text
 stringChunkText =
   escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '"' || p == '{'
+    p == '"' || p == '{' || p == '\\'
 
 
 -- -----------------------------------------------------------------------------
@@ -471,6 +469,10 @@ newline =
 
 -- -----------------------------------------------------------------------------
 -- low level parsers
+
+reserved :: [Char] -> Parser ()
+reserved s =
+  P.try (string s <* P.notFollowedBy P.alphaNumChar)
 
 someTill' :: Parser m -> Parser end -> Parser [m]
 someTill' m end =

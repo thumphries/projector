@@ -78,7 +78,7 @@ genHtmlLitT =
 genTemplate :: Jack (Template ())
 genTemplate =
   sized $ \k -> do
-    j <- chooseInt (0, k)
+    j <- chooseInt (1, k+1)
     Template () <$> genTemplateTypeSig <*>
       fmap (everywhere (mkT mergePlain)) (genHtml j)
 
@@ -98,7 +98,7 @@ genHtml :: Int -> Jack (THtml ())
 genHtml k =
   let j = k `div` 2 in
   THtml () <$>
-  listOfN 0 k (oneOf [genElement j, genVoidElement j, genComment, genPlain, genHtmlExpr j])
+  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genPlain, genHtmlExpr j])
 
 genElement :: Int -> Jack (TNode ())
 genElement k =
@@ -116,11 +116,15 @@ genVoidElement k =
 
 genComment :: Jack (TNode ())
 genComment =
-  TComment () <$> genPlainText
+  TComment () <$> genCommentText
 
 genPlain :: Jack (TNode ())
 genPlain =
   TPlain () <$> genPlainText
+
+genCommentText :: Jack TPlainText
+genCommentText =
+  TPlainText . T.replace "-" "a" . mangle <$> (arbitrary `suchThat` (/= T.empty))
 
 genPlainText :: Jack TPlainText
 genPlainText =
@@ -129,6 +133,7 @@ genPlainText =
 mangle :: Text -> Text
 mangle =
     T.replace " " "a"
+  . T.replace "\r" "d"
   . T.replace "\n" "b"
   . T.replace "\t" "c"
   . T.replace "\\" "\\\\"

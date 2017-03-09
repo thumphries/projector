@@ -84,11 +84,15 @@ template = mdo
   expr' <- expr node'
   node' <- E.rule (htmlNode expr' html')
   html' <- html node'
-  E.rule $
-    (\tsig thtml -> Template (extract thtml) tsig thtml)
-      <$> optional tsig'
-      <*> html'
-      <?> "template"
+  E.rule (template' tsig' html')
+
+template' :: Rule r (TTypeSig Range) -> Rule r (THtml Range) -> Rule r (Template Range)
+template' tsig' html' =
+  (\tsig thtml -> Template (extract thtml) tsig thtml)
+    <$> optional tsig'
+    <*> html'
+    <?> "template"
+
 
 -- -----------------------------------------------------------------------------
 
@@ -285,6 +289,7 @@ expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
 expr node' = mdo
   expr2 <- E.rule $
         exprApp expr2 expr1
+    <|> exprEach expr2 expr1
     <|> expr1
   expr1 <- E.rule $
         exprLam expr2
@@ -310,6 +315,13 @@ exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
   (\e1 e2 -> TEApp (extract e1 <> extract e2) e1 e2)
     <$> expr'
+    <*> expr''
+
+exprEach :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
+exprEach expr' expr'' =
+  (\a e1 e2 -> TEEach (a <> extract e2) e1 e2)
+    <$> token ExprEach
+    <*> expr'
     <*> expr''
 
 exprLam :: Rule r (TExpr Range) -> Rule r (TExpr Range)
@@ -347,14 +359,15 @@ exprCase expr' pat' =
 
 exprAlts :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (NonEmpty (TAlt Range))
 exprAlts expr' pat' =
-  sepBy1 (exprAlt expr' pat') (token ExprCaseSep)
+  some' (exprAlt expr' pat')
 
 exprAlt :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TAlt Range)
 exprAlt expr' pat' =
-  (\p _ e -> TAlt (extract p <> extract e) p e)
+  (\p _ e b -> TAlt (extract p <> b) p e)
     <$> pat'
     <*> token ExprArrow
     <*> expr'
+    <*> token ExprCaseSep
 
 exprString :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprString expr' =
