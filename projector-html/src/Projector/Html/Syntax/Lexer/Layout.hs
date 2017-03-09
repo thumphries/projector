@@ -18,7 +18,8 @@ import           Projector.Html.Syntax.Token
 -- Minimise HTML whitespace as far as possible.
 layout :: [Positioned Token] -> [Positioned Token]
 layout =
-  applyLayout [] []
+  id
+--  applyLayout [] []
 
 data Scope =
     CaseScope -- expecting case separator
