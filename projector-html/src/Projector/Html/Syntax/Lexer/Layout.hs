@@ -81,7 +81,6 @@ applyLayout mms@(TypeSigMode : _) ss (sep@(TypeSigSep :@ _) : Whitespace _ :@ _ 
   sep : applyLayout mms ss xs
 
 
-
 --
 -- html mode
 --
@@ -114,7 +113,8 @@ applyLayout (TagOpenMode : ms) ss (tsc@(TagSelfClose :@ _) : xs) =
 -- Drop whitespace, newlines
 applyLayout mms@(TagOpenMode : _) ss (Whitespace _ :@ _ : xs) =
   applyLayout mms ss xs
-
+applyLayout mms@(TagOpenMode : _) ss (Newline :@ _ : xs) =
+  applyLayout mms ss xs
 
 --
 -- tag close mode
@@ -134,6 +134,10 @@ applyLayout mms@(TagCloseMode : _) ss (Newline :@ _ : xs) =
 --
 -- expr mode
 --
+
+-- Drop into tag open mode on tagopen
+applyLayout mms@(ExprMode : _) ss (top@(TagOpen :@ a) : xs) =
+  top : applyLayout (TagOpenMode : mms) ss xs
 
 -- Close relevant implicit scopes on right brace
 applyLayout mms@(ExprMode : ms) ss (est@(ExprEnd :@ a) : xs) =
