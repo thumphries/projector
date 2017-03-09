@@ -136,6 +136,10 @@ deindent' mms@(ExprMode : _) il (top@(TagOpen :@ a) : xs) =
 deindent' mms@(ExprMode : ms) il (est@(ExprEnd :@ a) : xs) =
   est : deindent' ms il xs
 
+-- Nested expr mode
+deindent' mms@(ExprMode : _) il (est@(ExprStart :@ a) : xs) =
+  est : deindent' (ExprMode : mms) il xs
+
 -- Track indent/dedent
 deindent' ms@(ExprMode : _) il (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
   newline ms il b x xs
