@@ -23,10 +23,11 @@ layout =
 -- -----------------------------------------------------------------------------
 
 data Scope =
-    CaseScope -- expecting case separator
-  | ParenScope -- explicit parentheses
-  | BraceScope -- explicit braces { }
-  | BlockScope Int -- an implicit scope
+    Case -- expecting case separator
+  | Paren -- explicit parentheses
+  | Brace -- explicit braces { }
+  | Block -- an implicit scope for which we inject parens
+  | Indent -- an implicit scope we ignore for indent tracking purposes
   deriving (Eq, Ord, Show)
 
 newtype IndentLevel = IndentLevel {
@@ -61,12 +62,8 @@ applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : Newline :@ _ : xs
 applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : xs) =
   end : applyLayout' ms il ss xs
 
--- Drop whitespace, indent, dedent in the type signature
+-- Drop whitespace in the type signature
 applyLayout' mms@(TypeSigMode : _) il ss (Whitespace _ :@ _ : xs) =
-  applyLayout' mms il ss xs
-applyLayout' mms@(TypeSigMode : _) il ss (Indent _ :@ _ : xs) =
-  applyLayout' mms il ss xs
-applyLayout' mms@(TypeSigMode : _) il ss (Dedent :@ _ : xs) =
   applyLayout' mms il ss xs
 
 -- Separators can be injected on newline where needed
@@ -182,33 +179,45 @@ newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positione
 
 newline ms@(ExprMode : _) iis@(IndentLevel i : is) ss a x xs
   | i == x =
+    -- same level
     applyLayout' ms iis ss xs
 
   | i > x =
-    (Dedent :@ a) : newline ms is ss a x xs
+    -- indent decreased
+    -- close an indent scope
+    let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
+    toks <> newline ms is sss a x xs
 
   | otherwise {- i < x -} =
-    (Indent (x - i) :@ a) : applyLayout' ms (IndentLevel x : iis) ss xs
+    -- indent increased
+    -- open an indent scope
+    applyLayout' ms (IndentLevel x : iis) (Indent : ss) xs
 
 newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
+    -- same level
     applyLayout' ms iis ss xs
 
   | i > x =
+    -- indent decreased
     newline ms is ss a x xs
 
   | otherwise {- i < x -} =
+    -- indent increased
     applyLayout' ms (IndentLevel x : iis) ss xs
 
 newline ms@(ExprMode : _) [] ss a x xs
   | x == 0 =
+    -- initial unindented
     applyLayout' ms [] ss xs
 
   | otherwise =
-    (Indent x :@ a) : applyLayout' ms [IndentLevel x] ss xs
+    -- initially indented
+    applyLayout' ms [IndentLevel x] (Indent : ss) xs
 
 newline ms [] ss a x xs
   | x == 0 =
+    -- initial unindented
     applyLayout' ms [] ss xs
 
   | otherwise =
@@ -218,46 +227,64 @@ newline ms [] ss a x xs
 
 -- -----------------------------------------------------------------------------
 
-{-
-
--- | Close scopes
-closeScopes :: Range -> Scope -> [LexerMode] -> [Scope] -> [Positioned Token] -> [Positioned Token]
-closeScopes a s ms ss xs =
-  fmap (:@ a) toks <> applyLayout' ms sss xs
+closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
+closeScopes s sss =
+  foo (go (fmap (closeScope s) sss))
   where
-    (toks, sss) = closeScopes' s ss
-
-closeScopes' :: Scope -> [Scope] -> ([Token], [Scope])
-closeScopes' s ss =
-  go ([], []) ss
-  where
-    go acc [] = acc
-    go (ts, sss) (x:xs) =
-      case closeScope s x of
-        Just t ->
-          go (t <> ts, sss) xs
-        Nothing ->
-          (ts, (x:xs))
+    foo :: [[Token]] -> ([Token], [Scope])
+    foo ts = (fold ts, L.drop (length ts) sss)
+    go [] = []
+    go (Stop : _) = [[]]
+    go (CloseAndStop t : _) = [[t]]
+    go (Continue : cs) = go cs
+    go (CloseAndContinue t : cs) = [t] : go cs
 
 
-closeScope :: Scope -> Scope -> Maybe [Token]
+data ScopeClose =
+    CloseAndStop Token
+  | CloseAndContinue Token
+  | Continue
+  | Stop
+  deriving (Eq, Ord, Show)
 
-closeScope BraceScope BraceScope = Just [ExprEnd]
-closeScope BraceScope (BlockScope _) = Just [ExprRParen]
-closeScope BraceScope CaseScope = Just []
-closeScope BraceScope ParenScope = Nothing
+-- | Which scopes can close which.
+closeScope :: Scope -> Scope -> ScopeClose
 
-closeScope ParenScope ParenScope = Just [ExprRParen]
-closeScope ParenScope (BlockScope _) = Just [ExprRParen]
-closeScope ParenScope _ = Nothing
+-- brace scopes are closed by braces
+closeScope Brace Brace = CloseAndStop ExprEnd
+-- braces close blocks
+closeScope Brace Block = CloseAndContinue ExprRParen
+-- braces close case statements silently
+closeScope Brace Case = Continue
+-- braces close soft indent
+closeScope Brace Indent = Continue
+-- braces can't close explicit parens
+closeScope Brace Paren = Stop
 
-closeScope (BlockScope _) (BlockScope _) = Just [ExprRParen]
-closeScope (BlockScope _) CaseScope = Just []
-closeScope (BlockScope _) _ = Nothing
+-- parens close other parens
+closeScope Paren Paren = CloseAndStop ExprRParen
+-- parens can close blocks
+closeScope Paren Block = CloseAndContinue ExprRParen
+-- parens can clsoe soft indent
+closeScope Paren Indent = Continue
+-- parens cant close braces or cases
+closeScope Paren Brace = Stop
+closeScope Paren Case = Stop
 
-closeScope CaseScope CaseScope = Just []
-closeScope CaseScope (BlockScope _) = Just [ExprRParen]
-closeScope CaseScope _ = Nothing
+-- block scopes are only closed by indentation
+closeScope Block _ = Stop
 
+closeScope Case Case = Stop
+closeScope Case Block = CloseAndContinue ExprRParen
+closeScope Case Indent = Continue
+closeScope Case _ = Stop
 
--}
+-- soft indent closes itself
+closeScope Indent Indent = Stop
+-- soft indent can close block scopes
+closeScope Indent Block = CloseAndStop ExprRParen
+-- soft indent can inject case separators
+closeScope Indent Case = CloseAndStop ExprCaseSep
+-- soft indent can't close braces or parens
+closeScope Indent Brace = Stop
+closeScope Indent Paren = Stop

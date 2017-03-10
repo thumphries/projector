@@ -69,7 +69,7 @@ data Token =
   | StringChunk Text      -- foo
   | StringEnd             -- "
 
-  -- Semantic whitespace
-  | Indent Int
-  | Dedent
+--  -- Semantic whitespace
+--  | Indent Int
+--  | Dedent
   deriving (Eq, Ord, Show)
