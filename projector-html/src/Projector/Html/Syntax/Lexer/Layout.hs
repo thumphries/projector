@@ -196,18 +196,22 @@ applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
 applyLayout' (ExprPatternMode : ms) il ss (arr@(ExprArrow :@ a) : xs) =
   arr : ExprLParen :@ a : applyLayout' ms il (Case : ss) xs
 
+-- Track indent/dedent
+applyLayout' ms@(ExprPatternMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
+  newline ms il ss b x xs
+applyLayout' ms@(ExprPatternMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
+  newline ms il ss b 0 xs
+
 -- drop whitespace and newlines
 applyLayout' mms@(ExprPatternMode : ms) il ss (Whitespace _ :@ _ : xs) =
   applyLayout' mms il ss xs
 applyLayout' mms@(ExprPatternMode : ms) il ss (Newline :@ _ : xs) =
   applyLayout' mms il ss xs
 
-
-
-
--- debugging
---applyLayout' ms il ss (x@(ExprLamStart :@ _) : xs) =
---  trace (show ms) $ x : applyLayout' ms il ss xs
+-- shut down on brace
+applyLayout' mms@(ExprPatternMode : ms) il ss (ExprEnd :@ a : xs) =
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
+  toks <> applyLayout' ms il sss xs
 
 
 --
@@ -235,8 +239,14 @@ newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positione
 newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
     -- same level
+    -- this is reason enough to close a case
     trace (show ss) $
-    applyLayout' ms iis ss xs
+    case ss of
+      Case : _ ->
+        let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
+        toks <> applyLayout' (ExprPatternMode : ms) iis sss xs
+      _ ->
+        applyLayout' ms iis ss xs
 
   | i > x =
     -- indent decreased
@@ -263,7 +273,7 @@ newline ms [] ss a x xs
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
-  trace (show s <> " closes " <> show bar <> " from " <> show sss <> " " <> show (length quux)) $
+ trace (show s <> " closes " <> show bar <> " from " <> show sss <> " " <> show (length quux)) $
   bar
   where
     bar = foo quux
