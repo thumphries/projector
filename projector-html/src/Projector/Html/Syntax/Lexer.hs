@@ -13,7 +13,6 @@ import           Projector.Html.Data.Position
 import           Projector.Html.Syntax.Token
 import           Projector.Html.Syntax.Lexer.Tokenise
 import           Projector.Html.Syntax.Lexer.Layout
-import           Projector.Html.Syntax.Lexer.Whitespace
 
 import           System.IO (FilePath)
 
@@ -30,4 +29,4 @@ renderLexError le =
 
 lex :: FilePath -> Text -> Either LexError [Positioned Token]
 lex file =
-  bimap LexTokenError (layout . deindent) . tokenise file
+  bimap LexTokenError layout . tokenise file
