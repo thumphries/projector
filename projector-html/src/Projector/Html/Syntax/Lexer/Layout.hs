@@ -142,7 +142,24 @@ applyLayout' mms@(ExprMode : ms) il ss (est@(ExprEnd :@ a) : xs) =
 
 -- Nested expr mode
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ a) : xs) =
-  est : applyLayout' (ExprMode : mms) il ss xs
+  est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
+
+-- Enter block scope on lambda
+applyLayout' mms@(ExprMode : _) il ss (est@(ExprLamStart :@ a) : xs) =
+  ExprLParen :@ a : est : applyLayout' mms il (Block : ss) xs
+
+-- Enter block scope on case start
+applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseStart :@ a) : xs) =
+  ExprLParen :@ a : est : applyLayout' mms il (Block : ss) xs
+
+-- Enter block scope on arrow
+applyLayout' mms@(ExprMode : _) il ss (arr@(ExprArrow :@ a) : xs) =
+  arr : ExprLParen :@ a : applyLayout' mms il (Block : ss) xs
+
+-- close block scope on casesep
+applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseSep :@ a) : xs) =
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
+  toks <> (est : applyLayout' mms il sss xs)
 
 -- Track indent/dedent
 applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
@@ -178,7 +195,7 @@ applyLayout' _ _ _ [] =
 -- accordingly, then continue with applyLayout.
 newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positioned Token] -> [Positioned Token]
 
-newline ms@(ExprMode : _) iis@(IndentLevel i : is) ss a x xs
+newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
     -- same level
     applyLayout' ms iis ss xs
@@ -194,20 +211,7 @@ newline ms@(ExprMode : _) iis@(IndentLevel i : is) ss a x xs
     -- open an indent scope
     applyLayout' ms (IndentLevel x : iis) (Indent : ss) xs
 
-newline ms iis@(IndentLevel i : is) ss a x xs
-  | i == x =
-    -- same level
-    applyLayout' ms iis ss xs
-
-  | i > x =
-    -- indent decreased
-    newline ms is ss a x xs
-
-  | otherwise {- i < x -} =
-    -- indent increased
-    applyLayout' ms (IndentLevel x : iis) ss xs
-
-newline ms@(ExprMode : _) [] ss a x xs
+newline ms [] ss a x xs
   | x == 0 =
     -- initial unindented
     applyLayout' ms [] ss xs
@@ -216,22 +220,14 @@ newline ms@(ExprMode : _) [] ss a x xs
     -- initially indented
     applyLayout' ms [IndentLevel x] (Indent : ss) xs
 
-newline ms [] ss a x xs
-  | x == 0 =
-    -- initial unindented
-    applyLayout' ms [] ss xs
-
-  | otherwise =
-    applyLayout' ms [IndentLevel x] ss xs
-
-
 
 -- -----------------------------------------------------------------------------
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
-  foo (go (fmap (closeScope s) sss))
+  bar
   where
+    bar = foo (go (fmap (closeScope s) sss))
     foo :: [[Token]] -> ([Token], [Scope])
     foo ts = (fold ts, L.drop (length ts) sss)
     go [] = []
