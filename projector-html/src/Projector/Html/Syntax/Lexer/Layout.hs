@@ -40,14 +40,15 @@ newtype IndentLevel = IndentLevel {
 -- take care of leading indentation when it exists
 applyLayout'' :: [IndentLevel] -> [Positioned Token] -> [Positioned Token]
 applyLayout'' il xs@(TypeSigStart :@ _ : _) =
-  applyLayout' [TypeSigMode, HtmlMode] il xs
+  applyLayout' [TypeSigMode, HtmlMode] il [] xs
+-- FIX not sure about this case at this point
 applyLayout'' il (Whitespace x :@ b : xs) =
-  newline [HtmlMode] il b x xs
+  newline [HtmlMode] il [] b x xs
 applyLayout'' il xs =
-  applyLayout' [HtmlMode] il xs
+  applyLayout' [HtmlMode] il [] xs
 
 
-applyLayout' :: [LexerMode] -> [IndentLevel] -> [Positioned Token] -> [Positioned Token]
+applyLayout' :: [LexerMode] -> [IndentLevel] -> [Scope] -> [Positioned Token] -> [Positioned Token]
 
 
 --
@@ -55,28 +56,28 @@ applyLayout' :: [LexerMode] -> [IndentLevel] -> [Positioned Token] -> [Positione
 --
 
 -- Drop out of signature mode on sig end, with optional newline
-applyLayout' (TypeSigMode : ms) il (end@(TypeSigEnd :@ _) : Newline :@ _ : xs) =
-  end : applyLayout' ms il xs
-applyLayout' (TypeSigMode : ms) il (end@(TypeSigEnd :@ _) : xs) =
-  end : applyLayout' ms il xs
+applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : Newline :@ _ : xs) =
+  end : applyLayout' ms il ss xs
+applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : xs) =
+  end : applyLayout' ms il ss xs
 
 -- Drop whitespace, indent, dedent in the type signature
-applyLayout' mms@(TypeSigMode : _) il (Whitespace _ :@ _ : xs) =
-  applyLayout' mms il xs
-applyLayout' mms@(TypeSigMode : _) il (Indent _ :@ _ : xs) =
-  applyLayout' mms il xs
-applyLayout' mms@(TypeSigMode : _) il (Dedent :@ _ : xs) =
-  applyLayout' mms il xs
+applyLayout' mms@(TypeSigMode : _) il ss (Whitespace _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(TypeSigMode : _) il ss (Indent _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(TypeSigMode : _) il ss (Dedent :@ _ : xs) =
+  applyLayout' mms il ss xs
 
 -- Separators can be injected on newline where needed
-applyLayout' mms@(TypeSigMode : _) il (Newline :@ a : xs) =
-  TypeSigSep :@ a : applyLayout' mms il xs
+applyLayout' mms@(TypeSigMode : _) il ss (Newline :@ a : xs) =
+  TypeSigSep :@ a : applyLayout' mms il ss xs
 
 -- ... but they're not needed when they're explicit:
-applyLayout' mms@(TypeSigMode : _) il (sep@(TypeSigSep :@ _) : Newline :@ _ : xs) =
-  sep : applyLayout' mms il xs
-applyLayout' mms@(TypeSigMode : _) il (sep@(TypeSigSep :@ _) : Whitespace _ :@ _ : Newline :@ _ : xs) =
-  sep : applyLayout' mms il xs
+applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Newline :@ _ : xs) =
+  sep : applyLayout' mms il ss xs
+applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Whitespace _ :@ _ : Newline :@ _ : xs) =
+  sep : applyLayout' mms il ss xs
 
 
 --
@@ -84,22 +85,16 @@ applyLayout' mms@(TypeSigMode : _) il (sep@(TypeSigSep :@ _) : Whitespace _ :@ _
 --
 
 -- Drop into expr mode on left brace
-applyLayout' mms@(HtmlMode : ms) il (est@(ExprStart :@ _) : xs) =
-  est : applyLayout' (ExprMode : mms) il xs
+applyLayout' mms@(HtmlMode : ms) il ss (est@(ExprStart :@ _) : xs) =
+  est : applyLayout' (ExprMode : mms) il ss xs
 
 -- Drop into tag open mode on tagopen
-applyLayout' mms@(HtmlMode : ms) il (top@(TagOpen :@ _) : xs) =
-  top : applyLayout' (TagOpenMode : mms) il xs
+applyLayout' mms@(HtmlMode : ms) il ss (top@(TagOpen :@ _) : xs) =
+  top : applyLayout' (TagOpenMode : mms) il ss xs
 
 -- Drop into tag close mode on tag close
-applyLayout' (HtmlMode : ms) il (tcl@(TagClose :@ _) : xs) =
-  tcl : applyLayout' (TagCloseMode : ms) il xs
-
--- Track indent levels
---applyLayout' ms@(HtmlMode : _) il (n@(Newline :@ _) : w@(Whitespace x :@ b) : xs) =
---  n : w : newline ms il b x xs
---applyLayout' ms@(HtmlMode : _) il (n@(Newline :@ _) : xs@(_ :@ b : _)) =
---  n : newline ms il b 0 xs
+applyLayout' (HtmlMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
+  tcl : applyLayout' (TagCloseMode : ms) il ss xs
 
 
 --
@@ -107,32 +102,32 @@ applyLayout' (HtmlMode : ms) il (tcl@(TagClose :@ _) : xs) =
 --
 
 -- Drop into html mode on tagclose
-applyLayout' (TagOpenMode : ms) il (tcl@(TagClose :@ _) : xs) =
-  tcl : applyLayout' (HtmlMode : ms) il xs
+applyLayout' (TagOpenMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
+  tcl : applyLayout' (HtmlMode : ms) il ss xs
 
 -- Pop mode on tagselfclose
-applyLayout' (TagOpenMode : ms) il (tsc@(TagSelfClose :@ _) : xs) =
-  tsc : applyLayout' ms il xs
+applyLayout' (TagOpenMode : ms) il ss (tsc@(TagSelfClose :@ _) : xs) =
+  tsc : applyLayout' ms il ss xs
 
 -- Drop whitespace, newlines
-applyLayout' mms@(TagOpenMode : _) il (Whitespace _ :@ _ : xs) =
-  applyLayout' mms il xs
-applyLayout' mms@(TagOpenMode : _) il (Newline :@ _ : xs) =
-  applyLayout' mms il xs
+applyLayout' mms@(TagOpenMode : _) il ss (Whitespace _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(TagOpenMode : _) il ss (Newline :@ _ : xs) =
+  applyLayout' mms il ss xs
 
 --
 -- tag close mode
 --
 
 -- Pop mode on tag close
-applyLayout' (TagCloseMode : ms) il (tcl@(TagClose :@ _) : xs) =
-  tcl : applyLayout' ms il xs
+applyLayout' (TagCloseMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
+  tcl : applyLayout' ms il ss xs
 
 -- Drop whitespace, newlines
-applyLayout' mms@(TagCloseMode : _) il (Whitespace _ :@ _ : xs) =
-  applyLayout' mms il xs
-applyLayout' mms@(TagCloseMode : _) il (Newline :@ _ : xs) =
-  applyLayout' mms il xs
+applyLayout' mms@(TagCloseMode : _) il ss (Whitespace _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(TagCloseMode : _) il ss (Newline :@ _ : xs) =
+  applyLayout' mms il ss xs
 
 
 --
@@ -140,42 +135,42 @@ applyLayout' mms@(TagCloseMode : _) il (Newline :@ _ : xs) =
 --
 
 -- Drop into tag open mode on tagopen
-applyLayout' mms@(ExprMode : _) il (top@(TagOpen :@ a) : xs) =
-  top : applyLayout' (TagOpenMode : mms) il xs
+applyLayout' mms@(ExprMode : _) il ss (top@(TagOpen :@ a) : xs) =
+  top : applyLayout' (TagOpenMode : mms) il ss xs
 
 -- Pop mode on expr end
-applyLayout' mms@(ExprMode : ms) il (est@(ExprEnd :@ a) : xs) =
-  est : applyLayout' ms il xs
+applyLayout' mms@(ExprMode : ms) il ss (est@(ExprEnd :@ a) : xs) =
+  est : applyLayout' ms il ss xs
 
 -- Nested expr mode
-applyLayout' mms@(ExprMode : _) il (est@(ExprStart :@ a) : xs) =
-  est : applyLayout' (ExprMode : mms) il xs
+applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ a) : xs) =
+  est : applyLayout' (ExprMode : mms) il ss xs
 
 -- Track indent/dedent
-applyLayout' ms@(ExprMode : _) il (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
-  newline ms il b x xs
-applyLayout' ms@(ExprMode : _) il (n@(Newline :@ _) : xs@(_ :@ b : _)) =
-  newline ms il b 0 xs
+applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
+  newline ms il ss b x xs
+applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
+  newline ms il ss b 0 xs
 
 
 -- Drop whitespace and newlines
-applyLayout' mms@(ExprMode : ms) il (Whitespace _ :@ _ : xs) =
-  applyLayout' mms il xs
-applyLayout' mms@(ExprMode : ms) il (Newline :@ _ : xs) =
-  applyLayout' mms il xs
+applyLayout' mms@(ExprMode : ms) il ss (Whitespace _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
+  applyLayout' mms il ss xs
 
 
 -- Drop trailing newline
-applyLayout' _ _ (Newline :@ _ : []) =
+applyLayout' _ _ _ (Newline :@ _ : []) =
   []
 
 --
 -- Pass over any ignored tokens
 --
-applyLayout' ms il (x:xs) =
-  x : applyLayout' ms il xs
+applyLayout' ms il ss (x:xs) =
+  x : applyLayout' ms il ss xs
 
-applyLayout' _ _ [] =
+applyLayout' _ _ _ [] =
   []
 
 -- -----------------------------------------------------------------------------
@@ -183,41 +178,41 @@ applyLayout' _ _ [] =
 
 -- | Given a new indent level, insert indent or dedent tokens
 -- accordingly, then continue with applyLayout.
-newline :: [LexerMode] -> [IndentLevel] -> Range -> Int -> [Positioned Token] -> [Positioned Token]
+newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positioned Token] -> [Positioned Token]
 
-newline ms@(ExprMode : _) iis@(IndentLevel i : is) a x xs
+newline ms@(ExprMode : _) iis@(IndentLevel i : is) ss a x xs
   | i == x =
-    applyLayout' ms iis xs
+    applyLayout' ms iis ss xs
 
   | i > x =
-    (Dedent :@ a) : newline ms is a x xs
+    (Dedent :@ a) : newline ms is ss a x xs
 
   | otherwise {- i < x -} =
-    (Indent (x - i) :@ a) : applyLayout' ms (IndentLevel x : iis) xs
+    (Indent (x - i) :@ a) : applyLayout' ms (IndentLevel x : iis) ss xs
 
-newline ms iis@(IndentLevel i : is) a x xs
+newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
-    applyLayout' ms iis xs
+    applyLayout' ms iis ss xs
 
   | i > x =
-    newline ms is a x xs
+    newline ms is ss a x xs
 
   | otherwise {- i < x -} =
-    applyLayout' ms (IndentLevel x : iis) xs
+    applyLayout' ms (IndentLevel x : iis) ss xs
 
-newline ms@(ExprMode : _) [] a x xs
+newline ms@(ExprMode : _) [] ss a x xs
   | x == 0 =
-    applyLayout' ms [] xs
+    applyLayout' ms [] ss xs
 
   | otherwise =
-    (Indent x :@ a) : applyLayout' ms [IndentLevel x] xs
+    (Indent x :@ a) : applyLayout' ms [IndentLevel x] ss xs
 
-newline ms [] a x xs
+newline ms [] ss a x xs
   | x == 0 =
-    applyLayout' ms [] xs
+    applyLayout' ms [] ss xs
 
   | otherwise =
-    applyLayout' ms [IndentLevel x] xs
+    applyLayout' ms [IndentLevel x] ss xs
 
 
 
