@@ -301,10 +301,14 @@ isBalanced toks =
   where
     go (ExprLParen : xs) (ExprRParen : ts) =
       go xs ts
+    go _ (ExprRParen : _) =
+      False
     go xs (ExprLParen : ts) =
       go (ExprLParen : xs) ts
     go (ExprStart : xs) (ExprEnd : ts) =
       go xs ts
+    go _ (ExprEnd : _) =
+      False
     go xs (ExprStart : ts) =
       go (ExprStart : xs) ts
     go xs (t:ts) =
