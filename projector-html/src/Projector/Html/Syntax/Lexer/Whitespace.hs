@@ -85,10 +85,10 @@ deindent' (HtmlMode : ms) il (tcl@(TagClose :@ _) : xs) =
   tcl : deindent' (TagCloseMode : ms) il xs
 
 -- Track indent levels
-deindent' ms@(HtmlMode : _) il (n@(Newline :@ _) : w@(Whitespace x :@ b) : xs) =
-  n : w : newline ms il b x xs
-deindent' ms@(HtmlMode : _) il (n@(Newline :@ _) : xs@(_ :@ b : _)) =
-  n : newline ms il b 0 xs
+--deindent' ms@(HtmlMode : _) il (n@(Newline :@ _) : w@(Whitespace x :@ b) : xs) =
+--  n : w : newline ms il b x xs
+--deindent' ms@(HtmlMode : _) il (n@(Newline :@ _) : xs@(_ :@ b : _)) =
+--  n : newline ms il b 0 xs
 
 
 --
