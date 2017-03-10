@@ -153,21 +153,33 @@ applyLayout' mms@(ExprMode : _) il ss (est@(ExprLamStart :@ a) : xs) =
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseStart :@ a) : xs) =
   ExprLParen :@ a : est : applyLayout' mms il (Block : ss) xs
 
+-- Enter pattern mode on case of
+applyLayout' mms@(ExprMode : _) il ss (cof@(ExprCaseOf :@ _) : xs) =
+  cof : applyLayout' (ExprPatternMode : mms) il ss xs
+
 -- Enter block scope on arrow
 applyLayout' mms@(ExprMode : _) il ss (arr@(ExprArrow :@ a) : xs) =
   arr : ExprLParen :@ a : applyLayout' mms il (Block : ss) xs
 
--- close block scope on casesep
+-- close block scope on casesep, push pattern mode
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseSep :@ a) : xs) =
-  let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
-  toks <> (est : applyLayout' mms il sss xs)
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Case ss) in
+  toks <> (est : applyLayout' (ExprPatternMode : mms) il sss xs)
+
+-- enter paren scopes on left paren
+applyLayout' mms@(ExprMode : _) il ss (elp@(ExprLParen :@ a) : xs) =
+  elp : applyLayout' mms il (Paren : ss) xs
+
+-- close scopes on right paren
+applyLayout' mms@(ExprMode : _) il ss (erp@(ExprRParen :@ a) : xs) =
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Paren ss) in
+  toks <> applyLayout' mms il sss xs
 
 -- Track indent/dedent
 applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
   newline ms il ss b x xs
 applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
   newline ms il ss b 0 xs
-
 
 -- Drop whitespace and newlines
 applyLayout' mms@(ExprMode : ms) il ss (Whitespace _ :@ _ : xs) =
@@ -176,9 +188,21 @@ applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
   applyLayout' mms il ss xs
 
 
--- Drop trailing newline
-applyLayout' _ _ _ (Newline :@ _ : []) =
-  []
+--
+-- expr pat mode
+--
+
+-- open case scope and pop mode on arrow
+applyLayout' (ExprPatternMode : ms) il ss (arr@(ExprArrow :@ a) : xs) =
+  arr : ExprLParen :@ a : applyLayout' ms il (Case : ss) xs
+
+-- drop whitespace and newlines
+applyLayout' mms@(ExprPatternMode : ms) il ss (Whitespace _ :@ _ : xs) =
+  applyLayout' mms il ss xs
+applyLayout' mms@(ExprPatternMode : ms) il ss (Newline :@ _ : xs) =
+  applyLayout' mms il ss xs
+
+
 
 
 -- debugging
@@ -187,8 +211,14 @@ applyLayout' _ _ _ (Newline :@ _ : []) =
 
 
 --
--- Pass over any ignored tokens
+-- General
 --
+
+-- Drop trailing newline
+applyLayout' _ _ _ (Newline :@ _ : []) =
+  []
+
+-- Pass over any ignored tokens
 applyLayout' ms il ss (x:xs) =
   x : applyLayout' ms il ss xs
 
@@ -205,6 +235,7 @@ newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positione
 newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
     -- same level
+    trace (show ss) $
     applyLayout' ms iis ss xs
 
   | i > x =
@@ -232,21 +263,23 @@ newline ms [] ss a x xs
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
+  trace (show s <> " closes " <> show bar <> " from " <> show sss <> " " <> show (length quux)) $
   bar
   where
-    bar = foo (go (fmap (closeScope s) sss))
+    bar = foo quux
+    quux = go (fmap (closeScope s) sss)
     foo :: [[Token]] -> ([Token], [Scope])
     foo ts = (fold ts, L.drop (length ts) sss)
     go [] = []
     go (Stop : _) = [[]]
-    go (CloseAndStop t : _) = [[t]]
+    go (CloseAndStop t : _) = [t]
     go (Continue : cs) = go cs
-    go (CloseAndContinue t : cs) = [t] : go cs
+    go (CloseAndContinue t : cs) = t : go cs
 
 
 data ScopeClose =
-    CloseAndStop Token
-  | CloseAndContinue Token
+    CloseAndStop [Token]
+  | CloseAndContinue [Token]
   | Continue
   | Stop
   deriving (Eq, Ord, Show)
@@ -255,46 +288,47 @@ data ScopeClose =
 closeScope :: Scope -> Scope -> ScopeClose
 
 -- brace scopes are closed by braces
-closeScope Brace Brace = CloseAndStop ExprEnd
+closeScope Brace Brace = CloseAndStop [ExprEnd]
 -- braces close blocks
-closeScope Brace Block = CloseAndContinue ExprRParen
--- braces close case statements silently
-closeScope Brace Case = Continue
+closeScope Brace Block = CloseAndContinue [ExprRParen]
+-- braces close case statements
+closeScope Brace Case = CloseAndContinue [ExprRParen]
 -- braces close soft indent
 closeScope Brace Indent = Continue
 -- braces can't close explicit parens
 closeScope Brace Paren = Stop
 
 -- parens close other parens
-closeScope Paren Paren = CloseAndStop ExprRParen
+closeScope Paren Paren = CloseAndStop [ExprRParen]
 -- parens can close blocks
-closeScope Paren Block = CloseAndContinue ExprRParen
+closeScope Paren Block = CloseAndContinue [ExprRParen]
 -- parens can clsoe soft indent
 closeScope Paren Indent = Continue
+closeScope Paren Case = CloseAndContinue [ExprRParen]
 -- parens cant close braces or cases
 closeScope Paren Brace = Stop
-closeScope Paren Case = Stop
 
--- block scopes are only closed by indentation
-closeScope Block _ = Stop
-
-closeScope Case Case = Stop
-closeScope Case Block = CloseAndContinue ExprRParen
+closeScope Case Case = CloseAndStop [ExprRParen]
+closeScope Case Block = CloseAndContinue [ExprRParen]
 closeScope Case Indent = Continue
 closeScope Case _ = Stop
 
 -- soft indent closes itself
 closeScope Indent Indent = Stop
 -- soft indent can close block scopes
-closeScope Indent Block = CloseAndStop ExprRParen
+closeScope Indent Block = CloseAndStop [ExprRParen]
 -- soft indent can inject case separators
-closeScope Indent Case = CloseAndStop ExprCaseSep
+closeScope Indent Case = CloseAndStop [ExprRParen, ExprCaseSep]
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
 closeScope Indent Paren = Stop
 
+-- block scopes are only closed by indentation, they don't appear on lhs
+closeScope Block _ = Stop
 
--- TODO remove, i suppose?
+
+
+-- TODO remove, i suppose? or run afterwards?
 isBalanced :: [Token] -> Bool
 isBalanced toks =
   go [] toks

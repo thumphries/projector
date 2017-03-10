@@ -9,13 +9,13 @@ module Projector.Html.Syntax.Token (
 import           P
 
 
-
 data LexerMode =
     HtmlMode
   | HtmlCommentMode
   | TagOpenMode
   | TagCloseMode
   | ExprMode
+  | ExprPatternMode
   | ExprCommentMode
   | StringMode
   | TypeSigMode
@@ -68,8 +68,4 @@ data Token =
   | StringStart           -- "
   | StringChunk Text      -- foo
   | StringEnd             -- "
-
---  -- Semantic whitespace
---  | Indent Int
---  | Dedent
   deriving (Eq, Ord, Show)
