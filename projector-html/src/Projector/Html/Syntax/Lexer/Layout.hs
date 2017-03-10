@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Syntax.Lexer.Layout (
     layout
+  , isBalanced
   ) where
 
 
@@ -90,7 +91,7 @@ applyLayout' mms@(HtmlMode : ms) il ss (top@(TagOpen :@ _) : xs) =
   top : applyLayout' (TagOpenMode : mms) il ss xs
 
 -- Drop into tag close mode on tag close
-applyLayout' (HtmlMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
+applyLayout' (HtmlMode : ms) il ss (tcl@(TagCloseOpen :@ _) : xs) =
   tcl : applyLayout' (TagCloseMode : ms) il ss xs
 
 
@@ -178,6 +179,12 @@ applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
 -- Drop trailing newline
 applyLayout' _ _ _ (Newline :@ _ : []) =
   []
+
+
+-- debugging
+--applyLayout' ms il ss (x@(ExprLamStart :@ _) : xs) =
+--  trace (show ms) $ x : applyLayout' ms il ss xs
+
 
 --
 -- Pass over any ignored tokens
@@ -285,3 +292,24 @@ closeScope Indent Case = CloseAndStop ExprCaseSep
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
 closeScope Indent Paren = Stop
+
+
+-- TODO remove, i suppose?
+isBalanced :: [Token] -> Bool
+isBalanced toks =
+  go [] toks
+  where
+    go (ExprLParen : xs) (ExprRParen : ts) =
+      go xs ts
+    go xs (ExprLParen : ts) =
+      go (ExprLParen : xs) ts
+    go (ExprStart : xs) (ExprEnd : ts) =
+      go xs ts
+    go xs (ExprStart : ts) =
+      go (ExprStart : xs) ts
+    go xs (t:ts) =
+      go xs ts
+    go [] [] =
+      True
+    go xs [] =
+      False
