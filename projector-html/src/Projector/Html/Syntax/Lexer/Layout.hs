@@ -83,7 +83,7 @@ applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Whitespace _ :
 
 -- Drop into expr mode on left brace
 applyLayout' mms@(HtmlMode : ms) il ss (est@(ExprStart :@ _) : xs) =
-  est : applyLayout' (ExprMode : mms) il ss xs
+  est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
 
 -- Drop into tag open mode on tagopen
 applyLayout' mms@(HtmlMode : ms) il ss (top@(TagOpen :@ _) : xs) =
@@ -137,7 +137,8 @@ applyLayout' mms@(ExprMode : _) il ss (top@(TagOpen :@ a) : xs) =
 
 -- Pop mode on expr end
 applyLayout' mms@(ExprMode : ms) il ss (est@(ExprEnd :@ a) : xs) =
-  est : applyLayout' ms il ss xs
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
+  toks <> applyLayout' ms il sss xs
 
 -- Nested expr mode
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ a) : xs) =
