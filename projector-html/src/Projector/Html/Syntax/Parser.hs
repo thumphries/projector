@@ -347,14 +347,15 @@ exprCase expr' pat' =
 
 exprAlts :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (NonEmpty (TAlt Range))
 exprAlts expr' pat' =
-  sepBy1 (exprAlt expr' pat') (token ExprCaseSep)
+  some' (exprAlt expr' pat')
 
 exprAlt :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TAlt Range)
 exprAlt expr' pat' =
-  (\p _ e -> TAlt (extract p <> extract e) p e)
+  (\p _ e b -> TAlt (extract p <> b) p e)
     <$> pat'
     <*> token ExprArrow
     <*> expr'
+    <*> token ExprCaseSep
 
 exprString :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprString expr' =
