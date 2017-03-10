@@ -271,9 +271,9 @@ closeScopes s sss =
     foo :: [[Token]] -> ([Token], [Scope])
     foo ts = (fold ts, L.drop (length ts) sss)
     go [] = []
-    go (Stop : _) = [[]]
+    go (Stop : _) = []
     go (CloseAndStop t : _) = [t]
-    go (Continue : cs) = go cs
+    go (Continue : cs) = [] : go cs
     go (CloseAndContinue t : cs) = t : go cs
 
 
@@ -314,7 +314,7 @@ closeScope Case Indent = Continue
 closeScope Case _ = Stop
 
 -- soft indent closes itself
-closeScope Indent Indent = Stop
+closeScope Indent Indent = CloseAndStop []
 -- soft indent can close block scopes
 closeScope Indent Block = CloseAndStop [ExprRParen]
 -- soft indent can inject case separators
