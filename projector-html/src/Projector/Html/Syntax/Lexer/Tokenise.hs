@@ -224,7 +224,7 @@ plainText :: Parser Token
 plainText =
   fmap Plain . escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}'
+    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}' || p == '\\'
 
 exprStart :: Parser Token
 exprStart =
