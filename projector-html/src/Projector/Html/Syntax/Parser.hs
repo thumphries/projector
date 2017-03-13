@@ -294,6 +294,7 @@ expr node' = mdo
   expr1 <- E.rule $
         exprLam expr2
     <|> exprCase expr2 pat1
+    <|> exprPrj expr2
     <|> exprHtml node'
     <|> exprList expr2
     <|> exprString expr2
@@ -331,6 +332,13 @@ exprLam expr' =
     <*> some' (fmap extractPositioned exprVarId)
     <*> token ExprArrow
     <*> expr'
+
+exprPrj :: Rule r (TExpr Range) -> Rule r (TExpr Range)
+exprPrj expr' =
+  (\e _ (fn :@ b) -> TEPrj (extract e <> b) e (TId fn))
+    <$> expr'
+    <*> token ExprDot
+    <*> exprVarId
 
 exprVar :: Rule r (TExpr Range)
 exprVar =

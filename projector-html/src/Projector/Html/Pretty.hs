@@ -241,6 +241,12 @@ exprTokens expr =
         , mconcat (L.intersperse [ListSep] (fmap exprTokens es))
         , [ListEnd]
         ]
+    TEPrj _ e (TId fn) ->
+      mconcat [
+          [ExprLParen]
+        , exprTokens e
+        , [ExprDot, ExprIdent fn, ExprRParen]
+        ]
 
 stringTokens :: TIString a -> DList (Token)
 stringTokens (TIString _ ss) =

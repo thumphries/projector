@@ -56,6 +56,7 @@ data Token
   | ListStart       -- [
   | ListEnd         -- ]
   | ListSep         -- ,
+  | ExprDot         -- .
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
@@ -109,6 +110,7 @@ renderToken tok =
     ListStart       -> "["
     ListEnd         -> "]"
     ListSep         -> ","
+    ExprDot         -> "."
 
     PatCon t        -> t
     PatId t         -> t

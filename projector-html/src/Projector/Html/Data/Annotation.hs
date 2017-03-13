@@ -31,6 +31,7 @@ data Annotation a
   | HtmlBlock a
   | AttributeExpression a
   | ListLiteral a
+  | RecordProjection a FieldName
   deriving (Eq, Ord, Show)
 
 type SrcAnnotation = Annotation Range
@@ -72,3 +73,5 @@ renderAnnotation f ann =
       f r <> " in an attribute expression"
     ListLiteral r ->
       f r <> " in a list literal"
+    RecordProjection r (FieldName fn) ->
+      f r <> " in a record projection '" <> fn <> "'"

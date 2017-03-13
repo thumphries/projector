@@ -222,6 +222,7 @@ genTemplateExpr k =
         , TEString () <$> genInterpolatedString j
         , TEEach () <$> genTemplateExpr j <*> genTemplateExpr j
         , TEList () <$> listOfN 0 (j `div` 2) (genTemplateExpr (j `div` 2))
+        , TEPrj () <$> genTemplateExpr j <*> genField
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
 
@@ -234,6 +235,10 @@ genTemplateAlt :: Int -> Jack (TAlt ())
 genTemplateAlt k =
   let j = k `div` 2 in
   TAlt () <$> genTemplatePattern j <*> genTemplateExpr j
+
+genField :: Jack TId
+genField =
+  TId <$> elements (waters <> boats <> muppets)
 
 genTemplatePattern :: Int -> Jack (TPattern ())
 genTemplatePattern k =
