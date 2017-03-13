@@ -44,9 +44,6 @@ newtype IndentLevel = IndentLevel {
 applyLayout'' :: [IndentLevel] -> [Positioned Token] -> [Positioned Token]
 applyLayout'' il xs@(TypeSigStart :@ _ : _) =
   applyLayout' [TypeSigMode, HtmlMode] il [] xs
--- FIX not sure about this case at this point
-applyLayout'' il (Whitespace x :@ b : xs) =
-  newline [HtmlMode] il [] b x xs
 applyLayout'' il xs =
   applyLayout' [HtmlMode] il [] xs
 
