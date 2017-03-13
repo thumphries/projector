@@ -128,6 +128,9 @@ eExpr expr =
         ]
     TEList a es ->
       EList (ListLiteral a) (fmap eExpr es)
+    TEPrj a e (TId fn) ->
+      EPrj (RecordProjection a (FieldName fn)) (eExpr e) (FieldName fn)
+
 
 eStr :: TIString a -> HtmlExpr (Annotation a)
 eStr (TIString a chunks) =

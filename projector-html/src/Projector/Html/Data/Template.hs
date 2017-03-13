@@ -201,6 +201,7 @@ data TExpr a
   | TENode a (TNode a)
   | TEString a (TIString a)
   | TEList a [TExpr a]
+  | TEPrj a (TExpr a) TId
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TExpr where
@@ -222,6 +223,8 @@ instance Comonad TExpr where
         a
       TEList a _ ->
         a
+      TEPrj a _ _ ->
+        a
   extend f expr =
     case expr of
       TEVar _ a ->
@@ -240,6 +243,8 @@ instance Comonad TExpr where
         TEString (f expr) (extend (const (f expr)) s)
       TEList _ es ->
         TEList (f expr) (fmap (extend f) es)
+      TEPrj _ e fn ->
+        TEPrj (f expr) (extend f e) fn
 
 setTExprAnnotation :: a -> TExpr a -> TExpr a
 setTExprAnnotation a expr =
@@ -260,6 +265,8 @@ setTExprAnnotation a expr =
       TEString a b
     TEList _ b ->
       TEList a b
+    TEPrj _ b c ->
+      TEPrj a b c
 
 data TIString a = TIString a [TIChunk a]
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
