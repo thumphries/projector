@@ -99,8 +99,11 @@ template' tsig' html' =
 typeSignatures :: Grammar r (TTypeSig Range)
 typeSignatures = mdo
   sigs <- E.rule (typeSigN sig)
-  sig <- E.rule (typeSig1 type1)
-  type1 <- E.rule (typeSigType type1)
+  sig <- E.rule (typeSig1 type2)
+  type2 <- E.rule $
+        typeApp type2 type1
+    <|> type1
+  type1 <- E.rule (typeSigType type2)
   E.rule (typeSig sigs)
 
 typeSig :: Rule r (TTypeSig Range) -> Rule r (TTypeSig Range)
@@ -123,6 +126,12 @@ typeSigType :: Rule r (TType Range) -> Rule r (TType Range)
 typeSigType type' =
       typeParens type'
   <|> typeVar
+
+typeApp :: Rule r (TType Range) -> Rule r (TType Range) -> Rule r (TType Range)
+typeApp type1 type2 =
+  (\t1 t2 -> TTApp (extract t1 <> extract t2) t1 t2)
+    <$> type1
+    <*> type2
 
 typeVar :: Rule r (TType Range)
 typeVar =

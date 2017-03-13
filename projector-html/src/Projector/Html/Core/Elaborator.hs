@@ -37,9 +37,8 @@ eType ty =
         _ ->
           TVar (TypeName x)
 
---    TTList _ t ->
---      TList (eType t)
-    -- TTApp to come eventually
+    TTApp _ f x ->
+      TArrow (eType f) (eType x)
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml (THtml a nodes) =
