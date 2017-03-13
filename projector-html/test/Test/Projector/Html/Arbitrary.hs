@@ -116,11 +116,15 @@ genVoidElement k =
 
 genComment :: Jack (TNode ())
 genComment =
-  TComment () <$> genPlainText
+  TComment () <$> genCommentText
 
 genPlain :: Jack (TNode ())
 genPlain =
   TPlain () <$> genPlainText
+
+genCommentText :: Jack TPlainText
+genCommentText =
+  TPlainText . T.replace "-" "a" . mangle <$> (arbitrary `suchThat` (/= T.empty))
 
 genPlainText :: Jack TPlainText
 genPlainText =
@@ -129,6 +133,7 @@ genPlainText =
 mangle :: Text -> Text
 mangle =
     T.replace " " "a"
+  . T.replace "\r" "d"
   . T.replace "\n" "b"
   . T.replace "\t" "c"
   . T.replace "\\" "\\\\"
