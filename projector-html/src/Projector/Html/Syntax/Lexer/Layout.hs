@@ -24,7 +24,8 @@ layout =
 -- -----------------------------------------------------------------------------
 
 data Scope =
-    Case -- expecting case separator
+    Cases -- expecting block indent, ) or }
+  | CaseAlt -- expecting case separator
   | Paren -- explicit parentheses
   | Brace -- explicit braces { }
   | Block -- an implicit scope for which we inject parens
@@ -149,9 +150,9 @@ applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ a) : xs) =
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprLamStart :@ a) : xs) =
   ExprLParen :@ a : est : applyLayout' mms il (Block : ss) xs
 
--- Enter block scope on case start
+-- Enter Cases block scope on case start
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseStart :@ a) : xs) =
-  ExprLParen :@ a : est : applyLayout' mms il (Block : ss) xs
+  ExprLParen :@ a : est : applyLayout' mms il (Cases : ss) xs
 
 -- Enter pattern mode on case of
 applyLayout' mms@(ExprMode : _) il ss (cof@(ExprCaseOf :@ _) : xs) =
@@ -163,7 +164,7 @@ applyLayout' mms@(ExprMode : _) il ss (arr@(ExprArrow :@ a) : xs) =
 
 -- close block scope on casesep, push pattern mode
 applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseSep :@ a) : xs) =
-  let (toks, sss) = first (fmap (:@ a)) (closeScopes Case ss) in
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes CaseAlt ss) in
   toks <> (est : applyLayout' (ExprPatternMode : mms) il sss xs)
 
 -- enter paren scopes on left paren
@@ -194,7 +195,7 @@ applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
 
 -- open case scope and pop mode on arrow
 applyLayout' (ExprPatternMode : ms) il ss (arr@(ExprArrow :@ a) : xs) =
-  arr : ExprLParen :@ a : applyLayout' ms il (Case : ss) xs
+  arr : ExprLParen :@ a : applyLayout' ms il (CaseAlt : ss) xs
 
 -- Track indent/dedent
 applyLayout' ms@(ExprPatternMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
@@ -209,9 +210,10 @@ applyLayout' mms@(ExprPatternMode : ms) il ss (Newline :@ _ : xs) =
   applyLayout' mms il ss xs
 
 -- shut down on brace
-applyLayout' mms@(ExprPatternMode : ms) il ss (ExprEnd :@ a : xs) =
-  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
-  toks <> applyLayout' ms il sss xs
+-- why do this? huh
+--applyLayout' mms@(ExprPatternMode : ms) il ss (ExprEnd :@ a : xs) =
+--  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
+--  toks <> applyLayout' ms il sss xs
 
 
 --
@@ -242,7 +244,7 @@ newline ms iis@(IndentLevel i : is) ss a x xs
     -- this is reason enough to close a case
     trace (show ss) $
     case ss of
-      Case : _ ->
+      CaseAlt : _ ->
         let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
         toks <> applyLayout' (ExprPatternMode : ms) iis sss xs
       _ ->
@@ -302,7 +304,9 @@ closeScope Brace Brace = CloseAndStop [ExprEnd]
 -- braces close blocks
 closeScope Brace Block = CloseAndContinue [ExprRParen]
 -- braces close case statements
-closeScope Brace Case = CloseAndContinue [ExprRParen]
+closeScope Brace Cases = CloseAndContinue [ExprRParen]
+-- braces close case alts
+closeScope Brace CaseAlt = CloseAndContinue [ExprCaseSep, ExprRParen]
 -- braces close soft indent
 closeScope Brace Indent = Continue
 -- braces can't close explicit parens
@@ -314,21 +318,27 @@ closeScope Paren Paren = CloseAndStop [ExprRParen]
 closeScope Paren Block = CloseAndContinue [ExprRParen]
 -- parens can clsoe soft indent
 closeScope Paren Indent = Continue
-closeScope Paren Case = CloseAndContinue [ExprRParen]
+closeScope Paren Cases = CloseAndContinue [ExprRParen]
+closeScope Paren CaseAlt = CloseAndContinue [ExprRParen, ExprCaseSep]
 -- parens cant close braces or cases
 closeScope Paren Brace = Stop
 
-closeScope Case Case = CloseAndStop [ExprRParen]
-closeScope Case Block = CloseAndContinue [ExprRParen]
-closeScope Case Indent = Continue
-closeScope Case _ = Stop
+
+closeScope CaseAlt CaseAlt = CloseAndStop [ExprRParen]
+closeScope CaseAlt Block = CloseAndContinue [ExprRParen]
+closeScope CaseAlt Indent = Continue
+-- ; can't close cases, parens or braces
+closeScope CaseAlt Cases = Stop
+closeScope CaseAlt Paren = Stop
+closeScope CaseAlt Brace = Stop
 
 -- soft indent closes itself
 closeScope Indent Indent = CloseAndStop []
 -- soft indent can close block scopes
 closeScope Indent Block = CloseAndStop [ExprRParen]
 -- soft indent can inject case separators
-closeScope Indent Case = CloseAndStop [ExprRParen, ExprCaseSep]
+closeScope Indent Cases = CloseAndStop [ExprCaseSep]
+closeScope Indent CaseAlt = CloseAndStop [ExprRParen, ExprCaseSep]
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
 closeScope Indent Paren = Stop
@@ -336,9 +346,10 @@ closeScope Indent Paren = Stop
 -- block scopes are only closed by indentation, they don't appear on lhs
 closeScope Block _ = Stop
 
+-- cases are only closed by parens/indent, they don't appear on lhs
+closeScope Cases _ = Stop
 
-
--- TODO remove, i suppose? or run afterwards?
+-- TODO remove, i suppose? or run afterwards as a sanity check?
 isBalanced :: [Token] -> Bool
 isBalanced toks =
   go [] toks
