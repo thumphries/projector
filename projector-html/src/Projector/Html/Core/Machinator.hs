@@ -33,6 +33,9 @@ fromMachinatorDT dt =
     MC.Variant nts ->
       DVariant . toList . with nts $ \(MC.Name n, ts) ->
         (Constructor n, fmap fromMachinatorT ts)
+    MC.Record fts ->
+      DRecord . with fts $ \(MC.Name n, t) ->
+        (FieldName n, fromMachinatorT t)
 
 fromMachinatorT :: MC.Type -> HtmlType
 fromMachinatorT mt =
