@@ -104,6 +104,10 @@ applyLayout' (HtmlMode : ms) il ss (tcl@(TagCloseOpen :@ _) : xs) =
 applyLayout' (TagOpenMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
   tcl : applyLayout' (HtmlMode : ms) il ss xs
 
+-- drop into expr mode on tagopen
+applyLayout' mms@(TagOpenMode : ms) il ss (est@(ExprStart :@ _) : xs) =
+  est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
+
 -- Pop mode on tagselfclose
 applyLayout' (TagOpenMode : ms) il ss (tsc@(TagSelfClose :@ _) : xs) =
   tsc : applyLayout' ms il ss xs
@@ -306,7 +310,7 @@ closeScope Brace Block = CloseAndContinue [ExprRParen]
 -- braces close case statements
 closeScope Brace Cases = CloseAndContinue [ExprRParen]
 -- braces close case alts
-closeScope Brace CaseAlt = CloseAndContinue [ExprCaseSep, ExprRParen]
+closeScope Brace CaseAlt = CloseAndContinue [ExprRParen, ExprCaseSep]
 -- braces close soft indent
 closeScope Brace Indent = Continue
 -- braces can't close explicit parens
