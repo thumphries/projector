@@ -84,11 +84,15 @@ template = mdo
   expr' <- expr node'
   node' <- E.rule (htmlNode expr' html')
   html' <- html node'
-  E.rule $
-    (\tsig thtml -> Template (extract thtml) tsig thtml)
-      <$> optional tsig'
-      <*> html'
-      <?> "template"
+  E.rule (template' tsig' html')
+
+template' :: Rule r (TTypeSig Range) -> Rule r (THtml Range) -> Rule r (Template Range)
+template' tsig' html' =
+  (\tsig thtml -> Template (extract thtml) tsig thtml)
+    <$> optional tsig'
+    <*> html'
+    <?> "template"
+
 
 -- -----------------------------------------------------------------------------
 
