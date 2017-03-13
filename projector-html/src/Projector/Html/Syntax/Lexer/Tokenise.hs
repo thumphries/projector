@@ -208,6 +208,7 @@ htmlToken =
   <|> tagCommentStart
   <|> tagCloseOpen
   <|> tagOpen
+  <|> exprCommentStart
   <|> exprStart
   <|> htmlExprEnd
   <|> plainText
@@ -267,6 +268,7 @@ tagOpenToken =
   <|> tagSelfClose
   <|> tagIdent
   <|> tagStringStart
+  <|> exprCommentStart
   <|> exprStart
 
 
@@ -300,6 +302,7 @@ tagCloseToken =
   <|> newline
   <|> tagCloseClose
   <|> tagIdent
+  <|> exprCommentStart
 
 tagCloseClose :: Parser Token
 tagCloseClose =
@@ -429,6 +432,7 @@ exprCommentEnd =
 stringToken :: Parser Token
 stringToken =
       stringChunk
+  <|> exprCommentStart
   <|> stringExprStart
   <|> stringEnd
 
