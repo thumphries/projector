@@ -281,8 +281,10 @@ newline ms [] ss _a x xs
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
-  splits (go (fmap (closeScope s) sss))
+--  trace (show s <> " closes " <> show result <> " from " <> show sss)  $
+  result
   where
+    result = splits (go (fmap (closeScope s) sss))
     splits :: [[Token]] -> ([Token], [Scope])
     splits ts = (fold ts, L.drop (length ts) sss)
     go [] = []
@@ -340,7 +342,7 @@ closeScope Indent Indent = CloseAndStop []
 -- soft indent can close block scopes
 closeScope Indent Block = CloseAndStop [ExprRParen]
 -- soft indent can inject case separators
-closeScope Indent Cases = CloseAndStop [ExprCaseSep]
+closeScope Indent Cases = CloseAndStop [ExprRParen]
 closeScope Indent CaseAlt = CloseAndStop [ExprRParen, ExprCaseSep]
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
