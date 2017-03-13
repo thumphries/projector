@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Projector.Html.Parser.QQ (
+module Projector.Html.Syntax.QQ (
     template
   ) where
 
@@ -12,7 +12,7 @@ import           P
 
 import qualified Prelude
 
-import           Projector.Html.Parser  (parse)
+import           Projector.Html.Syntax (templateFromText)
 
 import           Language.Haskell.TH  (Loc (..), location)
 import           Language.Haskell.TH.Quote  (QuasiQuoter)
@@ -24,7 +24,7 @@ template :: QuasiQuoter
 template =
   qparse $ \s -> do
     loc <- location
-    case parse (loc_filename loc) (T.pack s) of
+    case templateFromText (loc_filename loc) (T.pack s) of
       Left e ->
         Prelude.error $ "Failed to parse quasi quoter: " <> show e
       Right t ->

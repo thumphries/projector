@@ -20,6 +20,7 @@ library
                      , ambiata-x-templatehaskell
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
+                     , Earley                          == 0.11.*
                      , filepath
                      , megaparsec                      == 5.1.*
                      , semigroups                      == 0.18.*
@@ -60,10 +61,15 @@ library
 
                        Projector.Html.ModuleGraph
 
-                       Projector.Html.Parser
-                       Projector.Html.Parser.QQ
-
                        Projector.Html.Pretty
+
+                       Projector.Html.Syntax
+                       Projector.Html.Syntax.Lexer
+                       Projector.Html.Syntax.Lexer.Tokenise
+                       Projector.Html.Syntax.Lexer.Layout
+                       Projector.Html.Syntax.Parser
+                       Projector.Html.Syntax.Token
+                       Projector.Html.Syntax.QQ
 
 
 test-suite test

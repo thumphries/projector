@@ -11,6 +11,7 @@ module Projector.Html.Data.Position (
   , Range (..)
   , renderRange
   , Positioned (..)
+  , extractPosition
   , extractPositioned
   , (<@@)
   , (@@>)
@@ -58,6 +59,10 @@ instance Monoid Range where
 data Positioned a
   = !a :@ !Range
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+
+extractPosition :: Positioned a -> Range
+extractPosition (_ :@ b) =
+  b
 
 extractPositioned :: Positioned a -> a
 extractPositioned (a :@ _) =
