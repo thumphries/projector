@@ -452,7 +452,7 @@ stringChunkText :: Parser Text
 stringChunkText =
   escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '"' || p == '{'
+    p == '"' || p == '{' || p == '\\'
 
 
 -- -----------------------------------------------------------------------------
