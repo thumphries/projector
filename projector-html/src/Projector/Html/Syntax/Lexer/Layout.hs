@@ -207,6 +207,18 @@ applyLayout' ms@(ExprPatternMode : _) il ss ((Newline :@ _) : (Whitespace x :@ b
 applyLayout' ms@(ExprPatternMode : _) il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
   newline ms il ss b 0 xs
 
+-- Handle left and right parens
+applyLayout' ms@(ExprPatternMode : _) il ss (elp@(ExprLParen :@ _) : xs) =
+  elp : applyLayout' ms il (Paren : ss) xs
+applyLayout' mms@(ExprPatternMode : _) il ss ((ExprRParen :@ a) : xs) =
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Paren ss) in
+  toks <> applyLayout' mms il sss xs
+
+-- pop mode on expr brace
+applyLayout' (ExprPatternMode : ms) il ss ((ExprEnd :@ a) : xs) =
+  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
+  toks <> applyLayout' ms il sss xs
+
 -- drop whitespace and newlines
 applyLayout' mms@(ExprPatternMode : _) il ss (Whitespace _ :@ _ : xs) =
   applyLayout' mms il ss xs
@@ -281,7 +293,7 @@ newline ms [] ss _a x xs
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
---  trace (show s <> " closes " <> show result <> " from " <> show sss)  $
+  -- trace (show s <> " closes " <> show result <> " from " <> show sss)  $
   result
   where
     result = splits (go (fmap (closeScope s) sss))
