@@ -366,11 +366,11 @@ exprEnd =
 
 exprCaseStart :: Parser Token
 exprCaseStart =
-  string "case" *> pure ExprCaseStart
+  reserved "case" *> pure ExprCaseStart
 
 exprCaseOf :: Parser Token
 exprCaseOf =
-  string "of" *> pure ExprCaseOf
+  reserved "of" *> pure ExprCaseOf
 
 exprCaseSep :: Parser Token
 exprCaseSep =
@@ -378,7 +378,7 @@ exprCaseSep =
 
 exprEach :: Parser Token
 exprEach =
-  string "each" *> pure ExprEach
+  reserved "each" *> pure ExprEach
 
 exprDot :: Parser Token
 exprDot =
@@ -469,6 +469,10 @@ newline =
 
 -- -----------------------------------------------------------------------------
 -- low level parsers
+
+reserved :: [Char] -> Parser ()
+reserved s =
+  P.try (string s <* P.notFollowedBy P.alphaNumChar)
 
 someTill' :: Parser m -> Parser end -> Parser [m]
 someTill' m end =
