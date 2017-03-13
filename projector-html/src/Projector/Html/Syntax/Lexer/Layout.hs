@@ -218,6 +218,15 @@ applyLayout' mms@(ExprPatternMode : _) il ss (Newline :@ _ : xs) =
 -- General
 --
 
+-- Drop expr comments
+applyLayout' ms il ss (ExprCommentStart :@ _ : xs) =
+  applyLayout' ms il ss xs
+applyLayout' ms il ss (ExprCommentChunk _ :@ _ : xs) =
+  applyLayout' ms il ss xs
+applyLayout' ms il ss (ExprCommentEnd :@ _ : xs) =
+  applyLayout' ms il ss xs
+
+
 -- Drop trailing newline
 applyLayout' _ _ _ (Newline :@ _ : []) =
   []
