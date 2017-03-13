@@ -84,11 +84,11 @@ applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Whitespace _ :
 --
 
 -- Drop into expr mode on left brace
-applyLayout' mms@(HtmlMode : ms) il ss (est@(ExprStart :@ _) : xs) =
+applyLayout' mms@(HtmlMode : _) il ss (est@(ExprStart :@ _) : xs) =
   est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
 
 -- Drop into tag open mode on tagopen
-applyLayout' mms@(HtmlMode : ms) il ss (top@(TagOpen :@ _) : xs) =
+applyLayout' mms@(HtmlMode : _) il ss (top@(TagOpen :@ _) : xs) =
   top : applyLayout' (TagOpenMode : mms) il ss xs
 
 -- Drop into tag close mode on tag close
@@ -105,7 +105,7 @@ applyLayout' (TagOpenMode : ms) il ss (tcl@(TagClose :@ _) : xs) =
   tcl : applyLayout' (HtmlMode : ms) il ss xs
 
 -- drop into expr mode on tagopen
-applyLayout' mms@(TagOpenMode : ms) il ss (est@(ExprStart :@ _) : xs) =
+applyLayout' mms@(TagOpenMode : _) il ss (est@(ExprStart :@ _) : xs) =
   est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
 
 -- Pop mode on tagselfclose
@@ -138,16 +138,16 @@ applyLayout' mms@(TagCloseMode : _) il ss (Newline :@ _ : xs) =
 --
 
 -- Drop into tag open mode on tagopen
-applyLayout' mms@(ExprMode : _) il ss (top@(TagOpen :@ a) : xs) =
+applyLayout' mms@(ExprMode : _) il ss (top@(TagOpen :@ _) : xs) =
   top : applyLayout' (TagOpenMode : mms) il ss xs
 
 -- Pop mode on expr end
-applyLayout' mms@(ExprMode : ms) il ss (est@(ExprEnd :@ a) : xs) =
+applyLayout' (ExprMode : ms) il ss ((ExprEnd :@ a) : xs) =
   let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
   toks <> applyLayout' ms il sss xs
 
 -- Nested expr mode
-applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ a) : xs) =
+applyLayout' mms@(ExprMode : _) il ss (est@(ExprStart :@ _) : xs) =
   est : applyLayout' (ExprMode : mms) il (Brace : ss) xs
 
 -- Enter block scope on lambda
@@ -172,24 +172,24 @@ applyLayout' mms@(ExprMode : _) il ss (est@(ExprCaseSep :@ a) : xs) =
   toks <> (est : applyLayout' (ExprPatternMode : mms) il sss xs)
 
 -- enter paren scopes on left paren
-applyLayout' mms@(ExprMode : _) il ss (elp@(ExprLParen :@ a) : xs) =
+applyLayout' mms@(ExprMode : _) il ss (elp@(ExprLParen :@ _) : xs) =
   elp : applyLayout' mms il (Paren : ss) xs
 
 -- close scopes on right paren
-applyLayout' mms@(ExprMode : _) il ss (erp@(ExprRParen :@ a) : xs) =
+applyLayout' mms@(ExprMode : _) il ss ((ExprRParen :@ a) : xs) =
   let (toks, sss) = first (fmap (:@ a)) (closeScopes Paren ss) in
   toks <> applyLayout' mms il sss xs
 
 -- Track indent/dedent
-applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
+applyLayout' ms@(ExprMode : _) il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
   newline ms il ss b x xs
-applyLayout' ms@(ExprMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
+applyLayout' ms@(ExprMode : _) il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
   newline ms il ss b 0 xs
 
 -- Drop whitespace and newlines
-applyLayout' mms@(ExprMode : ms) il ss (Whitespace _ :@ _ : xs) =
+applyLayout' mms@(ExprMode : _) il ss (Whitespace _ :@ _ : xs) =
   applyLayout' mms il ss xs
-applyLayout' mms@(ExprMode : ms) il ss (Newline :@ _ : xs) =
+applyLayout' mms@(ExprMode : _) il ss (Newline :@ _ : xs) =
   applyLayout' mms il ss xs
 
 
@@ -202,22 +202,16 @@ applyLayout' (ExprPatternMode : ms) il ss (arr@(ExprArrow :@ a) : xs) =
   arr : ExprLParen :@ a : applyLayout' ms il (CaseAlt : ss) xs
 
 -- Track indent/dedent
-applyLayout' ms@(ExprPatternMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
+applyLayout' ms@(ExprPatternMode : _) il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
   newline ms il ss b x xs
-applyLayout' ms@(ExprPatternMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
+applyLayout' ms@(ExprPatternMode : _) il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
   newline ms il ss b 0 xs
 
 -- drop whitespace and newlines
-applyLayout' mms@(ExprPatternMode : ms) il ss (Whitespace _ :@ _ : xs) =
+applyLayout' mms@(ExprPatternMode : _) il ss (Whitespace _ :@ _ : xs) =
   applyLayout' mms il ss xs
-applyLayout' mms@(ExprPatternMode : ms) il ss (Newline :@ _ : xs) =
+applyLayout' mms@(ExprPatternMode : _) il ss (Newline :@ _ : xs) =
   applyLayout' mms il ss xs
-
--- shut down on brace
--- why do this? huh
---applyLayout' mms@(ExprPatternMode : ms) il ss (ExprEnd :@ a : xs) =
---  let (toks, sss) = first (fmap (:@ a)) (closeScopes Brace ss) in
---  toks <> applyLayout' ms il sss xs
 
 
 --
@@ -246,7 +240,6 @@ newline ms iis@(IndentLevel i : is) ss a x xs
   | i == x =
     -- same level
     -- this is reason enough to close a case
-    trace (show ss) $
     case ss of
       CaseAlt : _ ->
         let (toks, sss) = first (fmap (:@ a)) (closeScopes Indent ss) in
@@ -265,7 +258,7 @@ newline ms iis@(IndentLevel i : is) ss a x xs
     -- open an indent scope
     applyLayout' ms (IndentLevel x : iis) (Indent : ss) xs
 
-newline ms [] ss a x xs
+newline ms [] ss _a x xs
   | x == 0 =
     -- initial unindented
     applyLayout' ms [] ss xs
@@ -279,13 +272,10 @@ newline ms [] ss a x xs
 
 closeScopes :: Scope -> [Scope] -> ([Token], [Scope])
 closeScopes s sss =
- trace (show s <> " closes " <> show bar <> " from " <> show sss <> " " <> show (length quux)) $
-  bar
+  splits (go (fmap (closeScope s) sss))
   where
-    bar = foo quux
-    quux = go (fmap (closeScope s) sss)
-    foo :: [[Token]] -> ([Token], [Scope])
-    foo ts = (fold ts, L.drop (length ts) sss)
+    splits :: [[Token]] -> ([Token], [Scope])
+    splits ts = (fold ts, L.drop (length ts) sss)
     go [] = []
     go (Stop : _) = []
     go (CloseAndStop t : _) = [t]
@@ -353,7 +343,7 @@ closeScope Block _ = Stop
 -- cases are only closed by parens/indent, they don't appear on lhs
 closeScope Cases _ = Stop
 
--- TODO remove, i suppose? or run afterwards as a sanity check?
+-- Maybe this should be run as validation?
 isBalanced :: [Token] -> Bool
 isBalanced toks =
   go [] toks
@@ -370,9 +360,9 @@ isBalanced toks =
       False
     go xs (ExprStart : ts) =
       go (ExprStart : xs) ts
-    go xs (t:ts) =
+    go xs (_:ts) =
       go xs ts
     go [] [] =
       True
-    go xs [] =
+    go __ [] =
       False
