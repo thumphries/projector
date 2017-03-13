@@ -320,6 +320,7 @@ exprToken =
   <|> exprStringStart
   <|> exprCaseStart
   <|> exprCaseOf
+  <|> exprEach
   <|> exprCaseSep
   <|> exprLamStart
   <|> exprArrow
@@ -371,6 +372,10 @@ exprCaseOf =
 exprCaseSep :: Parser Token
 exprCaseSep =
   char ';' *> pure ExprCaseSep
+
+exprEach :: Parser Token
+exprEach =
+  string "each" *> pure ExprEach
 
 exprDot :: Parser Token
 exprDot =

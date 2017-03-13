@@ -64,6 +64,8 @@ data Token =
   | ExprCommentChunk Text -- foo
   | ExprCommentEnd        -- -}
   | ExprEnd               -- }
+  -- TODO remove this
+  | ExprEach              -- each
 
   -- General ambiguous
   | Whitespace Int        -- "   "
@@ -116,6 +118,7 @@ renderToken tok =
     ExprCommentChunk t    -> t
     ExprCommentEnd        -> "-}"
     ExprEnd               -> "}"
+    ExprEach              -> "each"
 
     -- General ambiguous
     Whitespace x          -> T.replicate x " "

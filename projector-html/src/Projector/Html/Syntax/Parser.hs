@@ -289,6 +289,7 @@ expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
 expr node' = mdo
   expr2 <- E.rule $
         exprApp expr2 expr1
+    <|> exprEach expr2 expr1
     <|> expr1
   expr1 <- E.rule $
         exprLam expr2
@@ -314,6 +315,13 @@ exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
   (\e1 e2 -> TEApp (extract e1 <> extract e2) e1 e2)
     <$> expr'
+    <*> expr''
+
+exprEach :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
+exprEach expr' expr'' =
+  (\a e1 e2 -> TEEach (a <> extract e2) e1 e2)
+    <$> token ExprEach
+    <*> expr'
     <*> expr''
 
 exprLam :: Rule r (TExpr Range) -> Rule r (TExpr Range)
