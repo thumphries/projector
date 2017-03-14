@@ -69,4 +69,5 @@ extractModuleExprs =
 data Imports
   = OpenImport
   | OnlyImport [Name]
+  | ImportQualified
   deriving (Eq, Ord, Show)

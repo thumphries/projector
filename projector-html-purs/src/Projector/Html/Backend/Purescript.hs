@@ -82,15 +82,13 @@ genModule (Module ts _ es) = do
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =
-  T.unwords [
-      "import"
-    , n
-    , case imports of
-        OpenImport ->
-          T.empty
-        OnlyImport quals ->
-          "(" <> T.intercalate ", " (fmap unName quals) <> ")"
-    ]
+  case imports of
+    OpenImport ->
+      "import " <> n
+    OnlyImport funs ->
+      "import " <> n <> " (" <> T.intercalate ", " (fmap unName funs) <> ")"
+    ImportQualified ->
+      "import qualified " <> n
 
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
