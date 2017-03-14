@@ -15,6 +15,7 @@ import           P
 
 import           Projector.Core
 import           Projector.Html.Data.Annotation
+import           Projector.Html.Data.Module
 import qualified Projector.Html.Data.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
@@ -49,11 +50,12 @@ fileProp mname modl f g =
     fmap g (f path')
 
 
-helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr (Annotation a)))
+helloWorld :: (Name, ModuleExpr (Maybe Prim.HtmlType) Prim.PrimT (Annotation a))
 helloWorld =
   ( Name "helloWorld"
-  , ( Lib.tHtml
-    , fmap (const EmptyAnnotation) $ ECon () (Constructor "Nested") Lib.nHtml [
+  , ModuleExpr
+      (Just Lib.tHtml)
+      (fmap (const EmptyAnnotation) $ ECon () (Constructor "Nested") Lib.nHtml [
         EList () [
             ECon () (Constructor "Plain") Lib.nHtml [ELit () (Prim.VString "Hello,")]
           , ECon () (Constructor "Whitespace") Lib.nHtml []
@@ -70,4 +72,5 @@ helloWorld =
               ]
           , EVar () Lib.nHtmlBlank
           ]
-      ]))
+        ]
+  ))

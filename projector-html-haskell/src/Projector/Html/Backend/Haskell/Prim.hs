@@ -59,7 +59,7 @@ toHaskellModule (Module typs imps exps) =
   Module
     (toHaskellTypeDecls typs)
     imps
-    (with exps (\(t, e) -> (toHaskellType t, toHaskellExpr e)))
+    (with exps (\(ModuleExpr t e) -> ModuleExpr (toHaskellType t) (toHaskellExpr e)))
 
 toHaskellType :: HtmlType -> HaskellType
 toHaskellType =

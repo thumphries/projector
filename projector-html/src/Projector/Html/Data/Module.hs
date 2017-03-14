@@ -7,6 +7,7 @@ module Projector.Html.Data.Module (
     ModuleName (..)
   , moduleNameAppend
   , Module (..)
+  , ModuleExpr (..)
   , moduleFree
   , moduleBound
   , extractModuleBindings
@@ -39,7 +40,7 @@ moduleNameAppend (ModuleName a) (ModuleName b) =
 data Module b l a = Module {
     moduleTypes :: TypeDecls l
   , moduleImports :: Map ModuleName Imports
-  , moduleExprs :: Map Name (b, Expr l a)
+  , moduleExprs :: Map Name (ModuleExpr b l a)
   } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance Ground l => Monoid (Module b l a) where
@@ -50,10 +51,15 @@ instance Ground l => Monoid (Module b l a) where
     , moduleExprs = c <> f
     }
 
+data ModuleExpr b l a = ModuleExpr {
+    meParameter :: b
+  , meExpr :: Expr l a
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+
 -- | The names of all free variables referenced in this module.
 moduleFree :: Module b l a -> Set Name
 moduleFree (Module _types _imports exprs) =
-  foldl' (flip S.delete) (foldMap (\(_ty, ex) -> gatherFree ex) exprs) (M.keys exprs)
+  foldl' (flip S.delete) (foldMap (gatherFree . meExpr) exprs) (M.keys exprs)
 
 -- | The names of all variables bound/exported in this module.
 moduleBound :: Module b l a -> Set Name
@@ -62,11 +68,11 @@ moduleBound (Module _types _imports exprs) =
 
 extractModuleBindings :: Map k (Module b l a) -> Map Name a
 extractModuleBindings =
-  foldMap (fmap (extractAnnotation . snd) . moduleExprs) . M.elems
+  foldMap (fmap (extractAnnotation . meExpr) . moduleExprs) . M.elems
 
 extractModuleExprs :: Map k (Module b l a) -> Map Name (Expr l a)
 extractModuleExprs =
-  foldMap (fmap snd . moduleExprs) . M.elems
+  foldMap (fmap meExpr . moduleExprs) . M.elems
 
 data Imports
   = OpenImport

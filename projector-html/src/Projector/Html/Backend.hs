@@ -29,7 +29,7 @@ checkModule b m =
 
 predModule :: [Predicate e] -> Module HtmlType PrimT b -> PredResult [e]
 predModule preds =
-  fmap fold . predResults . fmap (runPredicates preds . snd) . M.elems . moduleExprs
+  fmap fold . predResults . fmap (runPredicates preds . meExpr) . M.elems . moduleExprs
 
 runPredicates :: [Predicate e] -> HtmlExpr a -> PredResult [e]
 runPredicates preds expr =

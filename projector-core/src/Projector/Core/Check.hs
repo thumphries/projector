@@ -111,24 +111,38 @@ typeCheckAll' decls known exprs = do
   -- for each declaration, generate constraints and assumptions
   (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
   -- build up new global set of constraints from the assumptions
-  let localConstraints = sConstraints sstate
+  let -- the inferred types (thus far) for our exprs
+      exprTypes = fmap extractType annotated
+      -- constraints we figured out in generateConstraints
+      localConstraints = sConstraints sstate
+      -- constraints provided by the user in type signatures
+      userConstraints = D.fromList . M.elems $
+        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const Equal)) known exprTypes
+      -- assumptions we made about free variables
       Assumptions assums = sAssumptions sstate
-      types = known <> fmap extractType annotated
+      -- types biased towards 'known' over 'inferred', since they may be user constraints
+      types = known <> exprTypes
+      -- constraints for free variables we know stuff about
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
         maybe mempty (with itys . Equal) (M.lookup n types)
-      constraints = D.toList (localConstraints <> globalConstraints)
+      -- all the constraints mashed together in a dlist
+      constraints = D.toList (localConstraints <> userConstraints <> globalConstraints)
+      -- all variables let-bound
       bound = S.fromList (M.keys known <> M.keys exprs)
+      -- all variables we have lingering assumptions about
       used = S.fromList (M.keys (M.filter (not . null) assums))
+      -- all mystery free variables
       free = used `S.difference` bound
+      -- annotating mystery free variables with location info
       freeAt = foldMap (\n -> maybe [] (fmap ((n,) . snd . flattenIType)) (M.lookup n assums)) (toList free)
-  -- catch any free variables
+  -- throw errors for any undefined variables
   if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
 
-  -- solve them all at once
+  -- solve all our constraints at once
   subs <- solveConstraints constraints
-  -- substitute them all at once
+  -- substitute solved types, all at once
   let subbed = fmap (substitute subs) annotated
-  -- lower them all at once
+  -- lower them from IType into Type, all at once
   first D.toList (ET.sequenceEither (fmap lowerExpr subbed))
 
 typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
@@ -380,6 +394,7 @@ addConstraint :: Ground l => Constraint l a -> Check l a ()
 addConstraint c =
   Check . lift $
     modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
+
 
 -- -----------------------------------------------------------------------------
 -- Assumptions

@@ -140,23 +140,30 @@ checkExprIncremental decls known =
 
 checkModule ::
      HtmlDecls
-  -> HB.Module a PrimT SrcAnnotation
+  -> HB.Module (Maybe HtmlType) PrimT SrcAnnotation
   -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 checkModule decls (HB.Module typs imps exps) = do
-  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) (conFunTypes <> libraryExprs) (fmap snd exps))
-  let exps'' = with exps' . uncurry $ \ty expr -> (ty, PC.whnf toSubstitute expr)
+  exps' <-
+    bimap HtmlCoreError (fmap (uncurry HB.ModuleExpr))
+      (HC.typeCheckIncremental allDecls allSigs exprs)
+  let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.whnf toSubstitute expr)
   pure (HB.Module typs imps exps'')
   where
+    exprTypes = M.fromList . catMaybes . fmap sequenceA . M.toList $
+      with exps (\(HB.ModuleExpr mt x) -> with mt (\t -> (t, PC.extractAnnotation x)))
     conFunTypes = HC.constructorFunctionTypes decls
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
+    allDecls = decls <> typs
+    allSigs = conFunTypes <> exprTypes
+    exprs = fmap HB.meExpr exps
 
 -- | Figure out the dependency order of a set of modules, then
 -- typecheck them all in that order.
 checkModules ::
      HtmlDecls
   -> Map PC.Name (HtmlType, SrcAnnotation)
-  -> Map HB.ModuleName (HB.Module a PrimT SrcAnnotation)
+  -> Map HB.ModuleName (HB.Module (Maybe HtmlType) PrimT SrcAnnotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names here somewhere
@@ -172,11 +179,13 @@ checkModules decls known exprs =
       maybe (pure (res, acc)) (\mo -> doit n mo res acc) (M.lookup n exprs)
     --
     doit n (HB.Module types imports exps) res acc = do
-      exps' <- HC.typeCheckIncremental (decls <> types) acc (fmap snd exps)
-      let exps'' = with exps' . uncurry $ \ty expr ->
-            (ty, PC.whnf toSubstitute expr)
+      let esigs = M.fromList . catMaybes . fmap sequenceA . M.toList $
+            with exps (\(HB.ModuleExpr mt x) -> with mt (\t -> (t, PC.extractAnnotation x)))
+      exps' <- fmap (uncurry HB.ModuleExpr)
+        <$> HC.typeCheckIncremental (decls <> types) (acc <> esigs) (fmap HB.meExpr exps)
+      let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.whnf toSubstitute expr)
           result = HB.Module types imports exps''
-          newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
+          newacc = M.union (fmap (PC.extractAnnotation . HB.meExpr) exps') acc
       pure (M.insert n result res, newacc)
 
 -- | Generate code for a provided backend.
@@ -204,7 +213,9 @@ codeGenRename :: TemplateNameMap -> CodeGenNamer -> HB.Module a b c -> HB.Module
 codeGenRename (TemplateNameMap nmap) cgn (HB.Module ts is es) =
   let renameDef n = maybe n (uncurry (templateNameToBackendName cgn n)) (M.lookup n nmap)
       renameVal n = maybe n (uncurry (templateDefToBackendDef cgn n)) (M.lookup n nmap)
-  in HB.Module ts is $ with (M.mapKeys renameDef es) (fmap (PC.mapFree renameVal))
+  in HB.Module ts is . with (M.mapKeys renameDef es) $ \(HB.ModuleExpr a x) ->
+       HB.ModuleExpr a (PC.mapFree renameVal x)
+
 
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
@@ -308,7 +319,7 @@ smush ::
   -> RawTemplates
   -> Either
        [HtmlError]
-       (ModuleGraph, TemplateNameMap, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
+       (ModuleGraph, TemplateNameMap, Map HB.ModuleName (HB.Module (Maybe HtmlType) PrimT SrcAnnotation))
 smush mdm mnr hms (RawTemplates templates) = do
   let
     known = fmap (M.keysSet . HB.moduleExprs) hms
@@ -321,7 +332,7 @@ smush mdm mnr hms (RawTemplates templates) = do
               HB.moduleTypes = mempty
             , HB.moduleImports = M.fromList $
                 fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
-            , HB.moduleExprs = M.singleton expn ((), core)
+            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr Nothing core)
             })
       pure (addToTemplateNameMap expn modn fp nmap, res:acc)
   -- Produce a module for each template and build up the template name map

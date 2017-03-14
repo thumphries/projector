@@ -87,7 +87,7 @@ buildSingletonModules mapp =
     Module {
         moduleTypes = mempty
       , moduleImports = mempty
-      , moduleExprs = M.singleton n ((), e)
+      , moduleExprs = M.singleton n (ModuleExpr () e)
       }
 
 genCycle :: [Name] -> Map Name (HtmlExpr ())
@@ -126,23 +126,23 @@ testModuleSet =
           moduleTypes = mempty
         , moduleImports = mempty
         , moduleExprs = M.fromList [
-              (Name "foo", ((), var_ "bar"))
-            , (Name "bar", ((), var_ "baz"))
-            , (Name "bort", ((), var_ "quux"))
+              (Name "foo", (ModuleExpr () $ var_ "bar"))
+            , (Name "bar", (ModuleExpr () $ var_ "baz"))
+            , (Name "bort", (ModuleExpr () $ var_ "quux"))
             ]
         })
     , (ModuleName "Module.Baz", Module {
           moduleTypes = mempty
         , moduleImports = mempty
         , moduleExprs = M.fromList [
-              (Name "baz", ((), lit (VString "hello")))
+              (Name "baz", (ModuleExpr () $ lit (VString "hello")))
             ]
         })
     , (ModuleName "Module.Quux", Module {
           moduleTypes = mempty
         , moduleImports = mempty
         , moduleExprs = M.fromList [
-            (Name "quux", ((), var_ "baz"))
+            (Name "quux", (ModuleExpr () $ var_ "baz"))
           ]
         })
     , (ModuleName "Module.Independent", mempty)
@@ -150,17 +150,17 @@ testModuleSet =
           moduleTypes = mempty
         , moduleImports = mempty
         , moduleExprs = M.fromList [
-            (Name "bil", ((), var_ "pib"))
-          , (Name "mun", ((), lit (VString "mun")))
-          , (Name "pib", ((), var_ "mun"))
-          , (Name "wol", ((), var_ "heck"))
+            (Name "bil", (ModuleExpr () $ var_ "pib"))
+          , (Name "mun", (ModuleExpr () $ lit (VString "mun")))
+          , (Name "pib", (ModuleExpr () $ var_ "mun"))
+          , (Name "wol", (ModuleExpr () $ var_ "heck"))
           ]
         })
     , (ModuleName "Hapless.Tepid.Module", Module {
           moduleTypes = mempty
         , moduleImports = mempty
         , moduleExprs = M.fromList [
-            (Name "heck", ((), var_ "bil"))
+            (Name "heck", (ModuleExpr () $ var_ "bil"))
           ]
         })
     ]

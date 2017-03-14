@@ -50,7 +50,13 @@ genWellTypedHtmlModule n decls = do
   modl <- Module
     <$> pure ourDecls
     <*> pure mempty
-    <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions ourDecls) (genHtmlType decls) genWellTypedHtmlLit
+    <*> fmap (fmap (\(ty, ex) -> ModuleExpr (Just ty) ex))
+          (genWellTypedLetrec
+            n
+            (decls <> htmlTypes)
+            (fst <$> constructorFunctions ourDecls)
+            (genHtmlType decls)
+            genWellTypedHtmlLit)
   either
     (\e -> (fail ("invariant: module was not well-typed!\n" <> show e)))
     pure

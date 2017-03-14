@@ -151,7 +151,7 @@ genImport (ModuleName n) imports =
 genModule :: HaskellModule (HtmlType, a) -> Either HaskellError [TH.Dec]
 genModule (Module ts _ es) = do
   let tdecs = genTypeDecs ts
-  decs <- for (M.toList es) $ \(n, (ty, e)) -> do
+  decs <- for (M.toList es) $ \(n, ModuleExpr ty e) -> do
     d <- genExpDec n e
     pure [genTypeSig n ty, d]
   pure (tdecs <> fold decs)
