@@ -99,18 +99,18 @@ ppTypeError' err =
                ])))
     BadPatternConstructor (Constructor c) a ->
       WL.annotate a (text "Unknown constructor: " WL.<> WL.squotes (text c))
-    MissingRecordField (TypeName tn) (FieldName fn) a ->
-      WL.annotate a (text "Missing record field for type " WL.<> WL.squotes (text tn) WL.<> text ": " WL.<> WL.squotes (text fn))
-    ExtraRecordField (TypeName tn) (FieldName fn) a ->
-      WL.annotate a (text "Extraneous record field for type " WL.<> WL.squotes (text tn) WL.<> text ": " WL.<> WL.squotes (text fn))
+    MissingRecordField (TypeName tn) (FieldName fn) (ty, _b) a ->
+      WL.annotate a . WL.hang 2 $
+        text "Missing record field for type " WL.<> WL.squotes (text tn) WL.<> text ":"
+          WL.<$$> WL.squotes (text fn) <+> text ":" <+> text (ppType ty)
+    ExtraRecordField (TypeName tn) (FieldName fn) (ty, _b) a ->
+      WL.annotate a . WL.hang 2 $ text "Extraneous record field for type " WL.<> WL.squotes (text tn) WL.<> text ":"
+        WL.<$$> WL.squotes (text fn) <+> text ":" <+> text (ppType ty)
     DuplicateRecordFields (TypeName tn) fns a ->
       WL.annotate a $
         WL.hang 2
           (text "Duplicate record fields for type " WL.<> WL.squotes (text tn) WL.<> text ":"
           WL.<$$> (WL.hcat (WL.punctuate WL.comma (fmap (text . unFieldName) fns))))
-    RecordUnificationError tes ->
-      WL.hang 2 $ (text "Type errors (record unification):")
-        WL.<$$> WL.vcat (fmap ppTypeError' tes)
     UndeclaredType (TypeName n) a ->
       WL.annotate a (text "Undeclared type: " WL.<> WL.squotes (text n))
     InferenceError a ->
