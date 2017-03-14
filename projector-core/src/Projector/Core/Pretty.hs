@@ -111,9 +111,6 @@ ppTypeError' err =
         WL.hang 2
           (text "Duplicate record fields for type " WL.<> WL.squotes (text tn) WL.<> text ":"
           WL.<$$> (WL.hcat (WL.punctuate WL.comma (fmap (text . unFieldName) fns))))
-    RecordUnificationError tes ->
-      WL.hang 2 $ (text "Type errors (record unification):")
-        WL.<$$> WL.vcat (fmap ppTypeError' tes)
     UndeclaredType (TypeName n) a ->
       WL.annotate a (text "Undeclared type: " WL.<> WL.squotes (text n))
     InferenceError a ->

@@ -62,7 +62,6 @@ data TypeError l a
   | MissingRecordField TypeName FieldName (Type l, a) a
   | ExtraRecordField TypeName FieldName (Type l, a) a
   | DuplicateRecordFields TypeName [FieldName] a
-  | RecordUnificationError [TypeError l a]
   | InferenceError a
   | RecordInferenceError [(FieldName, Type l)] a
   | InfiniteType (Type l, a) (Type l, a)
@@ -646,7 +645,7 @@ mostGeneralUnifierST ::
   => STRef s (Points s l a)
   -> IType l a
   -> IType l a
-  -> ST s (Either (TypeError l a) ())
+  -> ST s (Either [TypeError l a] ())
 mostGeneralUnifierST points t1 t2 =
   runEitherT (void (mguST points t1 t2))
 
@@ -655,7 +654,7 @@ mguST ::
   => STRef s (Points s l a)
   -> IType l a
   -> IType l a
-  -> EitherT (TypeError l a) (ST s) (IType l a)
+  -> EitherT [TypeError l a] (ST s) (IType l a)
 mguST points t1 t2 =
   case (t1, t2) of
     (IDunno a x, _) -> do
@@ -669,32 +668,28 @@ mguST points t1 t2 =
       unifyVar points a x (IOpenRecord b y hs)
 
     (IOpenRecord a x fs, IClosedRecord _ tn gs) -> do
-      -- this is bad, it biases inferred constraints too heavily.
-      -- should be explicit instance constraints once we have those
       _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t2
 
     (IClosedRecord _ tn gs, IOpenRecord a x fs) -> do
-      -- this is bad, it biases inferred constraints too heavily.
-      -- should be explicit instance constraints once we have those
       _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t1
 
     (IClosedRecord _ x _fs1, IClosedRecord _ y _fs2) -> do
-      unless (x == y) (left (unificationError t1 t2))
+      unless (x == y) (left [unificationError t1 t2])
       pure t1
 
     (IVar _ x, IVar _ y) -> do
-      unless (x == y) (left (unificationError t1 t2))
+      unless (x == y) (left [unificationError t1 t2])
       pure t1
 
     (ILit _ x, ILit _ y) -> do
-      unless (x == y) (left (unificationError t1 t2))
+      unless (x == y) (left [unificationError t1 t2])
       pure t1
 
     (IArrow a f g, IArrow _ h i) -> do
-      j <- mguST points f h
-      k <- mguST points g i
+      -- Would be nice to have an applicative newtype for this...
+      [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
 
     (IList k a, IList _ b) -> do
@@ -702,9 +697,9 @@ mguST points t1 t2 =
       pure (IList k c)
 
     (_, _) ->
-      left (unificationError t1 t2)
+      left [unificationError t1 t2]
 
-unifyVar :: Ground l => STRef s (Points s l a) -> a -> Int -> IType l a -> EitherT (TypeError l a) (ST s) (IType l a)
+unifyVar :: Ground l => STRef s (Points s l a) -> a -> Int -> IType l a -> EitherT [TypeError l a] (ST s) (IType l a)
 unifyVar points a x t2 = do
   mt1 <- lift (getRepr points x)
   let safeUnion c z u2 = do
@@ -715,12 +710,12 @@ unifyVar points a x t2 = do
     -- special case if the var is its class representative
     Just t1@(IDunno b y) ->
       if x == y
-        then safeUnion b y t2
+        then firstT pure (safeUnion b y t2)
         else mguST points t1 t2
     Just t1 ->
       mguST points t1 t2
     Nothing ->
-      safeUnion a x t2
+      firstT pure (safeUnion a x t2)
 
 -- | Check that a given unification variable isn't present inside the
 -- type it's being unified with. This is necessary for typechecking
@@ -756,15 +751,15 @@ unifyOpenFields ::
   => STRef s (Points s l a)
   -> Fields l a
   -> Fields l a
-  -> EitherT (TypeError l a) (ST s) (Fields l a)
+  -> EitherT [TypeError l a] (ST s) (Fields l a)
 unifyOpenFields points (Fields fs1) (Fields fs2) = do
-  ET.bimapEitherT RecordUnificationError Fields . ET.sequenceEitherT $
+  fmap Fields . ET.sequenceEitherT $
     M.merge
       -- missing fields either side just get propagated
       (M.mapMissing (const (firstT pure . pure)))
       (M.mapMissing (const (firstT pure . pure)))
       -- unify any matching fields normally
-      (M.zipWithMatched (\_fn t1 t2 -> firstT pure (mguST points t1 t2)))
+      (M.zipWithMatched (\_fn t1 t2 -> mguST points t1 t2))
       fs1
       fs2
 
@@ -774,9 +769,9 @@ unifyClosedFields ::
   -> Fields l a
   -> TypeName
   -> Fields l a
-  -> EitherT (TypeError l a) (ST s) (Fields l a)
+  -> EitherT [TypeError l a] (ST s) (Fields l a)
 unifyClosedFields points (Fields have) tn (Fields want) = do
-  ET.bimapEitherT RecordUnificationError Fields . ET.sequenceEitherT $
+  fmap Fields . ET.sequenceEitherT $
     M.merge
       -- invocation order really matters here
       -- extra fields in 'have' are very bad
@@ -784,7 +779,7 @@ unifyClosedFields points (Fields have) tn (Fields want) = do
       -- extra fields in 'want' are to be expected
       (M.mapMissing (const (firstT pure . pure)))
       -- unify all the other fields
-      (M.zipWithMatched (\_fn t1 t2 -> firstT pure (mguST points t1 t2)))
+      (M.zipWithMatched (\_fn t1 t2 -> mguST points t1 t2))
       have
       want
 
@@ -798,7 +793,7 @@ solveConstraints constraints =
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
         Equal t1 t2 ->
-          fmap (first D.singleton) (mostGeneralUnifierST points t1 t2)
+          fmap (first D.fromList) (mostGeneralUnifierST points t1 t2)
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points

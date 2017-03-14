@@ -142,7 +142,7 @@ prop_record_unit_prj_extra =
   once $
     typeCheck dRecord rexpr
     ===
-    Left [ RecordUnificationError [ ExtraRecordField nRecord (FieldName "quux") (TVar (TypeName "b"), ()) () ] ]
+    Left [ ExtraRecordField nRecord (FieldName "quux") (TVar (TypeName "b"), ()) () ]
   where
     rexpr =
       EApp ()
