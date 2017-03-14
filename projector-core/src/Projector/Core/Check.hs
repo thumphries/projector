@@ -59,8 +59,8 @@ data TypeError l a
   | BadConstructorArity Constructor Int Int a
   | BadPatternArity Constructor (Type l) Int Int a
   | BadPatternConstructor Constructor a
-  | MissingRecordField TypeName FieldName a
-  | ExtraRecordField TypeName FieldName a
+  | MissingRecordField TypeName FieldName (Type l, a) a
+  | ExtraRecordField TypeName FieldName (Type l, a) a
   | DuplicateRecordFields TypeName [FieldName] a
   | RecordUnificationError [TypeError l a]
   | InferenceError a
@@ -536,9 +536,9 @@ generateConstraints' decls expr =
               have = M.fromList (fmap (fmap extractType) fes')
           _ <- M.mergeA
             -- What to do when a required field is missing
-            (M.traverseMissing (\fn _ty -> throwError (MissingRecordField tn fn a)))
+            (M.traverseMissing (\fn ty -> throwError (MissingRecordField tn fn (flattenIType ty) a)))
             -- When an extraneous field is present
-            (M.traverseMissing (\fn _ty -> throwError (ExtraRecordField tn fn a)))
+            (M.traverseMissing (\fn ty -> throwError (ExtraRecordField tn fn (flattenIType ty) a)))
             -- When present in both, add a constraint
             (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal twant thave)))
             need
@@ -665,19 +665,19 @@ mguST points t1 t2 =
       unifyVar points a x t1
 
     (IOpenRecord a x fs, IOpenRecord b y gs) -> do
-      hs <- unifyFields points fs gs
+      hs <- unifyOpenFields points fs gs
       unifyVar points a x (IOpenRecord b y hs)
 
-    (IOpenRecord a x fs, IClosedRecord _ _tn gs) -> do
+    (IOpenRecord a x fs, IClosedRecord _ tn gs) -> do
       -- this is bad, it biases inferred constraints too heavily.
       -- should be explicit instance constraints once we have those
-      _hs <- unifyFields points fs gs
+      _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t2
 
-    (IClosedRecord _ _tn gs, IOpenRecord a x fs) -> do
+    (IClosedRecord _ tn gs, IOpenRecord a x fs) -> do
       -- this is bad, it biases inferred constraints too heavily.
       -- should be explicit instance constraints once we have those
-      _hs <- unifyFields points fs gs
+      _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t1
 
     (IClosedRecord _ x _fs1, IClosedRecord _ y _fs2) -> do
@@ -751,16 +751,42 @@ occurs a q ity =
           go x f
 {-# INLINE occurs #-}
 
-unifyFields ::
+unifyOpenFields ::
      Ground l
   => STRef s (Points s l a)
   -> Fields l a
   -> Fields l a
   -> EitherT (TypeError l a) (ST s) (Fields l a)
-unifyFields points (Fields fs1) (Fields fs2) = do
-  let intersect = M.intersectionWith (\t1 t2 -> firstT pure (mguST points t1 t2)) fs1 fs2
-  fs3 <- firstT RecordUnificationError (ET.sequenceEitherT intersect)
-  pure (Fields (fs3 <> fs1 <> fs2))
+unifyOpenFields points (Fields fs1) (Fields fs2) = do
+  ET.bimapEitherT RecordUnificationError Fields . ET.sequenceEitherT $
+    M.merge
+      -- missing fields either side just get propagated
+      (M.mapMissing (const (firstT pure . pure)))
+      (M.mapMissing (const (firstT pure . pure)))
+      -- unify any matching fields normally
+      (M.zipWithMatched (\_fn t1 t2 -> firstT pure (mguST points t1 t2)))
+      fs1
+      fs2
+
+unifyClosedFields ::
+     Ground l
+  => STRef s (Points s l a)
+  -> Fields l a
+  -> TypeName
+  -> Fields l a
+  -> EitherT (TypeError l a) (ST s) (Fields l a)
+unifyClosedFields points (Fields have) tn (Fields want) = do
+  ET.bimapEitherT RecordUnificationError Fields . ET.sequenceEitherT $
+    M.merge
+      -- invocation order really matters here
+      -- extra fields in 'have' are very bad
+      (M.mapMissing (\fn t1 -> left [ExtraRecordField tn fn (flattenIType t1) (snd (flattenIType t1))]))
+      -- extra fields in 'want' are to be expected
+      (M.mapMissing (const (firstT pure . pure)))
+      -- unify all the other fields
+      (M.zipWithMatched (\_fn t1 t2 -> firstT pure (mguST points t1 t2)))
+      have
+      want
 
 solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
 solveConstraints constraints =

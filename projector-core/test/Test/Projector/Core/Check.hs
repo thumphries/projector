@@ -93,7 +93,7 @@ prop_record_unit_missing =
   once $
     typeCheck dRecord expr
     ===
-    Left [ MissingRecordField nRecord (FieldName "bar") () ]
+    Left [ MissingRecordField nRecord (FieldName "bar") (TLit TString, ()) () ]
   where
     expr = ERec () nRecord [
         (FieldName "foo", lit (VBool True))
@@ -112,6 +112,19 @@ prop_record_unit_complete =
       , (FieldName "baz", lit (VInt 43))
       ]
 
+prop_record_unit_extra =
+  once $
+    typeCheck dRecord expr
+    ===
+    Left [ ExtraRecordField nRecord (FieldName "quux") (TLit TBool, ()) () ]
+  where
+    expr = ERec () nRecord [
+        (FieldName "bar", lit (VString "bar!"))
+      , (FieldName "foo", lit (VBool True))
+      , (FieldName "baz", lit (VInt 43))
+      , (FieldName "quux", lit (VBool False))
+      ]
+
 prop_record_unit_duplicate =
   once $
     typeCheck dRecord expr
@@ -124,6 +137,24 @@ prop_record_unit_duplicate =
       , (FieldName "baz", lit (VInt 43))
       , (FieldName "bar", lit (VString "bar!"))
       ]
+
+prop_record_unit_prj_extra =
+  once $
+    typeCheck dRecord rexpr
+    ===
+    Left [ RecordUnificationError [ ExtraRecordField nRecord (FieldName "quux") (TVar (TypeName "b"), ()) () ] ]
+  where
+    rexpr =
+      EApp ()
+        (ELam () (Name "x") (Just (TLit TBool)) (EVar () (Name "x")))
+        (EPrj ()
+          (ERec () nRecord [
+              (FieldName "bar", lit (VString "bar!"))
+            , (FieldName "foo", lit (VBool True))
+            , (FieldName "baz", lit (VInt 43))
+            ])
+          (FieldName "quux"))
+
 
 
 return []
