@@ -54,7 +54,6 @@ import qualified Projector.Html.Core.Elaborator as Elab
 import qualified Projector.Html.Core.Library as Library
 import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
-import qualified Projector.Html.Data.Backend as HB
 import qualified Projector.Html.Data.Module as HB
 import           Projector.Html.Data.Position  (Range, renderRange)
 import           Projector.Html.Data.Prim
@@ -141,7 +140,7 @@ checkModule ::
   -> HB.Module a PrimT SrcAnnotation
   -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 checkModule decls (HB.Module typs imps exps) = do
-  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) conFunTypes (fmap snd exps))
+  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) (conFunTypes <> libraryExprs) (fmap snd exps))
   let exps'' = with exps' . uncurry $ \ty expr -> (ty, PC.whnf toSubstitute expr)
   pure (HB.Module typs imps exps'')
   where
@@ -158,7 +157,7 @@ checkModules ::
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names here somewhere
-  first HtmlCoreError (fmap fst (foldM fun (mempty, conFunTypes <> known) deps))
+  first HtmlCoreError (fmap fst (foldM fun (mempty, conFunTypes <> libraryExprs <> known) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
     conFunTypes = HC.constructorFunctionTypes decls
@@ -247,7 +246,7 @@ runBuildIncremental (Build mnr mdm) (UserDataTypes decls) hms rts = do
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  fmap BuildArtefacts $ first pure (checkModules decls (libraryExprs <> HB.extractModuleBindings hms) mmap)
+  fmap BuildArtefacts $ first pure (checkModules decls (HB.extractModuleBindings hms) mmap)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
@@ -293,7 +292,7 @@ smush mdm mnr hms (RawTemplates templates) = do
     pure (modn, HB.Module {
         HB.moduleTypes = mempty
       , HB.moduleImports = M.fromList $
-          (HB.htmlRuntime, HB.OpenImport) : fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
+          fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
       , HB.moduleExprs = M.singleton expn ((), core)
       })
   pure (buildModuleGraph mmap, mmap)

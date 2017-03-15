@@ -7,19 +7,18 @@ module Test.IO.Projector.Html.Backend.Purescript where
 
 
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 
 import           Disorder.Core
 import           Disorder.Jack
 
 import           P
 
-import           Projector.Core.Eval (whnf)
-import           Projector.Html.Backend.Purescript (purescriptBackend)
+import qualified Projector.Html as Html
+import           Projector.Html.Backend.Purescript
 import           Projector.Html.Data.Annotation
-import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
-import           Projector.Html.Core
 import qualified Projector.Html.Core.Library as Lib
 import qualified Projector.Html.Core.Prim as Prim
 
@@ -35,10 +34,10 @@ prop_empty_module =
   once (moduleProp (ModuleName "Test.Purescript.Module") mempty)
 
 prop_library_module =
-  once . moduleProp (ModuleName "Test.Purescript.Library") $ Module {
+  once . modulePropCheck (ModuleName "Test.Purescript.Library") $ Module {
       moduleTypes = Lib.types <> Prim.types
-    , moduleImports = M.fromList [(htmlRuntime, OpenImport)]
-    , moduleExprs = Lib.exprs <> M.fromList [
+    , moduleImports = mempty
+    , moduleExprs = M.fromList [
           helloWorld
         ]
     }
@@ -51,23 +50,20 @@ prop_welltyped =
         moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
             -- TODO once the backend actually does something, remove this setter
             moduleTypes = decls
-          , moduleExprs = cleanExprs decls (libExprs <> moduleExprs modl)
+          , moduleExprs = moduleExprs modl
           }
-
--- Inline all the constructor functions
--- FIX temporary hack - this should happen somewhere else
-cleanExprs decls exprs =
-  let confuns = constructorFunctionExprs decls
-  in fmap (fmap (whnf confuns)) exprs
-
-libExprs =
-  fmap (fmap (fmap (fmap (const EmptyAnnotation)))) Lib.exprs
 
 -- -----------------------------------------------------------------------------
 
 moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Property
 moduleProp mn =
-  uncurry pscProp . either (fail . show) id . renderModule purescriptBackend mn
+  uncurry pscProp . either (fail . show) id . Html.codeGenModule purescriptBackend mn
+
+modulePropCheck :: ModuleName -> Module HtmlType PrimT SrcAnnotation -> Property
+modulePropCheck mn modl@(Module tys _ _) =
+  uncurry pscProp . either (fail . T.unpack) id $ do
+    modl' <- first Html.renderHtmlError (Html.checkModule tys modl)
+    first renderPurescriptError (Html.codeGenModule purescriptBackend mn modl')
 
 pscProp mname modl =
   fileProp mname modl

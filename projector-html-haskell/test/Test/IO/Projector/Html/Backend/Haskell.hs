@@ -6,6 +6,7 @@ module Test.IO.Projector.Html.Backend.Haskell where
 
 
 import qualified Data.Map.Strict as M
+import qualified Data.Text as T
 
 import           Disorder.Core
 import           Disorder.Jack
@@ -13,10 +14,12 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
+import qualified Projector.Html as Html
 import           Projector.Html.Backend (checkModule)
-import           Projector.Html.Backend.Haskell (haskellBackend)
+import           Projector.Html.Backend.Haskell
 import           Projector.Html.Core
-import           Projector.Html.Data.Backend
+import           Projector.Html.Data.Annotation
+import           Projector.Html.Data.Backend ()
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 
@@ -30,32 +33,31 @@ prop_empty_module =
   once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
 
 prop_library_runtime =
-  once . moduleProp (ModuleName "Test.Haskell.Runtime") $ Module {
+  once . modulePropCheck (ModuleName "Test.Haskell.Runtime") $ Module {
       moduleTypes = mempty
-    , moduleImports = M.fromList [
-          (htmlRuntime, OpenImport)
-        ]
+    , moduleImports = mempty
     , moduleExprs = M.fromList [
           helloWorld
         ]
     }
 
 prop_hello_world =
-  once $ runProp name (text <> "\nmain = putStr (toText helloWorld)\n")
+  once $ runProp name (text <> "\nmain = putStr (Hydrant.toText helloWorld)\n")
     (=== "Hello, world!<div class=\"table\"> </div>")
   where
     (name, text) =
-      either (fail . show) id . renderModule haskellBackend (ModuleName "Main") $ Module {
-          moduleTypes = mempty
-        , moduleImports = M.fromList [
-              (htmlRuntime, OpenImport)
-            , (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
-            , (ModuleName "Hydrant", OnlyImport [Name "toText"])
-            ]
-        , moduleExprs = M.fromList [
-              helloWorld
-            ]
-        }
+      either (fail . T.unpack) id $ do
+        let modl = Module {
+                moduleTypes = mempty
+              , moduleImports = M.fromList [
+                    (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
+                  ]
+              , moduleExprs = M.fromList [
+                    helloWorld
+                  ]
+              }
+        modl' <- first Html.renderHtmlError (Html.checkModule mempty modl)
+        first renderHaskellError (Html.codeGenModule haskellBackend (ModuleName "Main") modl')
 
 prop_welltyped :: Property
 prop_welltyped =
@@ -66,9 +68,17 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Property
+modulePropCheck :: ModuleName -> Module HtmlType PrimT SrcAnnotation -> Property
+modulePropCheck mn modl@(Module tys _ _) =
+  uncurry ghcProp . either (fail . T.unpack) id $ do
+    modl' <- first Html.renderHtmlError (Html.checkModule tys modl)
+    first renderHaskellError (Html.codeGenModule haskellBackend mn modl')
+
+moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, SrcAnnotation) -> Property
 moduleProp mn =
-  uncurry ghcProp . either (fail . show) id . renderModule haskellBackend mn
+  uncurry ghcProp .
+  either (fail . T.unpack) id .
+  first renderHaskellError . Html.codeGenModule haskellBackend mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
 ghcProp mname modl =

@@ -77,7 +77,7 @@ predicates :: [Predicate HaskellError]
 predicates = [
     PatPredicate $ \case
       PCon _ c _ ->
-        if S.member c htmlConstructors || S.member c htmlNodeConstructors
+        if S.member c htmlConstructors
           then PredError HtmlCase
           else PredOk
       _ ->
@@ -87,20 +87,23 @@ predicates = [
 -- | The set of constructors used for the Html library type.
 htmlConstructors :: Set Constructor
 htmlConstructors =
-  case dHtml of
-    DVariant cts ->
-      S.fromList (fmap fst cts)
-    DRecord _ ->
-      mempty
+  fold [
+      sumCons dHtml
+    , sumCons dTag
+    , sumCons dAttribute
+    , sumCons dAttributeKey
+    , sumCons dAttributeValue
+    ]
+  where
+  sumCons x =
+    case x of
+      DVariant cts ->
+        S.fromList (fmap fst cts)
+      DRecord _ ->
+        mempty
 
--- | The set of constructors used for the HtmlNode library type.
-htmlNodeConstructors :: Set Constructor
-htmlNodeConstructors =
-  case dHtml of
-    DVariant cts ->
-      S.fromList (fmap fst cts)
-    DRecord _ ->
-      mempty
+
+
 
 -- -----------------------------------------------------------------------------
 
@@ -116,13 +119,16 @@ renderModule mn@(ModuleName n) m = do
         ]
       (_mn', m') = second toHaskellModule (rewriteModule mn m)
       modName = T.unwords ["module", n, "where"]
-
-      imports = fmap (uncurry genImport) (M.toList (moduleImports m'))
+      importText = fmap (uncurry genImport) imports
+      imports =
+        (htmlRuntime, ImportQualified)
+          : (hydrant, ImportQualified)
+          : M.toList (moduleImports m')
   decls <- fmap (fmap (T.pack . TH.pprint)) (genModule m')
   pure (genFileName mn, T.unlines $ mconcat [
        pragmas
      , [modName]
-     , imports
+     , importText
      , decls
      ])
 
@@ -151,6 +157,14 @@ genModule (Module ts _ es) = do
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
   T.unpack (T.replace "." "/" n) <> ".hs"
+
+htmlRuntime :: ModuleName
+htmlRuntime =
+  ModuleName "Projector.Html.Runtime"
+
+hydrant :: ModuleName
+hydrant =
+  ModuleName "Hydrant"
 
 -- -----------------------------------------------------------------------------
 -- | Type declarations.

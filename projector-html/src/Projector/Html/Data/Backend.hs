@@ -10,10 +10,6 @@ module Projector.Html.Data.Backend (
     Backend (..)
   , Predicate (..)
   , PredResult (..)
-  -- * Runtime constants
-  , htmlRuntime
-  , htmlRuntimePrim
-  , htmlRuntimeLibrary
   ) where
 
 
@@ -52,15 +48,3 @@ data PredResult e
   = PredError e
   | PredOk
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
-
-htmlRuntime :: ModuleName
-htmlRuntime =
-  ModuleName "Projector.Html.Runtime"
-
-htmlRuntimePrim :: ModuleName
-htmlRuntimePrim =
-  ModuleName "Projector.Html.Runtime.Prim"
-
-htmlRuntimeLibrary :: ModuleName
-htmlRuntimeLibrary =
-  ModuleName "Projector.Html.Runtime.Library"

@@ -37,6 +37,7 @@ rewriteExpr =
 rules :: [RewriteRule PrimT a]
 rules =
   fmap Rewrite [
+      -- Replace HTML model with Hydrant functions.
       -- These rules are important for correctness - won't work without these.
       (\case ECon a (Constructor "Plain") _ [x] ->
                pure (apply (textNode a) [x])
@@ -67,14 +68,48 @@ rules =
              _ ->
                empty)
 
+      -- Qualify imports for runtime functions and constructors.
+    , (\case EForeign a (Name "append") ty ->
+               pure (EForeign a (Name "Projector.Html.Runtime.append") ty)
+             _ ->
+               empty)
+    , (\case EForeign a (Name "concat") ty ->
+               pure (EForeign a (Name "Projector.Html.Runtime.concat") ty)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "Tag") tn es ->
+               pure (ECon a (Constructor "Hydrant.Tag") tn es)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "Attribute") tn es ->
+               pure (ECon a (Constructor "Hydrant.Attribute") tn es)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "AttributeKey") tn es ->
+               pure (ECon a (Constructor "Hydrant.AttributeKey") tn es)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "AttributeValue") tn es ->
+               pure (ECon a (Constructor "Hydrant.AttributeValue") tn es)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "True") tn es ->
+               pure (ECon a (Constructor "Projector.Html.Runtime.True") tn es)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "False") tn es ->
+               pure (ECon a (Constructor "Projector.Html.Runtime.False") tn es)
+             _ ->
+               empty)
+
       -- These rules are just optimisations.
       -- foldHtml of a singleton: id
-    , (\case EApp _ (EForeign _ (Name "foldHtml") _) (EList _ [x]) ->
+    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
       -- adjacent raw plaintext nodes can be merged
-    , (\case EApp a fh@(EForeign _ (Name "foldHtml") _) (EList b nodes) -> do
+    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList b nodes) -> do
                nodes' <- foldRaw nodes
                pure (EApp a fh (EList b nodes'))
              _ ->
@@ -88,27 +123,27 @@ rules =
 
 textNode :: a -> Expr PrimT a
 textNode a =
-  EForeign a (Name "textNode") (TArrow (TLit TString) CL.tHtml)
+  EForeign a (Name "Hydrant.textNode") (TArrow (TLit TString) CL.tHtml)
 
 rawTextNode :: a -> Expr PrimT a
 rawTextNode a =
-  EForeign a (Name "textNodeUnescaped") (TArrow (TLit TString) CL.tHtml)
+  EForeign a (Name "Hydrant.textNodeUnescaped") (TArrow (TLit TString) CL.tHtml)
 
 parentNode :: a -> Expr PrimT a
 parentNode a =
-  EForeign a (Name "parentNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
+  EForeign a (Name "Hydrant.parentNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
 
 voidNode :: a -> Expr PrimT a
 voidNode a =
-  EForeign a (Name "voidNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
+  EForeign a (Name "Hydrant.voidNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
 
 comment :: a -> Expr PrimT a
 comment a =
-  EForeign a (Name "comment") (TArrow (TLit TString) CL.tHtml)
+  EForeign a (Name "Hydrant.comment") (TArrow (TLit TString) CL.tHtml)
 
 foldHtml :: a -> Expr PrimT a
 foldHtml a =
-  EForeign a (Name "foldHtml") (TArrow (TList CL.tHtml) CL.tHtml)
+  EForeign a (Name "Projector.Html.Runtime.foldHtml") (TArrow (TList CL.tHtml) CL.tHtml)
 
 -- build an application chain
 apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
@@ -117,7 +152,7 @@ apply f =
 
 pattern RawTextNode a b c t =
   EApp a
-    (EForeign b (Name "textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
+    (EForeign b (Name "Hydrant.textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
     (ELit c (VString t))
 
 foldRaw :: [HtmlExpr a] -> Maybe [HtmlExpr a]

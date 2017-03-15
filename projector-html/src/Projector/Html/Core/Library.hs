@@ -10,15 +10,19 @@ module Projector.Html.Core.Library (
   -- ** Tag
   , tTag
   , nTag
+  , dTag
   -- ** Attributes
   , tAttribute
   , nAttribute
+  , dAttribute
   -- *** Attribute keys
   , tAttributeKey
   , nAttributeKey
+  , dAttributeKey
   -- *** Attribute values
   , tAttributeValue
   , nAttributeValue
+  , dAttributeValue
   -- ** Html
   , tHtml
   , nHtml

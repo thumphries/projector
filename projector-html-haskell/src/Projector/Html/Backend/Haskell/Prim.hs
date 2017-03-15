@@ -43,7 +43,7 @@ instance Ground HaskellPrimT where
     HTextV _ -> HTextT
 
   ppGroundType t = case t of
-    HTextT -> "Text"
+    HTextT -> "Projector.Html.Runtime.Text"
 
   ppGroundValue v = case v of
     HTextV s ->
@@ -83,6 +83,18 @@ swapLibTypes ty =
       TList (swapLibTypes t2)
     TArrow t2 t3 ->
       TArrow (swapLibTypes t2) (swapLibTypes t3)
+    TVar (TypeName "Html") ->
+      TVar (TypeName "Hydrant.Html")
+    TVar (TypeName "Attribute") ->
+      TVar (TypeName "Hydrant.Attribute")
+    TVar (TypeName "AttributeKey") ->
+      TVar (TypeName "Hydrant.AttributeKey")
+    TVar (TypeName "AttributeValue") ->
+      TVar (TypeName "Hydrant.AttributeValue")
+    TVar (TypeName "Tag") ->
+      TVar (TypeName "Hydrant.Tag")
+    TVar (TypeName "Bool") ->
+      TVar (TypeName "Projector.Html.Runtime.Bool")
     _ ->
       ty
 {-# INLINE swapLibTypes #-}

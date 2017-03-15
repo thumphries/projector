@@ -14,6 +14,7 @@ import           Disorder.Jack
 import           P
 
 import           Projector.Core
+import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Data.Prim as Prim
 import qualified Projector.Html.Core.Library as Lib
 
@@ -48,25 +49,25 @@ fileProp mname modl f g =
     fmap g (f path')
 
 
-helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr (Prim.HtmlType, ())))
+helloWorld :: (Name, (Prim.HtmlType, Prim.HtmlExpr (Annotation a)))
 helloWorld =
   ( Name "helloWorld"
   , ( Lib.tHtml
-    , fmap (,()) $ ECon Lib.tHtml (Constructor "Nested") Lib.nHtml [
-        EList (TList Lib.tHtml) [
-            ECon Lib.tHtml (Constructor "Plain") Lib.nHtml [ELit (TLit Prim.TString) (Prim.VString "Hello,")]
-          , ECon Lib.tHtml (Constructor "Whitespace") Lib.nHtml []
-          , EApp Lib.tHtml (EVar Lib.tHtmlText Lib.nHtmlText) (ELit (TLit Prim.TString) (Prim.VString "world!"))
-          , ECon Lib.tHtml (Constructor "Element") Lib.nHtml [
-                ECon Lib.tTag (Constructor "Tag") Lib.nTag [ELit (TLit Prim.TString) (Prim.VString "div")]
-              , EList (TList Lib.tAttribute) [
-                    ECon Lib.tAttribute (Constructor "Attribute") Lib.nAttribute [
-                      ECon Lib.tAttributeKey (Constructor "AttributeKey") Lib.nAttributeKey [ELit (TLit Prim.TString) (Prim.VString "class")]
-                    , EApp Lib.tAttributeValue (EVar Lib.tHtmlAttrValue Lib.nHtmlAttrValue) (ELit (TLit Prim.TString) (Prim.VString "table"))
+    , fmap (const EmptyAnnotation) $ ECon () (Constructor "Nested") Lib.nHtml [
+        EList () [
+            ECon () (Constructor "Plain") Lib.nHtml [ELit () (Prim.VString "Hello,")]
+          , ECon () (Constructor "Whitespace") Lib.nHtml []
+          , EApp () (EVar () Lib.nHtmlText) (ELit () (Prim.VString "world!"))
+          , ECon () (Constructor "Element") Lib.nHtml [
+                ECon () (Constructor "Tag") Lib.nTag [ELit () (Prim.VString "div")]
+              , EList () [
+                    ECon () (Constructor "Attribute") Lib.nAttribute [
+                      ECon () (Constructor "AttributeKey") Lib.nAttributeKey [ELit () (Prim.VString "class")]
+                    , EApp () (EVar () Lib.nHtmlAttrValue) (ELit () (Prim.VString "table"))
                     ]
                   ]
-              , ECon Lib.tHtml (Constructor "Nested") Lib.nHtml [EList (TList Lib.tHtml) [ECon Lib.tHtml (Constructor "Whitespace") Lib.nHtml []]]
+              , ECon () (Constructor "Nested") Lib.nHtml [EList () [ECon () (Constructor "Whitespace") Lib.nHtml []]]
               ]
-          , EVar Lib.tHtml Lib.nHtmlBlank
+          , EVar () Lib.nHtmlBlank
           ]
       ]))
