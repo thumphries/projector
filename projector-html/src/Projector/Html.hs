@@ -51,6 +51,8 @@ import qualified Projector.Html.Backend as HB
 import qualified Projector.Html.Core as HC
 import           Projector.Html.Core  (CoreError(..))
 import qualified Projector.Html.Core.Elaborator as Elab
+import qualified Projector.Html.Core.Library as Library
+import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Data.Backend as HB
 import qualified Projector.Html.Data.Module as HB
@@ -125,17 +127,27 @@ checkExprIncremental ::
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkExprIncremental decls known =
     first HtmlCoreError
+  . fmap (fmap (PC.whnf toSubstitute))
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
-  . HC.typeCheckIncremental decls (HC.constructorFunctionTypes decls <> libraryExprs <> (M.mapKeys PC.Name known))
+  . HC.typeCheckIncremental decls (conFunTypes <> libraryExprs <> (M.mapKeys PC.Name known))
   . M.singleton (PC.Name "it")
+  where
+    conFunTypes = HC.constructorFunctionTypes decls
+    conFunExprs = HC.constructorFunctions decls
+    toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
 
 checkModule ::
      HtmlDecls
   -> HB.Module a PrimT SrcAnnotation
   -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
 checkModule decls (HB.Module typs imps exps) = do
-  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) (HC.constructorFunctionTypes decls) (fmap snd exps))
-  pure (HB.Module typs imps exps')
+  exps' <- first HtmlCoreError (HC.typeCheckIncremental (decls <> typs) conFunTypes (fmap snd exps))
+  let exps'' = with exps' . uncurry $ \ty expr -> (ty, PC.whnf toSubstitute expr)
+  pure (HB.Module typs imps exps'')
+  where
+    conFunTypes = HC.constructorFunctionTypes decls
+    conFunExprs = HC.constructorFunctions decls
+    toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
 
 -- | Figure out the dependency order of a set of modules, then
 -- typecheck them all in that order.
@@ -145,24 +157,34 @@ checkModules ::
   -> Map HB.ModuleName (HB.Module a PrimT SrcAnnotation)
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
-  -- FIX Check for duplicate function names
-  first HtmlCoreError (fmap fst (foldM fun (mempty, HC.constructorFunctionTypes decls <> known) deps))
+  -- FIX Check for duplicate function names here somewhere
+  first HtmlCoreError (fmap fst (foldM fun (mempty, conFunTypes <> known) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
+    conFunTypes = HC.constructorFunctionTypes decls
+    --
+    conFunExprs = HC.constructorFunctions decls
+    toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     --
     fun (res, acc) n =
       maybe (pure (res, acc)) (\mo -> doit n mo res acc) (M.lookup n exprs)
     --
     doit n (HB.Module types imports exps) res acc = do
       exps' <- HC.typeCheckIncremental (decls <> types) acc (fmap snd exps)
-      let result = HB.Module types imports exps'
+      let exps'' = with exps' . uncurry $ \ty expr ->
+            (ty, PC.whnf toSubstitute expr)
+          result = HB.Module types imports exps''
           newacc = M.union (fmap (PC.extractAnnotation . snd) exps') acc
       pure (M.insert n result res, newacc)
 
+-- | Generate code for a provided backend.
+--
+-- TODO This should be a lazy stream instead of Either. Either limits throughput.
 codeGen :: HB.Backend SrcAnnotation e -> BuildArtefacts -> Either [e] [(FilePath, Text)]
 codeGen backend (BuildArtefacts checked) = do
+  -- Run the backend's validation predicates
   validateModules backend checked
-  -- TODO this can be a lazy stream
+  -- Generate code.
   fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) checked)
 
 codeGenModule ::
@@ -223,7 +245,7 @@ runBuildIncremental (Build mnr mdm) (UserDataTypes decls) hms rts = do
   (mg, mmap) <- smush mdm mnr hms rts
   -- Check it for cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
-  -- Check all modules (this can be a lazy stream)
+  -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
   fmap BuildArtefacts $ first pure (checkModules decls (libraryExprs <> HB.extractModuleBindings hms) mmap)
 
