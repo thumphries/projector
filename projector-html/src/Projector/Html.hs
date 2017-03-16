@@ -327,7 +327,7 @@ smush mdm mnr hms (RawTemplates templates) = do
   -- Produce a module for each template and build up the template name map
   (nmap, modls) <- foldM mkmod mempty templates
   -- Derive the module map and its import graph
-  let mmap = deriveImportsIncremental known (M.fromList modls)
+  let mmap = deriveImportsIncremental known (M.fromListWith (<>) modls)
   pure (buildModuleGraph mmap, nmap, mmap)
 
 -- | Provide a default naming scheme for modules and function names
