@@ -80,3 +80,5 @@ rewriteT rules expr =
       e1' <- rewriteT rules e1
       e2' <- rewriteT rules e2
       applyRules (EMap a e1' e2') rules
+    EHole _ ->
+      applyRules expr rules

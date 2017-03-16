@@ -32,6 +32,7 @@ data Annotation a
   | AttributeExpression a
   | ListLiteral a
   | RecordProjection a FieldName
+  | TypedHole a
   deriving (Eq, Ord, Show)
 
 type SrcAnnotation = Annotation Range
@@ -75,3 +76,5 @@ renderAnnotation f ann =
       f r <> " in a list literal"
     RecordProjection r (FieldName fn) ->
       f r <> " in a record projection '" <> fn <> "'"
+    TypedHole r ->
+      f r <> " in a hole '_'"

@@ -63,6 +63,7 @@ haskellBackend =
 data HaskellError
   = HtmlCase -- TODO should really return decorated parameterised error here
   | RecordTypeInvariant
+  | TypeHolePresent
   deriving (Eq, Ord, Show)
 
 renderHaskellError :: HaskellError -> Text
@@ -72,6 +73,8 @@ renderHaskellError e =
       "Don't case on Html, pal!"
     RecordTypeInvariant ->
       "BUG: Invariant failure - expected a record type, but found something else."
+    TypeHolePresent ->
+      "BUG: Type hole was present for code generation. Should have been a type error."
 
 predicates :: [Predicate HaskellError]
 predicates = [
@@ -267,6 +270,9 @@ genExp expr =
       f' <- genExp f
       g' <- genExp g
       pure (applyE (varE (mkName_ "Projector.Html.Runtime.fmap")) [f', g'])
+
+    EHole _ ->
+      Left TypeHolePresent
 
 -- | Compile a Projector record projection to Haskell.
 --

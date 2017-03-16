@@ -121,6 +121,8 @@ interpret' e =
       Left $ InterpretInvalidExpression e
     EForeign _ _ _ ->
       Left $ InterpretInvalidExpression e
+    EHole _ ->
+      Left $ InterpretInvalidExpression e
 
 -- | Guaranteed to return text, not html
 value :: HtmlExpr a -> Either (InterpretError a) Text

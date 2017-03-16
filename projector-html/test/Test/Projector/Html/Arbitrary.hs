@@ -213,6 +213,7 @@ genTemplateExpr k =
   let j = k `div` 2
       nonrec = [
           TEVar () <$> genTId
+        , pure (TEHole ())
         ]
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j

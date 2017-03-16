@@ -46,8 +46,8 @@ ppTypeError' err =
           WL.<$$> annNL a (text (ppType t1))
           WL.<$$> annNL b (text (ppType t2)))
     FreeVariable (Name n) a ->
-      WL.annotate a $
-        text ("Not in scope: " <> n)
+      WL.annotate a . WL.hang 2 $
+        WL.empty WL.<$$> text ("Not in scope: '" <> n <> "'")
     BadConstructorName (Constructor c) (TypeName tn) d a ->
       case d of
         DVariant cts ->
@@ -126,6 +126,11 @@ ppTypeError' err =
         (text "Type error (occurs check) - cannot construct the infinite type!"
           WL.<$$> annNL a (text (ppType t1))
           WL.<$$> annNL b (text (ppType t2)))
+    TypeHole (ty, _b) a ->
+      WL.annotate a . WL.hang 2 $
+        text "Found hole with type:"
+          WL.<$$> text (ppType ty)
+
 
 annNL :: a -> Doc a -> Doc a
 annNL a val =
@@ -262,6 +267,9 @@ ppExpr' types e =
 
     EForeign a (Name n) ty ->
       WL.annotate a $ WL.parens (text n WL.<> text "#" WL.<> text (typeMay ty))
+
+    EHole a ->
+      WL.annotate a (text "_")
   where typeMay t = if types then " : " <> ppType t else T.empty
 
 ppPattern :: Pattern a -> Text

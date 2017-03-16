@@ -83,6 +83,7 @@ data Expr l a
   | EList a [Expr l a]
   | EMap a (Expr l a) (Expr l a)
   | EForeign a Name (Type l)
+  | EHole a
   deriving (Functor, Foldable, Traversable)
 
 deriving instance (Ground l, Eq a) => Eq (Expr l a)
@@ -114,6 +115,8 @@ extractAnnotation e =
       a
     EForeign a _ _ ->
       a
+    EHole a ->
+      a
 {-# INLINE extractAnnotation #-}
 
 -- Set the top-level annotation.
@@ -142,6 +145,8 @@ setAnnotation a e =
       EMap a b c
     EForeign _ b c ->
       EForeign a b c
+    EHole _ ->
+      EHole a
 {-# INLINE setAnnotation #-}
 
 newtype Name = Name { unName :: Text }
@@ -291,6 +296,9 @@ traverseFree f' expr' =
         EForeign a b c ->
           pure (EForeign a b c)
 
+        EHole a ->
+          pure (EHole a)
+
 
 -- | Strict fold over free variables, including foreign definitions.
 foldFree :: (b -> Name -> b) -> b -> Expr l a -> b
@@ -337,6 +345,9 @@ foldFree f acc expr =
 
         EForeign _ x _ ->
           if (S.member x bound) then acc' else f' acc' $! x
+
+        EHole _ ->
+          acc'
 
 -- | Gather all free variables in an expression.
 gatherFree :: Expr l a -> Set Name
@@ -395,6 +406,9 @@ mapGround tmap vmap expr =
     EForeign a n t ->
       EForeign a n (mapGroundType tmap t)
 
+    EHole a ->
+      EHole a
+
 -- | Bottom-up monadic fold.
 foldrExprM ::
      Monad m
@@ -441,6 +455,8 @@ foldrExprM fx fp acc expr =
       acc'' <- foldrExprM fx fp acc' i
       fx expr acc''
     EForeign _ _ _ ->
+      fx expr acc
+    EHole _ ->
       fx expr acc
 
 -- | Bottom-up monadic fold over a pattern.
@@ -511,6 +527,8 @@ foldlExprM fx fp acc expr =
       acc' <- fx acc expr
       acc'' <- foldlExprM fx fp acc' i
       foldlExprM fx fp acc'' j
+    EHole _ ->
+      fx acc expr
 
 -- | Top-down monadic fold of a pattern.
 foldlPatternM :: Monad m => (b -> Pattern a -> m b) -> b -> Pattern a -> m b

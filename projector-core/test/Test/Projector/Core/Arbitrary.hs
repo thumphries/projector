@@ -95,6 +95,9 @@ genExpr n t v =
         EForeign _ _ _ ->
           []
 
+        EHole _ ->
+          []
+
       nonrec = [
           lit <$> v
         , var <$> n
