@@ -10,15 +10,19 @@ module Projector.Html.Core.Library (
   -- ** Tag
   , tTag
   , nTag
+  , dTag
   -- ** Attributes
   , tAttribute
   , nAttribute
+  , dAttribute
   -- *** Attribute keys
   , tAttributeKey
   , nAttributeKey
+  , dAttributeKey
   -- *** Attribute values
   , tAttributeValue
   , nAttributeValue
+  , dAttributeValue
   -- ** Html
   , tHtml
   , nHtml
@@ -45,6 +49,7 @@ import qualified Data.Map.Strict as M
 import           P
 
 import           Projector.Core
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 
 
@@ -58,7 +63,7 @@ types =
     , (nHtml, dHtml)
     ]
 
-exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, ()))
+exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, Annotation a))
 exprs =
   M.fromList [
       (nHtmlText, (tHtmlText, eHtmlText))
@@ -162,10 +167,14 @@ tHtmlText :: HtmlType
 tHtmlText =
   TArrow (TLit TString) tHtml
 
-eHtmlText :: HtmlExpr (HtmlType, ())
+eHtmlText :: HtmlExpr (HtmlType, Annotation a)
 eHtmlText =
-  ELam (tHtmlText, ()) (Name "t") (Just (TLit TString))
-    (ECon (tHtml, ()) (Constructor "Plain") nHtml [EVar (TLit TString, ()) (Name "t")])
+  ELam (tHtmlText, aHtmlText) (Name "t") (Just (TLit TString))
+    (ECon (tHtml, aHtmlText) (Constructor "Plain") nHtml [EVar (TLit TString, aHtmlText) (Name "t")])
+
+aHtmlText :: Annotation a
+aHtmlText =
+  LibraryFunction nHtmlText
 
 -- -----------------------------------------------------------------------------
 
@@ -177,10 +186,14 @@ tHtmlAttrValue :: HtmlType
 tHtmlAttrValue =
   TArrow (TLit TString) tAttributeValue
 
-eHtmlAttrValue :: HtmlExpr (HtmlType, ())
+eHtmlAttrValue :: HtmlExpr (HtmlType, Annotation a)
 eHtmlAttrValue =
-  ELam (tHtmlAttrValue, ()) (Name "t") (Just (TLit TString))
-    (ECon (tAttributeValue, ()) (Constructor "AttributeValue") nAttributeValue [EVar (TLit TString, ()) (Name "t")])
+  ELam (tHtmlAttrValue, aHtmlAttrValue) (Name "t") (Just (TLit TString))
+    (ECon (tAttributeValue, aHtmlAttrValue) (Constructor "AttributeValue") nAttributeValue [EVar (TLit TString, aHtmlAttrValue) (Name "t")])
+
+aHtmlAttrValue :: Annotation a
+aHtmlAttrValue =
+  LibraryFunction nHtmlAttrValue
 
 -- -----------------------------------------------------------------------------
 
@@ -192,9 +205,13 @@ tHtmlBlank :: HtmlType
 tHtmlBlank =
   tHtml
 
-eHtmlBlank :: HtmlExpr (HtmlType, ())
+eHtmlBlank :: HtmlExpr (HtmlType, Annotation a)
 eHtmlBlank =
-  ECon (tHtml, ()) (Constructor "Nested") nHtml
-    [EList (TList tHtml, ()) []]
+  ECon (tHtml, aHtmlBlank) (Constructor "Nested") nHtml
+    [EList (TList tHtml, aHtmlBlank) []]
+
+aHtmlBlank :: Annotation a
+aHtmlBlank =
+  LibraryFunction nHtmlBlank
 
 -- -----------------------------------------------------------------------------

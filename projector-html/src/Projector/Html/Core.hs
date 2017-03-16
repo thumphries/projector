@@ -97,7 +97,7 @@ htmlTypes :: HtmlDecls
 htmlTypes =
   Prim.types <> Library.types
 
-libraryExprs :: Map PC.Name (HtmlType, ())
+libraryExprs :: Map PC.Name (HtmlType, Annotation a)
 libraryExprs =
   fmap (fmap (snd . PC.extractAnnotation)) Library.exprs
 

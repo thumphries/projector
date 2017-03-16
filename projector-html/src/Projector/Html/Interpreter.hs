@@ -16,6 +16,8 @@ import           Projector.Core.Eval
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 import           Projector.Html.Core
+import qualified Projector.Html.Core.Library as Lib
+import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 
@@ -66,38 +68,38 @@ interpret ::
   -> Either (InterpretError (HtmlType, SrcAnnotation)) Html
 interpret decls bnds =
   let confuns = constructorFunctionExprs decls in
-  interpret' . nf (confuns <> bnds)
+  interpret' . nf (confuns <> fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds)
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
 interpret' e =
   case e of
     ECon _ c _ es ->
       case (c, es) of
-        (Constructor "Plain", [ELit _ (VString t)]) ->
-           pure $ Plain t
-        (Constructor "Raw", [ELit _ (VString t)]) ->
-           pure $ Raw t
+        (Constructor "Plain", [t]) ->
+           Plain <$> value t
+        (Constructor "Raw", [t]) ->
+           Raw <$> value t
         (Constructor "Whitespace", []) ->
            pure $ Whitespace " "
-        (Constructor "Comment", [ELit _ (VString t)]) ->
-           pure $ Comment t
-        (Constructor "Element", [ECon _ (Constructor "Tag") _ [(ELit _ (VString t))], EList _ attrs, body]) -> do
+        (Constructor "Comment", [t]) ->
+           Comment <$> value t
+        (Constructor "Element", [ECon _ (Constructor "Tag") _ [t], EList _ attrs, body]) -> do
            Element
-             <$> pure t
+             <$> value t
              <*> mapM attr attrs
              <*> interpret' body
-        (Constructor "VoidElement", [ECon _ (Constructor "Tag") _ [(ELit _ (VString t))], EList _ attrs]) -> do
+        (Constructor "VoidElement", [ECon _ (Constructor "Tag") _ [t], EList _ attrs]) -> do
            VoidElement
-             <$> pure t
+             <$> value t
              <*> mapM attr attrs
         (Constructor "Nested", [EList _ nodes]) ->
           fmap mconcat . mapM interpret' $ nodes
         _ ->
           Left $ InterpretInvalidExpression e
-    EApp _ (EVar _ (Name "text")) v ->
+    EApp _ (EForeign _ (Name "text") _) v ->
       Plain
         <$> value v
-    EApp _ (EVar _ (Name "blank")) _ ->
+    EApp _ (EForeign _ (Name "blank") _) _ ->
       pure $ Nested []
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e

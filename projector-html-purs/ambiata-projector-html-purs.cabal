@@ -55,3 +55,4 @@ test-suite test-io
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , containers
                      , process
+                     , text

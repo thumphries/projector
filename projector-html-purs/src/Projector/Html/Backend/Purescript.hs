@@ -60,11 +60,12 @@ predicates = [
 renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either PurescriptError (FilePath, Text)
 renderModule mn@(ModuleName n) m = do
   let modName = T.unwords ["module", n, "where"]
-      imports = fmap (uncurry genImport) (M.toList (moduleImports m))
+      imports = (htmlRuntime, OpenImport) : (M.toList (moduleImports m))
+      importText = fmap (uncurry genImport) imports
   decls <- fmap (fmap prettyUndecorated) (genModule m)
   pure (genFileName mn, T.unlines $ mconcat [
       [modName]
-    , imports
+    , importText
     , decls
     ])
 
@@ -82,19 +83,22 @@ genModule (Module ts _ es) = do
 
 genImport :: ModuleName -> Imports -> Text
 genImport (ModuleName n) imports =
-  T.unwords [
-      "import"
-    , n
-    , case imports of
-        OpenImport ->
-          T.empty
-        OnlyImport quals ->
-          "(" <> T.intercalate ", " (fmap unName quals) <> ")"
-    ]
+  case imports of
+    OpenImport ->
+      "import " <> n
+    OnlyImport funs ->
+      "import " <> n <> " (" <> T.intercalate ", " (fmap unName funs) <> ")"
+    ImportQualified ->
+      "import qualified " <> n
 
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
   T.unpack (T.replace "." "/" n) <> ".purs"
+
+htmlRuntime :: ModuleName
+htmlRuntime =
+  ModuleName "Projector.Html.Runtime"
+
 
 -- -----------------------------------------------------------------------------
 

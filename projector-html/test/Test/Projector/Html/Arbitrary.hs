@@ -10,7 +10,6 @@ import           Data.Generics.Aliases
 import           Data.Generics.Schemes
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import           Data.Text.Arbitrary ()
 
@@ -22,7 +21,6 @@ import           P
 import           Projector.Core
 import           Projector.Html
 import           Projector.Html.Data.Annotation
-import           Projector.Html.Data.Backend
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim as Prim
 import           Projector.Html.Data.Template
@@ -50,7 +48,7 @@ genWellTypedHtmlModule n decls = do
   let ourDecls = subtractTypes decls htmlTypes
   modl <- Module
     <$> pure ourDecls
-    <*> pure (M.fromList [(htmlRuntime, OpenImport)])
+    <*> pure mempty
     <*> genWellTypedLetrec n (decls <> htmlTypes) (fst <$> constructorFunctions ourDecls) (genHtmlType decls) genWellTypedHtmlLit
   either
     (\e -> (fail ("invariant: module was not well-typed!\n" <> show e)))

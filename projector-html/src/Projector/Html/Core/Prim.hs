@@ -7,14 +7,27 @@ module Projector.Html.Core.Prim (
     types
   , tBool
   , dBool
+  -- * Primitive functions
+  , exprs
+  -- ** String append
+  , nStringAppend
+  , tStringAppend
+  , eStringAppend
+  -- ** String concat
+  , nStringConcat
+  , tStringConcat
+  , eStringConcat
+
   ) where
 
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
 import           P
 
 import           Projector.Core
 
+import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 
 
@@ -22,6 +35,13 @@ types :: HtmlDecls
 types =
   TypeDecls $ M.fromList [
       (nBool, dBool)
+    ]
+
+exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, Annotation a))
+exprs =
+  M.fromList [
+      (nStringAppend, (tStringAppend, eStringAppend))
+    , (nStringConcat, (tStringConcat, eStringConcat))
     ]
 
 
@@ -39,3 +59,41 @@ dBool =
       (Constructor "True", [])
     , (Constructor "False", [])
     ]
+
+
+-- -----------------------------------------------------------------------------
+
+nStringAppend :: Name
+nStringAppend =
+  Name "append"
+
+tStringAppend :: HtmlType
+tStringAppend =
+  TArrow (TLit TString) (TArrow (TLit TString) (TLit TString))
+
+eStringAppend :: HtmlExpr (HtmlType, Annotation a)
+eStringAppend =
+  EForeign (tStringAppend, aStringAppend) nStringAppend tStringAppend
+
+aStringAppend :: Annotation a
+aStringAppend =
+  LibraryFunction nStringAppend
+
+-- -----------------------------------------------------------------------------
+-- TODO could probably implement this first class using append at some point
+
+nStringConcat :: Name
+nStringConcat =
+  Name "concat"
+
+tStringConcat :: HtmlType
+tStringConcat =
+  TArrow (TList (TLit TString)) (TLit TString)
+
+eStringConcat :: HtmlExpr (HtmlType, Annotation a)
+eStringConcat =
+  EForeign (tStringConcat, aStringConcat) nStringConcat tStringConcat
+
+aStringConcat :: Annotation a
+aStringConcat =
+  LibraryFunction nStringConcat
