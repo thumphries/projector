@@ -84,15 +84,15 @@ swapLibTypes ty =
     TArrow t2 t3 ->
       TArrow (swapLibTypes t2) (swapLibTypes t3)
     TVar (TypeName "Html") ->
-      TVar (TypeName "Hydrant.Html")
+      TVar (TypeName "Projector.Html.Runtime.Html")
     TVar (TypeName "Attribute") ->
-      TVar (TypeName "Hydrant.Attribute")
+      TVar (TypeName "Projector.Html.Runtime.Attribute")
     TVar (TypeName "AttributeKey") ->
-      TVar (TypeName "Hydrant.AttributeKey")
+      TVar (TypeName "Projector.Html.Runtime.AttributeKey")
     TVar (TypeName "AttributeValue") ->
-      TVar (TypeName "Hydrant.AttributeValue")
+      TVar (TypeName "Projector.Html.Runtime.AttributeValue")
     TVar (TypeName "Tag") ->
-      TVar (TypeName "Hydrant.Tag")
+      TVar (TypeName "Projector.Html.Runtime.Tag")
     TVar (TypeName "Bool") ->
       TVar (TypeName "Projector.Html.Runtime.Bool")
     _ ->
