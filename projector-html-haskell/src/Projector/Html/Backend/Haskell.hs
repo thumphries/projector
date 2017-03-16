@@ -122,7 +122,6 @@ renderModule mn@(ModuleName n) m = do
       importText = fmap (uncurry genImport) imports
       imports =
         (htmlRuntime, ImportQualified)
-          : (hydrant, ImportQualified)
           : M.toList (moduleImports m')
   decls <- fmap (fmap (T.pack . TH.pprint)) (genModule m')
   pure (genFileName mn, T.unlines $ mconcat [
@@ -161,10 +160,6 @@ genFileName (ModuleName n) =
 htmlRuntime :: ModuleName
 htmlRuntime =
   ModuleName "Projector.Html.Runtime"
-
-hydrant :: ModuleName
-hydrant =
-  ModuleName "Hydrant"
 
 -- -----------------------------------------------------------------------------
 -- | Type declarations.
@@ -271,7 +266,7 @@ genExp expr =
     EMap _ f g -> do
       f' <- genExp f
       g' <- genExp g
-      pure (applyE (varE (mkName_ "fmap")) [f', g'])
+      pure (applyE (varE (mkName_ "Projector.Html.Runtime.fmap")) [f', g'])
 
 -- | Compile a Projector record projection to Haskell.
 --

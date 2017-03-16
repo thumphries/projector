@@ -51,6 +51,7 @@ prop_hello_world =
                 moduleTypes = mempty
               , moduleImports = M.fromList [
                     (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
+                  , (ModuleName "Hydrant", ImportQualified)
                   ]
               , moduleExprs = M.fromList [
                     helloWorld

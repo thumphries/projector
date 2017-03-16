@@ -38,6 +38,8 @@ module Projector.Core.Syntax (
   , pcon
   , pcon_
   -- * AST traversals
+  , mapFree
+  , traverseFree
   , foldFree
   , gatherFree
   , patternBinds
@@ -53,6 +55,7 @@ module Projector.Core.Syntax (
 
 import           Control.Monad.Trans.Cont (cont, runCont)
 
+import           Data.Functor.Identity
 import           Data.Set (Set)
 import qualified Data.Set as S
 
@@ -244,6 +247,50 @@ pcon =
 pcon_ :: Text -> [Pattern ()] -> Pattern ()
 pcon_ =
   pcon . Constructor
+
+mapFree :: (Name -> Name) -> Expr l a -> Expr l a
+mapFree f =
+  runIdentity . traverseFree (pure . f)
+
+traverseFree :: Applicative f => (Name -> f Name) -> Expr l a -> f (Expr l a)
+traverseFree f' expr' =
+  go f' mempty expr'
+  where
+    go f bound expr =
+      case expr of
+        ELit _ _ ->
+          pure expr
+
+        EVar a x ->
+          if S.member x bound then pure expr else EVar a <$> f x
+
+        ELam a x t g ->
+          ELam a x t <$> go f (S.insert x bound) g
+
+        EApp a t u ->
+          EApp a <$> go f bound t <*> go f bound u
+
+        ECon a c t es ->
+          ECon a c t <$> traverse (go f bound) es
+
+        ECase a e pes ->
+          ECase a <$> go f bound e <*> traverse (traverse (go f bound)) pes
+
+        ERec a n fes ->
+          ERec a n <$> traverse (traverse (go f bound)) fes
+
+        EPrj a e fn ->
+          EPrj a <$> go f bound e <*> pure fn
+
+        EList a es ->
+          EList a <$> traverse (go f bound) es
+
+        EMap a t u ->
+          EMap a <$> go f bound t <*> go f bound u
+
+        EForeign a b c ->
+          pure (EForeign a b c)
+
 
 -- | Strict fold over free variables, including foreign definitions.
 foldFree :: (b -> Name -> b) -> b -> Expr l a -> b
