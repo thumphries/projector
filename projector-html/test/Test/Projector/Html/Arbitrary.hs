@@ -8,6 +8,7 @@ module Test.Projector.Html.Arbitrary where
 
 import           Data.Generics.Aliases
 import           Data.Generics.Schemes
+import qualified Data.List as L
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
@@ -211,7 +212,7 @@ genTemplateExpr :: Int -> Jack (TExpr ())
 genTemplateExpr k =
   let j = k `div` 2
       nonrec = [
-          TEVar () <$> (TId <$> elements muppets)
+          TEVar () <$> genTId
         ]
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
@@ -223,6 +224,13 @@ genTemplateExpr k =
         , TEPrj () <$> genTemplateExpr j <*> genField
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
+
+genTId :: Jack TId
+genTId =
+  TId <$> oneOf [
+      elements muppets
+    , elements (L.zipWith (\a b -> a <> "/" <> b) cooking muppets)
+    ]
 
 genTemplateAlts :: Int -> Jack (NonEmpty (TAlt ()))
 genTemplateAlts j = do
