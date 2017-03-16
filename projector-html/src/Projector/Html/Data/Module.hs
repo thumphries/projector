@@ -19,6 +19,7 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import           P
 
@@ -30,7 +31,8 @@ newtype ModuleName = ModuleName { unModuleName :: Text }
 
 moduleNameAppend :: ModuleName -> ModuleName -> ModuleName
 moduleNameAppend (ModuleName a) (ModuleName b) =
-  ModuleName (a <> "." <> b)
+  ModuleName $
+    if T.null b then a else a <> "." <> b
 
 -- TODO might need another datatype, this bakes in a number of
 -- assumptions about the backend.
