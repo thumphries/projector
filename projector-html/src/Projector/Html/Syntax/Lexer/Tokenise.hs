@@ -402,7 +402,7 @@ exprConId =
 
 exprVarId :: Parser Token
 exprVarId =
-  fmap (ExprVarId . T.pack) ((:) <$> P.lowerChar <*> many (P.alphaNumChar <|> P.char '/'))
+  fmap (ExprVarId . T.pack) ((:) <$> P.lowerChar <*> many (P.alphaNumChar <|> P.char '/' <|> P.char '-'))
 
 exprHtmlStart :: Parser Token
 exprHtmlStart =
