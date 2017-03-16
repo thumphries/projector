@@ -13,7 +13,9 @@ module Projector.Html (
   , BuildArtefacts (..)
   , DataModuleName (..)
   , UserDataTypes (..)
+  , TemplateNameMap
   , ModuleNamer (..)
+  , CodeGenNamer (..)
   , ModuleGraph (..)
   , HB.ModuleName (..)
   -- * Useful template and module utils
@@ -35,6 +37,7 @@ module Projector.Html (
   , HtmlModules
   , HtmlExpr
   , moduleNamerSimple
+  , codeGenNamerSimple
   ) where
 
 
@@ -179,12 +182,14 @@ checkModules decls known exprs =
 -- | Generate code for a provided backend.
 --
 -- TODO This should be a lazy stream instead of Either. Either limits throughput.
-codeGen :: HB.Backend SrcAnnotation e -> BuildArtefacts -> Either [e] [(FilePath, Text)]
-codeGen backend (BuildArtefacts checked) = do
+codeGen :: HB.Backend SrcAnnotation e -> CodeGenNamer -> BuildArtefacts -> Either [e] [(FilePath, Text)]
+codeGen backend cgn (BuildArtefacts nmap checked) = do
   -- Run the backend's validation predicates
   validateModules backend checked
+  -- Apply the CodeGenNamer
+  let renamed = with checked (codeGenRename nmap cgn)
   -- Generate code.
-  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) checked)
+  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) renamed)
 
 codeGenModule ::
      HB.Backend a e
@@ -193,6 +198,13 @@ codeGenModule ::
   -> Either e (FilePath, Text)
 codeGenModule =
   HB.renderModule
+
+-- | Apply a 'CodeGenNamer' to some module.
+codeGenRename :: TemplateNameMap -> CodeGenNamer -> HB.Module a b c -> HB.Module a b c
+codeGenRename (TemplateNameMap nmap) cgn (HB.Module ts is es) =
+  let renameDef n = maybe n (uncurry (templateNameToBackendName cgn n)) (M.lookup n nmap)
+      renameVal n = maybe n (uncurry (templateDefToBackendDef cgn n)) (M.lookup n nmap)
+  in HB.Module ts is $ with (M.mapKeys renameDef es) (fmap (PC.mapFree renameVal))
 
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
@@ -213,7 +225,8 @@ newtype RawTemplates = RawTemplates {
   } deriving (Eq, Ord, Show)
 
 data BuildArtefacts = BuildArtefacts {
-    buildArtefactsHtmlModules :: HtmlModules
+    buildArtefactsNameMap :: TemplateNameMap
+  , buildArtefactsHtmlModules :: HtmlModules
   } deriving (Eq, Show)
 
 type HtmlModules = Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
@@ -231,6 +244,21 @@ data ModuleNamer = ModuleNamer {
   , filePathToExprName  :: FilePath -> PC.Name
   }
 
+-- | All the generated names for templates.
+newtype TemplateNameMap = TemplateNameMap {
+    unTemplateNameMap :: Map PC.Name (HB.ModuleName, FilePath)
+  } deriving (Eq, Ord, Show, Monoid)
+
+addToTemplateNameMap :: PC.Name -> HB.ModuleName -> FilePath -> TemplateNameMap -> TemplateNameMap
+addToTemplateNameMap n mn fp =
+  TemplateNameMap . M.insert n (mn, fp) . unTemplateNameMap
+
+-- | Turns generated template names (used in syntax) into the backend's preferred names.
+data CodeGenNamer = CodeGenNamer {
+    templateDefToBackendDef :: PC.Name -> HB.ModuleName -> FilePath -> PC.Name
+  , templateNameToBackendName :: PC.Name -> HB.ModuleName -> FilePath -> PC.Name
+  }
+
 -- | Run a complete build from start to finish, with no caching of artefacts.
 --
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
@@ -241,12 +269,12 @@ runBuild b udt rts =
 runBuildIncremental :: Build -> UserDataTypes -> HtmlModules -> RawTemplates -> Either [HtmlError] BuildArtefacts
 runBuildIncremental (Build mnr mdm) (UserDataTypes decls) hms rts = do
   -- Build the module map
-  (mg, mmap) <- smush mdm mnr hms rts
-  -- Check it for cycles
+  (mg, nmap, mmap) <- smush mdm mnr hms rts
+  -- Check it for import cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  fmap BuildArtefacts $ first pure (checkModules decls (HB.extractModuleBindings hms) mmap)
+  BuildArtefacts nmap <$> first pure (checkModules decls (HB.extractModuleBindings hms) mmap)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
@@ -272,7 +300,7 @@ warnModules decls mods =
 -- * we do one template per module right now
 -- * the expression names are derived from the filepath
 -- * the module name is also derived from the filepath
--- * we expect all user datatypes to be exported from a single module
+-- * we currently expect all user datatypes to be exported from a single module
 smush ::
      [DataModuleName]
   -> ModuleNamer
@@ -280,22 +308,27 @@ smush ::
   -> RawTemplates
   -> Either
        [HtmlError]
-       (ModuleGraph, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
+       (ModuleGraph, TemplateNameMap, Map HB.ModuleName (HB.Module () PrimT SrcAnnotation))
 smush mdm mnr hms (RawTemplates templates) = do
   let
     known = fmap (M.keysSet . HB.moduleExprs) hms
-  mmap <- fmap (deriveImportsIncremental known . M.fromList) . sequenceEither . with templates $ \(fp, body) -> do
-    ast <- first (:[]) (parseTemplate fp body)
-    let core = Elab.elaborate ast
-        modn = pathToModuleName mnr fp
-        expn = filePathToExprName mnr fp
-    pure (modn, HB.Module {
-        HB.moduleTypes = mempty
-      , HB.moduleImports = M.fromList $
-          fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
-      , HB.moduleExprs = M.singleton expn ((), core)
-      })
-  pure (buildModuleGraph mmap, mmap)
+    mkmod (nmap, acc) (fp, body) = do
+      ast <- first (:[]) (parseTemplate fp body)
+      let core = Elab.elaborate ast
+          modn = pathToModuleName mnr fp
+          expn = filePathToExprName mnr fp
+          res = (modn,  HB.Module {
+              HB.moduleTypes = mempty
+            , HB.moduleImports = M.fromList $
+                fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
+            , HB.moduleExprs = M.singleton expn ((), core)
+            })
+      pure (addToTemplateNameMap expn modn fp nmap, res:acc)
+  -- Produce a module for each template and build up the template name map
+  (nmap, modls) <- foldM mkmod mempty templates
+  -- Derive the module map and its import graph
+  let mmap = deriveImportsIncremental known (M.fromList modls)
+  pure (buildModuleGraph mmap, nmap, mmap)
 
 -- | Provide a default naming scheme for modules and function names
 moduleNamerSimple :: Maybe HB.ModuleName -> ModuleNamer
@@ -347,3 +380,9 @@ filePathToExprNameSimple =
     goLower (x:xs)
       | Char.isAlphaNum x = Char.toLower x : go xs
       | otherwise = goLower xs
+
+codeGenNamerSimple :: CodeGenNamer
+codeGenNamerSimple =
+  CodeGenNamer
+    (\n _ _ -> n)
+    (\n _ _ -> n)
