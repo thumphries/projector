@@ -241,6 +241,8 @@ exprTokens expr =
         , exprTokens e
         , [ExprDot, ExprIdent fn, ExprRParen]
         ]
+    TEHole _ ->
+      [ExprHole]
 
 stringTokens :: TIString a -> DList (Token)
 stringTokens (TIString _ ss) =

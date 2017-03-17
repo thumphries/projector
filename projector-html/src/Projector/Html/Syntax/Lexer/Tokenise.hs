@@ -332,6 +332,7 @@ exprToken =
   <|> exprStart
   <|> exprEnd
   <|> exprHtmlStart
+  <|> exprHole
   <|> exprConId
   <|> exprVarId
 
@@ -383,6 +384,10 @@ exprEach =
 exprDot :: Parser Token
 exprDot =
   char '.' *> pure ExprDot
+
+exprHole :: Parser Token
+exprHole =
+  char '_' *> pure ExprHole
 
 exprLamStart :: Parser Token
 exprLamStart =

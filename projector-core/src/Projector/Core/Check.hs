@@ -63,6 +63,7 @@ data TypeError l a
   | ExtraRecordField TypeName FieldName (Type l, a) a
   | DuplicateRecordFields TypeName [FieldName] a
   | InferenceError a
+  | TypeHole (Type l, a) a
   | RecordInferenceError [(FieldName, Type l)] a
   | InfiniteType (Type l, a) (Type l, a)
 
@@ -156,6 +157,7 @@ typeTree decls expr = do
 -- Looks a bit like regular types, extended with unification variables.
 data IType l a
   = IDunno a Int
+  | IHole a Int (Maybe (IType l a))
   | IVar a TypeName -- maybe remove?
   | ILit a l
   | IArrow a (IType l a) (IType l a)
@@ -203,6 +205,10 @@ lowerIType ity =
   case ity of
     IDunno a _ ->
       Left (InferenceError a)
+    IHole a _ Nothing ->
+      Left (InferenceError a)
+    IHole a _ (Just i) ->
+      Left (TypeHole (flattenIType i) a)
     ILit _ l ->
       pure (TLit l)
     IVar _ tn ->
@@ -235,6 +241,8 @@ flattenIType ity =
   , case ity of
       IDunno a _ ->
         a
+      IHole a _ _ ->
+        a
       ILit a _ ->
         a
       IVar a _ ->
@@ -252,6 +260,8 @@ flattenIType' :: IType l a -> Type l
 flattenIType' ity =
   case ity of
     IDunno _ x ->
+      TVar (dunnoTypeVar x)
+    IHole _ x _ ->
       TVar (dunnoTypeVar x)
     IVar _ tn ->
       TVar tn
@@ -349,6 +359,10 @@ nextUnificationVar =
 freshTypeVar :: a -> Check l a (IType l a)
 freshTypeVar a =
   IDunno a <$> nextUnificationVar
+
+freshTypeHole :: a -> Check l a (IType l a)
+freshTypeHole a =
+  IHole a <$> nextUnificationVar <*> pure Nothing
 
 freshOpenRecord :: a -> Fields l a -> Check l a (IType l a)
 freshOpenRecord a fs =
@@ -568,6 +582,10 @@ generateConstraints' decls expr =
       -- We know the type of foreign expressions immediately, because they're annotated.
       pure (EForeign (hoistType decls a ty, a) n ty)
 
+    EHole a -> do
+      ty <- freshTypeHole a
+      pure (EHole (ty, a))
+
 -- | Patterns are binding sites that also introduce lots of new constraints.
 patternConstraints ::
      Ground l
@@ -609,22 +627,31 @@ newtype Substitutions l a
 substitute :: Ground l => Substitutions l a -> Expr l (IType l a, a) -> Expr l (IType l a, a)
 substitute subs expr =
   with expr $ \(ty, a) ->
-    (substituteType subs ty, a)
+    (substituteType subs True ty, a)
 
-substituteType :: Ground l => Substitutions l a -> IType l a -> IType l a
-substituteType subs ty =
+substituteType :: Ground l => Substitutions l a -> Bool -> IType l a -> IType l a
+substituteType subs top ty =
   case ty of
     IDunno _ x ->
-      maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
+      maybe ty (substituteType subs False) (M.lookup x (unSubstitutions subs))
+
+    IHole a x _ ->
+      maybe
+        ty
+        (\sty ->
+          if top
+          then IHole a x (Just sty)
+          else substituteType subs False sty)
+        (M.lookup x (unSubstitutions subs))
 
     IArrow a t1 t2 ->
-      IArrow a (substituteType subs t1) (substituteType subs t2)
+      IArrow a (substituteType subs False t1) (substituteType subs False t2)
 
     IList a t ->
-      IList a (substituteType subs t)
+      IList a (substituteType subs False t)
 
     IOpenRecord _ x _ ->
-      maybe ty (substituteType subs) (M.lookup x (unSubstitutions subs))
+      maybe ty (substituteType subs False) (M.lookup x (unSubstitutions subs))
 
     IClosedRecord _ _ _ ->
       ty
@@ -661,6 +688,12 @@ mguST points t1 t2 =
       unifyVar points a x t2
 
     (_, IDunno a x) -> do
+      unifyVar points a x t1
+
+    (IHole a x _, _) -> do
+      unifyVar points a x t2
+
+    (_, IHole a x _) -> do
       unifyVar points a x t1
 
     (IOpenRecord a x fs, IOpenRecord b y gs) -> do
@@ -727,9 +760,11 @@ occurs a q ity =
     go x i =
       case i of
         IDunno _ y ->
-          if x == y
-            then Left (InfiniteType (flattenIType (IDunno a x)) (flattenIType ity))
-            else pure ()
+          when (x == y)
+            (Left (InfiniteType (flattenIType (IDunno a x)) (flattenIType ity)))
+        IHole _ y _ ->
+          when (x == y)
+            (Left (InfiniteType (flattenIType (IDunno a x)) (flattenIType ity)))
         IVar _ _ ->
           pure ()
         ILit _ _ ->

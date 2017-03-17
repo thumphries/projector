@@ -308,6 +308,7 @@ expr node' = mdo
     <|> exprList expr2
     <|> exprString expr2
     <|> exprVar
+    <|> exprHole
     <|> exprParens expr2
   pat1 <- pattern
   pure expr2
@@ -358,6 +359,11 @@ exprVar =
       pure (TEVar a (TId t))
     _ ->
       empty
+
+exprHole :: Rule r (TExpr Range)
+exprHole =
+  TEHole
+    <$> token ExprHole
 
 exprList :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprList expr' =

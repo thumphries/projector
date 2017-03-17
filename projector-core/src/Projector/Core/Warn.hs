@@ -72,6 +72,8 @@ warnShadowing bound expr =
         EMap _ f g -> do
           go bound' f
           go bound' g
+        EHole _ ->
+          pure ()
 
 -- -----------------------------------------------------------------------------
 -- Pattern exhaustivity

@@ -108,6 +108,8 @@ nf' expr = do
       pure expr'
     EForeign _ _ _ ->
       pure expr'
+    EHole _ ->
+      pure expr'
 
 -- | Beta reduction. Evaluate one step.
 beta :: Expr l a -> FixT (Eval l a) (Expr l a)
@@ -171,6 +173,8 @@ beta expr =
     ERec _ _ _ ->
       pure expr
     EList _ _ ->
+      pure expr
+    EHole _ ->
       pure expr
 
 match :: Expr l a -> [(Pattern a, Expr l a)] -> Maybe (Map Name (Expr l a), Expr l a)
@@ -294,6 +298,8 @@ subst' subs free expr =
     ELit _ _ ->
       pure expr
     EForeign _ _ _ ->
+      pure expr
+    EHole _ ->
       pure expr
 
 patSubst :: Map Name (Expr l a) -> Set Name -> Pattern a -> Expr l a -> FixT (Eval l a) (Pattern a, Expr l a)

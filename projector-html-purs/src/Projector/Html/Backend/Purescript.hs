@@ -43,6 +43,7 @@ purescriptBackend =
 
 data PurescriptError
   = RecordTypeInvariant
+  | TypeHolePresent
   deriving (Eq, Ord, Show)
 
 renderPurescriptError :: PurescriptError -> Text
@@ -50,6 +51,8 @@ renderPurescriptError e =
   case e of
     RecordTypeInvariant ->
       "BUG: Invariant failure - expected a record type, but found something else."
+    TypeHolePresent ->
+      "BUG: Type hole was present for code generation. Should have been a type error."
 
 predicates :: [Predicate PurescriptError]
 predicates = [
@@ -203,6 +206,9 @@ genExp expr =
 
     EForeign a (Name n) _ ->
       pure (WL.annotate a (text n))
+
+    EHole _ ->
+      Left TypeHolePresent
 
 fieldInst :: FieldName -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
 fieldInst (FieldName fn) expr = do

@@ -129,6 +129,8 @@ eExpr expr =
       EList (ListLiteral a) (fmap eExpr es)
     TEPrj a e (TId fn) ->
       EPrj (RecordProjection a (FieldName fn)) (eExpr e) (FieldName fn)
+    TEHole a ->
+      EHole (TypedHole a)
 
 
 eStr :: TIString a -> HtmlExpr (Annotation a)
