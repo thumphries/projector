@@ -59,6 +59,8 @@ uglyPrintTemplate =
           " "
         PatLParen ->
           " "
+        ExprHole ->
+          " "
         _ ->
           mempty
     post x =
