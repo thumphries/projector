@@ -83,8 +83,7 @@ genTemplate :: Jack (Template ())
 genTemplate =
   sized $ \k -> do
     j <- chooseInt (1, k+1)
-    Template () <$> genTemplateTypeSig <*>
-      fmap (everywhere (mkT mergePlain)) (genHtml j)
+    Template () <$> genTemplateTypeSig <*> genTemplateExpr j
 
 genTemplateTypeSig :: Jack (Maybe (TTypeSig ()))
 genTemplateTypeSig = do
@@ -104,8 +103,8 @@ genTVar =
 genHtml :: Int -> Jack (THtml ())
 genHtml k =
   let j = k `div` 2 in
-  THtml () <$>
-  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genPlain, genHtmlExpr j])
+  THtml () . everywhere (mkT mergePlain) <$>
+  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genHtmlExpr j])
 
 genElement :: Int -> Jack (TNode ())
 genElement k =
@@ -144,6 +143,8 @@ mangle =
   . T.replace "\n" "b"
   . T.replace "\t" "c"
   . T.replace "\\" "\\\\"
+  . T.replace "(" "e"
+  . T.replace ")" "f"
 
 genHtmlExpr :: Int -> Jack (TNode ())
 genHtmlExpr k =
@@ -231,6 +232,7 @@ genTemplateExpr k =
         , TEEach () <$> genTemplateExpr j <*> genTemplateExpr j
         , TEList () <$> listOfN 0 (j `div` 2) (genTemplateExpr (j `div` 2))
         , TEPrj () <$> genTemplateExpr j <*> genField
+        , TENode () <$> genHtml j
         ]
   in if k <= 2 then oneOf nonrec else oneOf recc
 

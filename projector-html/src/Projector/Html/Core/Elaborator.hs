@@ -20,8 +20,8 @@ import           Projector.Html.Data.Template
 
 
 elaborate :: Template a -> HtmlExpr (Annotation a)
-elaborate (Template _ mts html) =
-  eTypeSigs mts (eHtml html)
+elaborate (Template _ mts expr) =
+  eTypeSigs mts (eExpr expr)
 
 elaborateSig :: Template a -> Maybe HtmlType
 elaborateSig (Template _ mts _) = do
@@ -128,10 +128,8 @@ eExpr expr =
         EMap (SourceAnnotation a) (eExpr g) (eExpr f)
     TEString _ s ->
       eStr s
-    TENode a e ->
-      ECon (HtmlBlock a) (Constructor "Nested") Lib.nHtml [
-          EList (HtmlBlock a) [eNode e]
-        ]
+    TENode _ e ->
+      eHtml e
     TEList a es ->
       EList (ListLiteral a) (fmap eExpr es)
     TEPrj a e (TId fn) ->
