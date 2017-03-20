@@ -296,22 +296,24 @@ htmlCommentText =
 
 expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
 expr node' = mdo
+  expr3 <- E.rule $
+        exprApp expr3 expr2
+    <|> exprEach expr3 expr2
+    <|> expr2
   expr2 <- E.rule $
-        exprApp expr2 expr1
-    <|> exprEach expr2 expr1
+        exprPrj expr2
     <|> expr1
   expr1 <- E.rule $
-        exprLam expr2
-    <|> exprCase expr2 pat1
-    <|> exprPrj expr2
+        exprLam expr3
+    <|> exprCase expr3 pat1
     <|> exprHtml node'
-    <|> exprList expr2
-    <|> exprString expr2
+    <|> exprList expr3
+    <|> exprString expr3
     <|> exprVar
     <|> exprHole
-    <|> exprParens expr2
+    <|> exprParens expr3
   pat1 <- pattern
-  pure expr2
+  pure expr3
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
