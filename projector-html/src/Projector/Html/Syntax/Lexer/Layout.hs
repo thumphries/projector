@@ -61,19 +61,11 @@ applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : Newline :@ _ : xs
 applyLayout' (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : xs) =
   end : applyLayout' ms il ss xs
 
--- Drop whitespace in the type signature
+-- Drop whitespace and newlines in the type signature
 applyLayout' mms@(TypeSigMode : _) il ss (Whitespace _ :@ _ : xs) =
   applyLayout' mms il ss xs
-
--- Separators can be injected on newline where needed
-applyLayout' mms@(TypeSigMode : _) il ss (Newline :@ a : xs) =
-  TypeSigSep :@ a : applyLayout' mms il ss xs
-
--- ... but they're not needed when they're explicit:
-applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Newline :@ _ : xs) =
-  sep : applyLayout' mms il ss xs
-applyLayout' mms@(TypeSigMode : _) il ss (sep@(TypeSigSep :@ _) : Whitespace _ :@ _ : Newline :@ _ : xs) =
-  sep : applyLayout' mms il ss xs
+applyLayout' mms@(TypeSigMode : _) il ss (Newline :@ _ : xs) =
+  applyLayout' mms il ss xs
 
 
 --

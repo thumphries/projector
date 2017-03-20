@@ -191,11 +191,11 @@ typeSig =
 
 typeSigSep :: Parser Token
 typeSigSep =
-  char ';' *> pure TypeSigSep
+  string "->" *> pure TypeSigSep
 
 typeSigEnd :: Parser Token
 typeSigEnd =
-  string "->" *> pure TypeSigEnd <* pop
+  char '=' *> pure TypeSigEnd <* pop
 
 
 -- -----------------------------------------------------------------------------
