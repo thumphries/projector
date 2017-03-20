@@ -20,7 +20,7 @@ import           Projector.Html.Data.Prim
 
 rewriteModule :: ModuleName -> Module HtmlType PrimT a -> (ModuleName, Module HtmlType PrimT a)
 rewriteModule mn (Module tys imports exprs) =
-  let exprs' = fmap (\(ty, e) -> (ty, rewriteFix (globalRules <> rules) e)) exprs
+  let exprs' = fmap (\(ModuleExpr ty e) -> ModuleExpr ty (rewriteFix (globalRules <> rules) e)) exprs
   in (mn, Module tys imports exprs')
 
 rewriteExpr :: Expr PrimT a -> Expr PrimT a

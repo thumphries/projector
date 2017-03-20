@@ -69,7 +69,7 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-modulePropCheck :: ModuleName -> Module HtmlType PrimT SrcAnnotation -> Property
+modulePropCheck :: ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
 modulePropCheck mn modl@(Module tys _ _) =
   uncurry ghcProp . either (fail . T.unpack) id $ do
     modl' <- first Html.renderHtmlError (Html.checkModule tys modl)
