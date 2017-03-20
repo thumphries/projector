@@ -131,12 +131,13 @@ checkExprIncremental decls known =
     first HtmlCoreError
   . fmap (fmap (PC.whnf toSubstitute))
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
-  . HC.typeCheckIncremental decls (conFunTypes <> libraryExprs <> (M.mapKeys PC.Name known))
+  . HC.typeCheckIncremental decls allSigs
   . M.singleton (PC.Name "it")
   where
     conFunTypes = HC.constructorFunctionTypes decls
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
+    allSigs = conFunTypes <> libraryExprs <> M.mapKeys PC.Name known
 
 checkModule ::
      HtmlDecls
@@ -155,7 +156,7 @@ checkModule decls (HB.Module typs imps exps) = do
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allDecls = decls <> typs
-    allSigs = conFunTypes <> exprTypes
+    allSigs = conFunTypes <> libraryExprs <> exprTypes
     exprs = fmap HB.meExpr exps
 
 -- | Figure out the dependency order of a set of modules, then
@@ -167,10 +168,11 @@ checkModules ::
   -> Either HtmlError (Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)))
 checkModules decls known exprs =
   -- FIX Check for duplicate function names here somewhere
-  first HtmlCoreError (fmap fst (foldM fun (mempty, conFunTypes <> libraryExprs <> known) deps))
+  first HtmlCoreError (fmap fst (foldM fun (mempty, initialKnown) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
     conFunTypes = HC.constructorFunctionTypes decls
+    initialKnown = conFunTypes <> libraryExprs <> known
     --
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
