@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Elaborator (
     elaborate
+  , elaborateSig
   ) where
 
 
@@ -21,6 +22,15 @@ import           Projector.Html.Data.Template
 elaborate :: Template a -> HtmlExpr (Annotation a)
 elaborate (Template _ mts html) =
   eTypeSigs mts (eHtml html)
+
+elaborateSig :: Template a -> Maybe HtmlType
+elaborateSig (Template _ mts _) = do
+  TTypeSig _ msigs ty <- mts
+  case msigs of
+    Nothing ->
+      Just (eType ty)
+    Just sigs ->
+      Just (foldr (\(_, u) t -> TArrow (eType u) t) (eType ty) sigs)
 
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
 eTypeSigs mmsigs =

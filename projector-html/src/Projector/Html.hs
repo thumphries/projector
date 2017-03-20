@@ -327,14 +327,15 @@ smush mdm mnr hms (RawTemplates templates) = do
     known = fmap (M.keysSet . HB.moduleExprs) hms
     mkmod (nmap, acc) (fp, body) = do
       ast <- first (:[]) (parseTemplate fp body)
-      let core = Elab.elaborate ast
+      let esig = Elab.elaborateSig ast
+          core = Elab.elaborate ast
           modn = pathToModuleName mnr fp
           expn = filePathToExprName mnr fp
           res = (modn,  HB.Module {
               HB.moduleTypes = mempty
             , HB.moduleImports = M.fromList $
                 fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
-            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr Nothing core)
+            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
             })
       pure (addToTemplateNameMap expn modn fp nmap, res:acc)
   -- Produce a module for each template and build up the template name map
