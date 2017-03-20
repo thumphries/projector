@@ -41,6 +41,8 @@ module Projector.Html (
   ) where
 
 
+import           Control.Comonad
+
 import qualified Data.Char as Char
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -112,8 +114,10 @@ checkTemplateIncremental ::
   -> Map Text (HtmlType, SrcAnnotation)
   -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
-checkTemplateIncremental decls known =
-  checkExprIncremental decls known . Elab.elaborate
+checkTemplateIncremental decls known t =
+  checkExprIncremental decls (known <> tcon) (Elab.elaborate t)
+  where
+    tcon = maybe mempty (\ty -> M.singleton defaultName (ty, TypeSignature (extract t))) (Elab.elaborateSig t)
 
 checkExpr ::
      HtmlDecls
@@ -130,14 +134,17 @@ checkExprIncremental ::
 checkExprIncremental decls known =
     first HtmlCoreError
   . fmap (fmap (PC.whnf toSubstitute))
-  . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
+  . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name defaultName)))
   . HC.typeCheckIncremental decls allSigs
-  . M.singleton (PC.Name "it")
+  . M.singleton (PC.Name defaultName)
   where
     conFunTypes = HC.constructorFunctionTypes decls
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allSigs = conFunTypes <> libraryExprs <> M.mapKeys PC.Name known
+
+defaultName :: Text
+defaultName = "it"
 
 checkModule ::
      HtmlDecls
