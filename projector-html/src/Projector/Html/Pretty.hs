@@ -78,23 +78,41 @@ uglyPrintTemplate =
 
 testTemplate :: Template ()
 testTemplate =
-  Template ()
-    (Just (TTypeSig () ((TId "foo", (TTVar () (TId "Bar"))) :|
-                        [(TId "bar", (TTVar () (TId "Baz")))])))
-    (THtml () [
-        TElement () (TTag () "h1") [
-            TAttribute ()
-              (TAttrName "display")
-              (TQuotedAttrValue () (TIString () [TStringChunk () "inline-block"]))
-          ] (THtml () [
-           TPlain () (TPlainText "Hello, world!")
-          ])
-      , TExprNode () (TEApp () (TEVar () (TId "foo")) (TEVar () (TId "bar")))
-      , TExprNode () (TECase () (TEVar () (TId "foo")) (
-          (TAlt () (TPCon () (TConstructor "Foo") [TPVar () (TId "x")])
-                   (TEVar () (TId "x")))
-          :| []))
-      ])
+  Template
+    ()
+    (Just
+       (TTypeSig
+          ()
+          (Just
+             [ (TId "foo", (TTVar () (TId "Bar")))
+             , (TId "bar", (TTVar () (TId "Baz")))
+             ])
+          (TTVar () (TId "Quux"))))
+    (THtml
+       ()
+       [ TElement
+           ()
+           (TTag () "h1")
+           [ TAttribute
+               ()
+               (TAttrName "display")
+               (TQuotedAttrValue
+                  ()
+                  (TIString () [TStringChunk () "inline-block"]))
+           ]
+           (THtml () [TPlain () (TPlainText "Hello, world!")])
+       , TExprNode () (TEApp () (TEVar () (TId "foo")) (TEVar () (TId "bar")))
+       , TExprNode
+           ()
+           (TECase
+              ()
+              (TEVar () (TId "foo"))
+              ((TAlt
+                  ()
+                  (TPCon () (TConstructor "Foo") [TPVar () (TId "x")])
+                  (TEVar () (TId "x"))) :|
+               []))
+       ])
 
 -- -----------------------------------------------------------------------------
 -- Template to tokens
@@ -106,14 +124,17 @@ templateTokens (Template _ mts html) =
   <> htmlTokens html
 
 typeSigTokens :: TTypeSig a -> DList (Token)
-typeSigTokens (TTypeSig _ idts) =
+typeSigTokens (TTypeSig _ idts ty) =
   mconcat [
       [TypeSigsStart]
-    , mconcat . L.intersperse [TypeSigsSep] . NE.toList . with idts $ \((TId tid), tty) ->
-        mconcat [
-            [TypeIdent tid, TypeSigSep]
-          , typeTokens tty
-          ]
+    , mconcat . L.intersperse [TypeSigsSep] $
+        fromMaybe mempty . with idts . fmap $ \((TId tid), tty) ->
+          mconcat [
+              [TypeIdent tid, TypeSigSep]
+            , typeTokens tty
+            ]
+    , maybe mempty (const [TypeSigsSep]) idts
+    , typeTokens ty
     , [TypeSigsEnd]
     ]
 

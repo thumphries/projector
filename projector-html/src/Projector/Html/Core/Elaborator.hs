@@ -23,9 +23,11 @@ elaborate (Template _ mts html) =
   eTypeSigs mts (eHtml html)
 
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
-eTypeSigs msigs =
-  mcase msigs id $ \(TTypeSig a sigs) ->
-    foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id sigs
+eTypeSigs mmsigs =
+  mcase mmsigs id $ \(TTypeSig a msigs _ty) ->
+    -- We ignore the RHS of the type signature here, though it produces a constraint elsewhere.
+    mcase msigs id $
+      foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id
 
 eType :: TType a -> HtmlType
 eType ty =
