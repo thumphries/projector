@@ -94,12 +94,7 @@ genTemplateTypeSig = do
       pure Nothing
     _ ->
       fmap Just . TTypeSig ()
-        <$> oneOf [
-                fmap Just $ do
-                  listOfN 1 k
-                    ((,) <$> (TId <$> elements muppets) <*> genTVar)
-              , pure Nothing
-              ]
+        <$> listOfN 0 k ((,) <$> (TId <$> elements muppets) <*> genTVar)
         <*> genTVar
 
 genTVar :: Jack (TType ())

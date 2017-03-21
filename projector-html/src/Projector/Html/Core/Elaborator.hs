@@ -25,19 +25,14 @@ elaborate (Template _ mts html) =
 
 elaborateSig :: Template a -> Maybe HtmlType
 elaborateSig (Template _ mts _) = do
-  TTypeSig _ msigs ty <- mts
-  case msigs of
-    Nothing ->
-      Just (eType ty)
-    Just sigs ->
-      Just (foldr (\(_, u) t -> TArrow (eType u) t) (eType ty) sigs)
+  TTypeSig _ sigs ty <- mts
+  Just (foldr (\(_, u) t -> TArrow (eType u) t) (eType ty) sigs)
 
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
 eTypeSigs mmsigs =
-  mcase mmsigs id $ \(TTypeSig a msigs _ty) ->
+  mcase mmsigs id $ \(TTypeSig a sigs _ty) ->
     -- We ignore the RHS of the type signature here, though it produces a constraint elsewhere.
-    mcase msigs id $
-      foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id
+    foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id sigs
 
 eType :: TType a -> HtmlType
 eType ty =

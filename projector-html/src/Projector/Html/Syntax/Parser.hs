@@ -120,7 +120,7 @@ typeSig1 type' =
 
 typeSigN :: Rule r (TType Range) -> Rule r (TId, TType Range) -> Rule r (TTypeSig Range)
 typeSigN type' sig' =
-  (\ss ty -> TTypeSig (foldMap (extract . snd) ss) (if ss == [] then empty else pure ss) ty)
+  (\ss ty -> TTypeSig (foldMap (extract . snd) ss) ss ty)
     <$> many sig'
     <*> type'
 

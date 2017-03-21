@@ -57,7 +57,7 @@ instance Comonad Template where
 
 data TTypeSig a
   -- TODO fix location info here, should be per sig
-  = TTypeSig a (Maybe [(TId, TType a)]) (TType a)
+  = TTypeSig a [(TId, TType a)] (TType a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 setTTypeSigAnnotation :: a -> TTypeSig a -> TTypeSig a
@@ -70,7 +70,7 @@ instance Comonad TTypeSig where
   extract (TTypeSig a _ _) =
     a
   extend f ts@(TTypeSig _ tss ty) =
-    TTypeSig (f ts) (fmap (fmap (fmap (extend (const (f ts))))) tss) (extend (const (f ts)) ty)
+    TTypeSig (f ts) (fmap (fmap (extend (const (f ts)))) tss) (extend (const (f ts)) ty)
 
 data TType a
   = TTVar a TId

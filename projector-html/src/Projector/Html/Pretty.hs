@@ -83,10 +83,9 @@ testTemplate =
     (Just
        (TTypeSig
           ()
-          (Just
-             [ (TId "foo", (TTVar () (TId "Bar")))
-             , (TId "bar", (TTVar () (TId "Baz")))
-             ])
+          [ (TId "foo", (TTVar () (TId "Bar")))
+          , (TId "bar", (TTVar () (TId "Baz")))
+          ]
           (TTVar () (TId "Quux"))))
     (THtml
        ()
@@ -128,12 +127,12 @@ typeSigTokens (TTypeSig _ idts ty) =
   mconcat [
       [TypeSigsStart]
     , mconcat . L.intersperse [TypeSigsSep] $
-        fromMaybe mempty . with idts . fmap $ \((TId tid), tty) ->
+        with idts $ \((TId tid), tty) ->
           mconcat [
               [TypeIdent tid, TypeSigSep]
             , typeTokens tty
             ]
-    , maybe mempty (const [TypeSigsSep]) idts
+    , if null idts then mempty else [TypeSigsSep]
     , typeTokens ty
     , [TypeSigsEnd]
     ]
