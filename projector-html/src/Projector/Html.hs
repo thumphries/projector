@@ -41,6 +41,8 @@ module Projector.Html (
   ) where
 
 
+import           Control.Comonad
+
 import qualified Data.Char as Char
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -112,8 +114,10 @@ checkTemplateIncremental ::
   -> Map Text (HtmlType, SrcAnnotation)
   -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
-checkTemplateIncremental decls known =
-  checkExprIncremental decls known . Elab.elaborate
+checkTemplateIncremental decls known t =
+  checkExprIncremental decls (known <> tcon) (Elab.elaborate t)
+  where
+    tcon = maybe mempty (\ty -> M.singleton defaultName (ty, TypeSignature (extract t))) (Elab.elaborateSig t)
 
 checkExpr ::
      HtmlDecls
@@ -130,14 +134,17 @@ checkExprIncremental ::
 checkExprIncremental decls known =
     first HtmlCoreError
   . fmap (fmap (PC.whnf toSubstitute))
-  . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name "it")))
+  . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name defaultName)))
   . HC.typeCheckIncremental decls allSigs
-  . M.singleton (PC.Name "it")
+  . M.singleton (PC.Name defaultName)
   where
     conFunTypes = HC.constructorFunctionTypes decls
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allSigs = conFunTypes <> libraryExprs <> M.mapKeys PC.Name known
+
+defaultName :: Text
+defaultName = "it"
 
 checkModule ::
      HtmlDecls
@@ -327,14 +334,15 @@ smush mdm mnr hms (RawTemplates templates) = do
     known = fmap (M.keysSet . HB.moduleExprs) hms
     mkmod (nmap, acc) (fp, body) = do
       ast <- first (:[]) (parseTemplate fp body)
-      let core = Elab.elaborate ast
+      let esig = Elab.elaborateSig ast
+          core = Elab.elaborate ast
           modn = pathToModuleName mnr fp
           expn = filePathToExprName mnr fp
           res = (modn,  HB.Module {
               HB.moduleTypes = mempty
             , HB.moduleImports = M.fromList $
                 fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
-            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr Nothing core)
+            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
             })
       pure (addToTemplateNameMap expn modn fp nmap, res:acc)
   -- Produce a module for each template and build up the template name map

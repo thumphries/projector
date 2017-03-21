@@ -1,3 +1,4 @@
+-- These are the tokens used by the old pretty-printer. These need to go soon!
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Token (
@@ -14,8 +15,8 @@ import P
 data Token
   -- Type sigs
   = TypeSigsStart   -- \
-  | TypeSigsSep     -- [;\n]
-  | TypeSigsEnd     -- ->
+  | TypeSigsSep     -- [->]
+  | TypeSigsEnd     -- =
   | TypeSigSep      -- :
   | TypeIdent Text  -- foo | Foo
   | TypeLParen      -- (
@@ -69,8 +70,8 @@ renderToken :: Token -> Text
 renderToken tok =
   case tok of
     TypeSigsStart   -> "\\"
-    TypeSigsSep     -> ";"
-    TypeSigsEnd     -> "->"
+    TypeSigsSep     -> "->"
+    TypeSigsEnd     -> "="
     TypeSigSep      -> ":"
     TypeIdent t     -> t
     TypeLParen      -> "("

@@ -27,8 +27,8 @@ data LexerMode =
 data Token =
   -- Type signatures (OLD FORMAT)
     TypeSigStart          -- \
-  | TypeSigSep            -- ;
-  | TypeSigEnd            -- ->
+  | TypeSigSep            -- ->
+  | TypeSigEnd            -- =
   | TypeSig               -- :
   | TypeIdent Text        -- foo | Foo
   | TypeLParen            -- (
@@ -81,8 +81,8 @@ renderToken tok =
   case tok of
     -- Type signatures (OLD FORMAT)
     TypeSigStart          -> "\\"
-    TypeSigSep            -> ";"
-    TypeSigEnd            -> "->"
+    TypeSigSep            -> "->"
+    TypeSigEnd            -> "="
     TypeSig               -> ":"
     TypeIdent t           -> t
     TypeLParen            -> "("

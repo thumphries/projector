@@ -98,7 +98,7 @@ template' tsig' html' =
 
 typeSignatures :: Grammar r (TTypeSig Range)
 typeSignatures = mdo
-  sigs <- E.rule (typeSigN sig)
+  sigs <- E.rule (typeSigN type2 sig)
   sig <- E.rule (typeSig1 type2)
   type2 <- E.rule $
         typeApp type2 type1
@@ -112,15 +112,17 @@ typeSig sigs' =
 
 typeSig1 :: Rule r (TType Range) -> Rule r (TId, TType Range)
 typeSig1 type' =
-  (\a _ b -> (a, b))
+  (\a _ b _ -> (a, b))
     <$> fmap (TId . extractPositioned) sigIdent
     <*> token TypeSig
     <*> type'
+    <*> token TypeSigSep
 
-typeSigN :: Rule r (TId, TType Range) -> Rule r (TTypeSig Range)
-typeSigN sig' =
-  (\ss -> TTypeSig (foldMap (extract . snd) ss) ss)
-    <$> sepBy1 sig' (token TypeSigSep)
+typeSigN :: Rule r (TType Range) -> Rule r (TId, TType Range) -> Rule r (TTypeSig Range)
+typeSigN type' sig' =
+  (\ss ty -> TTypeSig (foldMap (extract . snd) ss) ss ty)
+    <$> many sig'
+    <*> type'
 
 typeSigType :: Rule r (TType Range) -> Rule r (TType Range)
 typeSigType type' =

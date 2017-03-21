@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Elaborator (
     elaborate
+  , elaborateSig
   ) where
 
 
@@ -22,9 +23,15 @@ elaborate :: Template a -> HtmlExpr (Annotation a)
 elaborate (Template _ mts html) =
   eTypeSigs mts (eHtml html)
 
+elaborateSig :: Template a -> Maybe HtmlType
+elaborateSig (Template _ mts _) = do
+  TTypeSig _ sigs ty <- mts
+  Just (foldr (\(_, u) t -> TArrow (eType u) t) (eType ty) sigs)
+
 eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
-eTypeSigs msigs =
-  mcase msigs id $ \(TTypeSig a sigs) ->
+eTypeSigs mmsigs =
+  mcase mmsigs id $ \(TTypeSig a sigs _ty) ->
+    -- We ignore the RHS of the type signature here, though it produces a constraint elsewhere.
     foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id sigs
 
 eType :: TType a -> HtmlType

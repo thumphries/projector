@@ -10,7 +10,6 @@ import           Data.Generics.Aliases
 import           Data.Generics.Schemes
 import qualified Data.List as L
 import           Data.List.NonEmpty  (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import           Data.Text.Arbitrary ()
 
@@ -94,10 +93,13 @@ genTemplateTypeSig = do
     0 ->
       pure Nothing
     _ ->
-      fmap (pure . TTypeSig () . NE.fromList) $ do
-        listOfN 1 k
-          ((,) <$> (TId <$> elements muppets) <*>
-           ((TTVar () . TId . T.toTitle) <$> elements waters))
+      fmap Just . TTypeSig ()
+        <$> listOfN 0 k ((,) <$> (TId <$> elements muppets) <*> genTVar)
+        <*> genTVar
+
+genTVar :: Jack (TType ())
+genTVar =
+  (TTVar () . TId . T.toTitle) <$> elements waters
 
 genHtml :: Int -> Jack (THtml ())
 genHtml k =
