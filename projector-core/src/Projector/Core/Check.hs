@@ -620,7 +620,7 @@ patternConstraints decls ty pat =
         Just (tn, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
-          let ty' = IVar a tn
+          let ty' = hoistType decls a (TVar tn)
           addConstraint (Equal ty' ty)
           pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) (uncurry (patternConstraints decls))
           pure (PCon (ty', a) c pats')
