@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 module Projector.Html (
     HtmlError (..)
   , renderHtmlError
@@ -13,6 +14,10 @@ module Projector.Html (
   , BuildArtefacts (..)
   , DataModuleName (..)
   , UserDataTypes (..)
+  , UserConstants (..)
+  , userConstants
+  , PlatformConstants (..)
+  , platformConstants
   , TemplateNameMap
   , ModuleNamer (..)
   , CodeGenNamer (..)
@@ -148,9 +153,10 @@ defaultName = "it"
 
 checkModule ::
      HtmlDecls
+  -> Map PC.Name (HtmlType, SrcAnnotation)
   -> HB.Module (Maybe HtmlType) PrimT SrcAnnotation
   -> Either HtmlError (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
-checkModule decls (HB.Module typs imps exps) = do
+checkModule decls known (HB.Module typs imps exps) = do
   exps' <-
     bimap HtmlCoreError (fmap (uncurry HB.ModuleExpr))
       (HC.typeCheckIncremental allDecls allSigs exprs)
@@ -163,7 +169,7 @@ checkModule decls (HB.Module typs imps exps) = do
     conFunExprs = HC.constructorFunctions decls
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allDecls = decls <> typs
-    allSigs = conFunTypes <> libraryExprs <> exprTypes
+    allSigs = conFunTypes <> libraryExprs <> exprTypes <> known
     exprs = fmap HB.meExpr exps
 
 -- | Figure out the dependency order of a set of modules, then
@@ -200,12 +206,17 @@ checkModules decls known exprs =
 -- | Generate code for a provided backend.
 --
 -- TODO This should be a lazy stream instead of Either. Either limits throughput.
-codeGen :: HB.Backend SrcAnnotation e -> CodeGenNamer -> BuildArtefacts -> Either [e] [(FilePath, Text)]
-codeGen backend cgn (BuildArtefacts nmap checked) = do
+codeGen ::
+     HB.Backend SrcAnnotation e
+  -> CodeGenNamer
+  -> PlatformConstants
+  -> BuildArtefacts
+  -> Either [e] [(FilePath, Text)]
+codeGen backend cgn pcons (BuildArtefacts nmap checked) = do
   -- Run the backend's validation predicates
   validateModules backend checked
-  -- Apply the CodeGenNamer
-  let renamed = with checked (codeGenRename nmap cgn)
+  -- Apply the CodeGenNamer and substitute any platform constants
+  let renamed = with checked (substPlatformConstants pcons . codeGenRename nmap cgn)
   -- Generate code.
   fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) renamed)
 
@@ -225,6 +236,17 @@ codeGenRename (TemplateNameMap nmap) cgn (HB.Module ts is es) =
   in HB.Module ts is . with (M.mapKeys renameDef es) $ \(HB.ModuleExpr a x) ->
        HB.ModuleExpr a (PC.mapFree renameVal x)
 
+substPlatformConstants ::
+     PlatformConstants
+  -> HB.Module b PrimT (HtmlType, SrcAnnotation)
+  -> HB.Module b PrimT (HtmlType, SrcAnnotation)
+substPlatformConstants pcons (HB.Module ts is es) =
+  HB.Module ts is . with es $ \(HB.ModuleExpr a x) ->
+    HB.ModuleExpr a (PC.substitute (platformConstants pcons) x)
+
+platformConstants :: PlatformConstants -> Map PC.Name (HtmlExpr (HtmlType, SrcAnnotation))
+platformConstants (PlatformConstants pcons) =
+  M.mapWithKey (\k -> fmap (, Constant k)) pcons
 
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
@@ -264,6 +286,14 @@ data ModuleNamer = ModuleNamer {
   , filePathToExprName  :: FilePath -> PC.Name
   }
 
+newtype UserConstants = UserConstants {
+    unUserConstants :: Map PC.Name HtmlType
+  } deriving (Eq, Ord, Show, Monoid)
+
+newtype PlatformConstants = PlatformConstants {
+    unPlatformConstants :: Map PC.Name (HtmlExpr HtmlType)
+  } deriving (Eq, Ord, Show, Monoid)
+
 -- | All the generated names for templates.
 newtype TemplateNameMap = TemplateNameMap {
     unTemplateNameMap :: Map PC.Name (HB.ModuleName, FilePath)
@@ -282,19 +312,31 @@ data CodeGenNamer = CodeGenNamer {
 -- | Run a complete build from start to finish, with no caching of artefacts.
 --
 -- TODO return partial results when we bomb out. 'These'-esque datatype.
-runBuild :: Build -> UserDataTypes -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuild b udt rts =
-  runBuildIncremental b udt mempty rts
+runBuild ::
+     Build
+  -> UserDataTypes
+  -> UserConstants
+  -> RawTemplates
+  -> Either [HtmlError] BuildArtefacts
+runBuild b udt ucons rts =
+  runBuildIncremental b udt ucons mempty rts
 
-runBuildIncremental :: Build -> UserDataTypes -> HtmlModules -> RawTemplates -> Either [HtmlError] BuildArtefacts
-runBuildIncremental (Build mnr mdm) (UserDataTypes decls) hms rts = do
+runBuildIncremental ::
+     Build
+  -> UserDataTypes
+  -> UserConstants
+  -> HtmlModules
+  -> RawTemplates
+  -> Either [HtmlError] BuildArtefacts
+runBuildIncremental (Build mnr mdm) (UserDataTypes decls) ucons hms rts = do
   -- Build the module map
   (mg, nmap, mmap) <- smush mdm mnr hms rts
   -- Check it for import cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
+  let known = HB.extractModuleBindings hms <> userConstants ucons
   -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  BuildArtefacts nmap <$> first pure (checkModules decls (HB.extractModuleBindings hms) mmap)
+  BuildArtefacts nmap <$> first pure (checkModules decls known mmap)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
@@ -314,6 +356,10 @@ warnModules decls mods =
       shadowing = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnShadowing binds) exprs))
       exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity decls) exprs))
   in shadowing *> exhaustiv
+
+userConstants :: UserConstants -> Map PC.Name (HtmlType, SrcAnnotation)
+userConstants (UserConstants ucons) =
+  M.mapWithKey (\n ty -> (ty, Constant n)) ucons
 
 -- | Produce the initial module map from a set of template inputs.
 -- Note that:

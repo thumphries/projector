@@ -57,7 +57,7 @@ prop_hello_world =
                     helloWorld
                   ]
               }
-        modl' <- first Html.renderHtmlError (Html.checkModule mempty modl)
+        modl' <- first Html.renderHtmlError (Html.checkModule mempty mempty modl)
         first renderHaskellError (Html.codeGenModule haskellBackend (ModuleName "Main") modl')
 
 prop_welltyped :: Property
@@ -72,7 +72,7 @@ prop_welltyped =
 modulePropCheck :: ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
 modulePropCheck mn modl@(Module tys _ _) =
   uncurry ghcProp . either (fail . T.unpack) id $ do
-    modl' <- first Html.renderHtmlError (Html.checkModule tys modl)
+    modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
     first renderHaskellError (Html.codeGenModule haskellBackend mn modl')
 
 moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, SrcAnnotation) -> Property

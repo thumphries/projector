@@ -33,6 +33,7 @@ data Annotation a
   | ListLiteral a
   | RecordProjection a FieldName
   | TypedHole a
+  | Constant Name
   deriving (Eq, Ord, Show)
 
 type SrcAnnotation = Annotation Range
@@ -78,3 +79,5 @@ renderAnnotation f ann =
       f r <> " in a record projection '" <> fn <> "'"
     TypedHole r ->
       f r <> " in a hole '_'"
+    Constant (Name n) ->
+      "In a constant '" <> n <> "'"
