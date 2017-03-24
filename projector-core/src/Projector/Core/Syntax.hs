@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -59,6 +60,8 @@ import           Data.Functor.Identity
 import           Data.Set (Set)
 import qualified Data.Set as S
 
+import           GHC.Generics (Generic)
+
 import           P
 
 import           Projector.Core.Type
@@ -84,11 +87,12 @@ data Expr l a
   | EMap a (Expr l a) (Expr l a)
   | EForeign a Name (Type l)
   | EHole a
-  deriving (Functor, Foldable, Traversable)
+  deriving (Functor, Foldable, Traversable, Generic)
 
 deriving instance (Ground l, Eq a) => Eq (Expr l a)
 deriving instance (Ground l, Show a) => Show (Expr l a)
 deriving instance (Ground l, Ord a) => Ord (Expr l a)
+instance (Ground l, NFData l, NFData (Value l), NFData a) => NFData (Expr l a)
 
 extractAnnotation :: Expr l a -> a
 extractAnnotation e =
@@ -150,13 +154,13 @@ setAnnotation a e =
 {-# INLINE setAnnotation #-}
 
 newtype Name = Name { unName :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | Pattern matching. Note that these are necessarily recursive.
 data Pattern a
   = PVar a Name
   | PCon a Constructor [Pattern a]
-  deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic, NFData)
 
 extractPatternAnnotation :: Pattern a -> a
 extractPatternAnnotation p =

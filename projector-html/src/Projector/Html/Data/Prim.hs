@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -19,6 +21,8 @@ module Projector.Html.Data.Prim (
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
+import           GHC.Generics (Generic)
+
 import           P
 
 import           Projector.Core
@@ -36,12 +40,12 @@ type HtmlWarning a = Warning PrimT a
 
 data PrimT
   = TString
-  deriving (Eq, Ord, Enum, Bounded, Read, Show)
+  deriving (Eq, Ord, Enum, Bounded, Read, Show, Generic, NFData)
 
 instance Ground PrimT where
   data Value PrimT
     = VString Text
-    deriving (Eq, Ord, Read, Show)
+    deriving (Eq, Ord, Read, Show, Generic, NFData)
 
   typeOf v = case v of
     VString _ -> TString

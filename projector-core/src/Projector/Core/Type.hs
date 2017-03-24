@@ -1,7 +1,8 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -36,12 +37,14 @@ module Projector.Core.Type (
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
+import           GHC.Generics (Generic)
+
 import           P
 
 
 -- | Types.
 newtype Type l = Type (TypeF l (Type l))
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 pattern TLit l = Type (TLitF l)
 pattern TVar x = Type (TVarF x)
@@ -54,11 +57,9 @@ data TypeF l a
   | TVarF TypeName
   | TArrowF a a
   | TListF a
-  deriving (Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
 
-deriving instance (Eq l, Eq a) => Eq (TypeF l a)
-deriving instance (Ord l, Ord a) => Ord (TypeF l a)
-deriving instance (Show l, Show a) => Show (TypeF l a)
+instance (NFData l, NFData a) => NFData (TypeF l a)
 
 -- | Swap out the ground type.
 mapGroundType :: Ground l => Ground m => (l -> m) -> Type l -> Type m
@@ -80,7 +81,7 @@ mapGroundType tmap (Type ty) =
 data Decl l
   = DVariant [(Constructor, [Type l])]
   | DRecord [(FieldName, Type l)]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | The class of user-supplied primitive types.
 class (Eq l, Ord l, Show l, Eq (Value l), Ord (Value l), Show (Value l)) => Ground l where
@@ -91,19 +92,19 @@ class (Eq l, Ord l, Show l, Eq (Value l), Ord (Value l), Show (Value l)) => Grou
 
 -- | A type's name.
 newtype TypeName = TypeName { unTypeName :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | A constructor's name.
 newtype Constructor  = Constructor { unConstructor :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | A record field's name.
 newtype FieldName = FieldName { unFieldName :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- | Type contexts.
 newtype TypeDecls l = TypeDecls { unTypeDecls :: Map TypeName (Decl l) }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 instance Ord l => Monoid (TypeDecls l) where
   mempty = TypeDecls mempty

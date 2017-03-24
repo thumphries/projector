@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -47,7 +48,7 @@ import           P
 
 data Template a
   = Template a (Maybe (TTypeSig a)) (TExpr a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad Template where
   extract (Template a _ _) =
@@ -58,7 +59,7 @@ instance Comonad Template where
 data TTypeSig a
   -- TODO fix location info here, should be per sig
   = TTypeSig a [(TId, TType a)] (TType a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 setTTypeSigAnnotation :: a -> TTypeSig a -> TTypeSig a
 setTTypeSigAnnotation a ts =
@@ -75,7 +76,7 @@ instance Comonad TTypeSig where
 data TType a
   = TTVar a TId
   | TTApp a (TType a) (TType a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 setTTypeAnnotation :: a -> TType a -> TType a
 setTTypeAnnotation a ty =
@@ -101,7 +102,7 @@ instance Comonad TType where
 
 data THtml a
   = THtml a [TNode a]
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad THtml where
   extract (THtml a _) =
@@ -117,7 +118,7 @@ data TNode a
   | TPlain a TPlainText
   | TWhiteSpace a
   | TExprNode a (TExpr a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TNode where
   extract node =
@@ -157,7 +158,7 @@ instance Comonad TNode where
 data TAttribute a
   = TAttribute a TAttrName (TAttrValue a)
   | TEmptyAttribute a TAttrName
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TAttribute where
   extract attr =
@@ -176,7 +177,7 @@ instance Comonad TAttribute where
 data TAttrValue a
   = TQuotedAttrValue a (TIString a)
   | TAttrExpr a (TExpr a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TAttrValue where
   extract val =
@@ -200,7 +201,7 @@ data TExpr a
   | TEList a [TExpr a]
   | TEPrj a (TExpr a) TId
   | TEHole a
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TExpr where
   extract expr =
@@ -273,7 +274,7 @@ setTExprAnnotation a expr =
       TEHole a
 
 data TIString a = TIString a [TIChunk a]
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TIString where
   extract (TIString a _) = a
@@ -285,7 +286,7 @@ instance Comonad TIString where
 data TIChunk a
   = TStringChunk a Text
   | TExprChunk a (TExpr a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TIChunk where
   extract chunk =
@@ -303,7 +304,7 @@ instance Comonad TIChunk where
 
 data TAlt a
   = TAlt a (TPattern a) (TExpr a)
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TAlt where
   extract (TAlt a _ _) =
@@ -314,7 +315,7 @@ instance Comonad TAlt where
 data TPattern a
   = TPVar a TId
   | TPCon a TConstructor [TPattern a]
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TPattern where
   extract pat =
@@ -339,7 +340,7 @@ setTPatAnnotation a pat =
       TPCon a b c
 
 data TTag a = TTag a Text
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 instance Comonad TTag where
   extract (TTag a _) =
@@ -350,13 +351,13 @@ instance Comonad TTag where
         TTag (f tag) t
 
 newtype TId = TId { unTId :: Text }
-  deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)
 
 newtype TPlainText = TPlainText { unTPlainText :: Text }
-  deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)
 
 newtype TAttrName = TAttrName { unTAttrName :: Text }
-  deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)
 
 newtype TConstructor = TConstructor { unTConstructor :: Text }
-  deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)

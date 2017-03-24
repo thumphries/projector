@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Annotation (
@@ -6,6 +8,8 @@ module Projector.Html.Data.Annotation (
   , renderAnnotation
   ) where
 
+
+import           GHC.Generics (Generic)
 
 import           P
 
@@ -34,7 +38,7 @@ data Annotation a
   | RecordProjection a FieldName
   | TypedHole a
   | Constant Name
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 type SrcAnnotation = Annotation Range
 

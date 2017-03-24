@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -34,7 +35,7 @@ data Position = Position {
     posLine :: !Int
   , posColumn :: !Int
   , posFile :: !FilePath
-  } deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  } deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)
 
 emptyPosition :: Position
 emptyPosition =
@@ -44,7 +45,7 @@ emptyPosition =
 data Range = Range {
     rangeStart :: !Position
   , rangeEnd :: !Position
-  } deriving (Eq, Ord, Show, Data, Typeable, Generic)
+  } deriving (Eq, Ord, Show, Data, Typeable, Generic, NFData)
 
 instance Semigroup Range where
   (Range a _) <> (Range _ d) = Range a d
@@ -58,7 +59,7 @@ instance Monoid Range where
 -- | A functor for positioned tokens.
 data Positioned a
   = !a :@ !Range
-  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
+  deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable, NFData)
 
 extractPosition :: Positioned a -> Range
 extractPosition (_ :@ b) =
