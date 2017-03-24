@@ -396,7 +396,7 @@ smush mdm mnr hms (RawTemplates templates) = do
             , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
             })
       pure (addToTemplateNameMap expn modn fp mempty, res)
-    eithers = parMap (evalTraversable (evalTraversable rseq)) (uncurry mkmod) templates
+    eithers = fmap (uncurry mkmod) templates `using` parListChunk 10 (evalTraversable (evalTraversable rdeepseq))
   -- Produce a module for each template and build up the template name map
   ers <- sequenceEither eithers
   let nmap = foldMap fst ers
