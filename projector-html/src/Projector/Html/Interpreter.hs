@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Interpreter (
@@ -9,6 +11,8 @@ module Projector.Html.Interpreter (
   ) where
 
 import           Data.Map (Map)
+
+import           GHC.Generics (Generic)
 
 import           P
 
@@ -29,7 +33,7 @@ data Html =
   | Element !Text ![Attribute] !Html
   | VoidElement !Text ![Attribute]
   | Nested ![Html]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Monoid Html where
   mempty =
