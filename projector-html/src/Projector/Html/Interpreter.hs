@@ -59,11 +59,11 @@ instance Monoid Html where
 
 data Attribute =
   Attribute !Text !Text
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 data InterpretError a =
   InterpretInvalidExpression (HtmlExpr a)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 interpret ::
      HtmlDecls
