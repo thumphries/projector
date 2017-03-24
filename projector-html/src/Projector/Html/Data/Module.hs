@@ -1,7 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Data.Module (
     ModuleName (..)
@@ -22,13 +25,15 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Text as T
 
+import           GHC.Generics (Generic)
+
 import           P
 
 import           Projector.Core
 
 
 newtype ModuleName = ModuleName { unModuleName :: Text }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 moduleNameAppend :: ModuleName -> ModuleName -> ModuleName
 moduleNameAppend (ModuleName a) (ModuleName b) =
@@ -41,7 +46,9 @@ data Module b l a = Module {
     moduleTypes :: TypeDecls l
   , moduleImports :: Map ModuleName Imports
   , moduleExprs :: Map Name (ModuleExpr b l a)
-  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+
+instance (Ground l, NFData b, NFData l, NFData (Value l), NFData a) => NFData (Module b l a)
 
 instance Ground l => Monoid (Module b l a) where
   mempty = Module mempty mempty mempty
@@ -54,7 +61,9 @@ instance Ground l => Monoid (Module b l a) where
 data ModuleExpr b l a = ModuleExpr {
     meParameter :: b
   , meExpr :: Expr l a
-  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
+  } deriving (Eq, Ord, Show, Functor, Foldable, Traversable, Generic)
+
+instance (Ground l, NFData b, NFData l, NFData (Value l), NFData a) => NFData (ModuleExpr b l a)
 
 -- | The names of all free variables referenced in this module.
 moduleFree :: Module b l a -> Set Name
@@ -78,4 +87,4 @@ data Imports
   = OpenImport
   | OnlyImport [Name]
   | ImportQualified
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)

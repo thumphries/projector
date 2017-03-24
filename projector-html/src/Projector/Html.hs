@@ -383,7 +383,7 @@ smush ::
 smush mdm mnr hms (RawTemplates templates) = do
   let
     known = fmap (M.keysSet . HB.moduleExprs) hms
-    mkmod (nmap, acc) (fp, body) = do
+    mkmod fp body = do
       ast <- first (:[]) (parseTemplate fp body)
       let esig = Elab.elaborateSig ast
           core = Elab.elaborate ast
@@ -395,11 +395,13 @@ smush mdm mnr hms (RawTemplates templates) = do
                 fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
             , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
             })
-      pure (addToTemplateNameMap expn modn fp nmap, res:acc)
+      pure (addToTemplateNameMap expn modn fp mempty, res)
+    eithers = parMap (evalTraversable (evalTraversable rdeepseq)) (uncurry mkmod) templates
   -- Produce a module for each template and build up the template name map
-  (nmap, modls) <- foldM mkmod mempty templates
-  -- Derive the module map and its import graph
-  let mmap = deriveImportsIncremental known (M.fromListWith (<>) modls)
+  ers <- sequenceEither eithers
+  let nmap = foldMap fst ers
+      -- Derive the module map and its import graph
+      mmap = deriveImportsIncremental known (M.fromListWith (<>) (fmap snd ers))
   pure (buildModuleGraph mmap, nmap, mmap)
 
 -- | Provide a default naming scheme for modules and function names
