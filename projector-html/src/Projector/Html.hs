@@ -220,8 +220,8 @@ codeGen backend cgn pcons (BuildArtefacts nmap checked) = do
         let m1 = codeGenRename nmap cgn m
             m2 = substPlatformConstants pcons m1
         first pure (codeGenModule backend n m2)
-      eithers = fmap (uncurry codegen) modules
-      result = sequenceEither (eithers `using` parTraversable rseq)
+      eithers = parMap rseq (uncurry codegen) modules
+      result = sequenceEither eithers
   result
 
 codeGenModule ::
