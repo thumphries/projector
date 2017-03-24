@@ -139,7 +139,7 @@ checkExprIncremental ::
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
 checkExprIncremental decls known =
     first HtmlCoreError
-  . fmap (fmap (PC.whnf toSubstitute))
+  . fmap (fmap (PC.substitute toSubstitute))
   . (>>= (maybe (Left (HC.HtmlTypeError [])) pure . M.lookup (PC.Name defaultName)))
   . HC.typeCheckIncremental decls allSigs
   . M.singleton (PC.Name defaultName)
@@ -161,7 +161,7 @@ checkModule decls known (HB.Module typs imps exps) = do
   exps' <-
     bimap HtmlCoreError (fmap (uncurry HB.ModuleExpr))
       (HC.typeCheckIncremental allDecls allSigs exprs)
-  let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.whnf toSubstitute expr)
+  let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.substitute toSubstitute expr)
   pure (HB.Module typs imps exps'')
   where
     exprTypes = M.fromList . catMaybes . fmap sequenceA . M.toList $
@@ -199,7 +199,7 @@ checkModules decls known exprs =
             with exps (\(HB.ModuleExpr mt x) -> with mt (\t -> (t, PC.extractAnnotation x)))
       exps' <- fmap (uncurry HB.ModuleExpr)
         <$> HC.typeCheckIncremental (decls <> types) (acc <> esigs) (fmap HB.meExpr exps)
-      let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.whnf toSubstitute expr)
+      let exps'' = with exps' $ \(HB.ModuleExpr ty expr) -> HB.ModuleExpr ty (PC.substitute toSubstitute expr)
           result = HB.Module types imports exps''
           newacc = M.union (fmap (PC.extractAnnotation . HB.meExpr) exps') acc
       pure (M.insert n result res, newacc)
@@ -396,7 +396,7 @@ smush mdm mnr hms (RawTemplates templates) = do
             , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
             })
       pure (addToTemplateNameMap expn modn fp mempty, res)
-    eithers = parMap (evalTraversable (evalTraversable rdeepseq)) (uncurry mkmod) templates
+    eithers = parMap (evalTraversable (evalTraversable rseq)) (uncurry mkmod) templates
   -- Produce a module for each template and build up the template name map
   ers <- sequenceEither eithers
   let nmap = foldMap fst ers
