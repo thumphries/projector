@@ -132,8 +132,8 @@ cinemaBuild b mb msp tg mdg o = do
     let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
     pure (stripPrefix, body)
   -- Run the build
-  ba <- hoistEither (first BuildError (runBuild b udts rts))
-  out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen (getBackend b') codeGenNamerSimple ba))) mb
+  ba <- hoistEither (first BuildError (runBuild b udts mempty rts))
+  out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen (getBackend b') codeGenNamerSimple mempty ba))) mb
   -- Write out any artefacts
   liftIO . for_ out $ \(f, body) -> do
     let ofile = o </> f

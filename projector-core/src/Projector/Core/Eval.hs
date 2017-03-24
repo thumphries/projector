@@ -6,6 +6,7 @@ module Projector.Core.Eval (
   -- * Normalising terms
     whnf
   , nf
+  , substitute
   -- * Fine-grained control
   , Eval
   , runEval
@@ -49,6 +50,11 @@ whnf bnds =
 nf :: Map Name (Expr l a) -> Expr l a -> Expr l a
 nf bnds =
   fst . runEval (EvalState 0) . (nf' <=< substAll bnds)
+
+-- | Safely substitute into an expression.
+substitute :: Map Name (Expr l a) -> Expr l a -> Expr l a
+substitute bnds =
+  fst . runEval (EvalState 0) . substAll bnds
 
 -- -----------------------------------------------------------------------------
 

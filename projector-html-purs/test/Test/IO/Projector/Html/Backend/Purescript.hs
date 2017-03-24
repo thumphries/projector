@@ -62,7 +62,7 @@ moduleProp mn =
 modulePropCheck :: ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
 modulePropCheck mn modl@(Module tys _ _) =
   uncurry pscProp . either (fail . T.unpack) id $ do
-    modl' <- first Html.renderHtmlError (Html.checkModule tys modl)
+    modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
     first renderPurescriptError (Html.codeGenModule purescriptBackend mn modl')
 
 pscProp mname modl =

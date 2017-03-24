@@ -59,7 +59,7 @@ genWellTypedHtmlModule n decls = do
   either
     (\e -> (fail ("invariant: module was not well-typed!\n" <> show e)))
     pure
-    (checkModule ourDecls (fmap (const EmptyAnnotation) modl))
+    (checkModule ourDecls mempty (fmap (const EmptyAnnotation) modl))
 
 genHtmlType :: HtmlDecls -> Jack HtmlType
 genHtmlType ctx =
