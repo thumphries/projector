@@ -81,16 +81,16 @@ type Grammar r a = E.Grammar r (Rule r a)
 template :: Grammar r (Template Range)
 template = mdo
   tsig' <- typeSignatures
-  expr' <- expr node'
+  expr' <- expr html'
   node' <- E.rule (htmlNode expr' html')
   html' <- html node'
-  E.rule (template' tsig' html')
+  E.rule (template' tsig' expr')
 
-template' :: Rule r (TTypeSig Range) -> Rule r (THtml Range) -> Rule r (Template Range)
-template' tsig' html' =
+template' :: Rule r (TTypeSig Range) -> Rule r (TExpr Range) -> Rule r (Template Range)
+template' tsig' expr' =
   (\tsig thtml -> Template (extract thtml) tsig thtml)
     <$> optional tsig'
-    <*> html'
+    <*> expr'
     <?> "template"
 
 
@@ -296,8 +296,11 @@ htmlCommentText =
 
 -- -----------------------------------------------------------------------------
 
-expr :: Rule r (TNode Range) -> Grammar r (TExpr Range)
-expr node' = mdo
+expr :: Rule r (THtml Range) -> Grammar r (TExpr Range)
+expr html' = mdo
+  expr4 <- E.rule $
+        exprHtml html'
+    <|> expr3
   expr3 <- E.rule $
         exprApp expr3 expr2
     <|> exprEach expr3 expr2
@@ -306,25 +309,25 @@ expr node' = mdo
         exprPrj expr2
     <|> expr1
   expr1 <- E.rule $
-        exprLam expr3
-    <|> exprCase expr3 pat1
-    <|> exprHtml node'
-    <|> exprList expr3
-    <|> exprString expr3
+        exprLam expr4
+    <|> exprCase expr4 pat1
+    <|> exprList expr4
+    <|> exprString expr4
     <|> exprVar
     <|> exprHole
-    <|> exprParens expr3
+    <|> exprParens expr4
   pat1 <- pattern
-  pure expr3
+  pure expr4
 
 exprParens :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprParens =
   delimited ExprLParen ExprRParen (\a b -> setTExprAnnotation (a <> b))
 
-exprHtml :: Rule r (TNode Range) -> Rule r (TExpr Range)
-exprHtml node' =
+exprHtml :: Rule r (THtml Range) -> Rule r (TExpr Range)
+exprHtml html' =
   (\n -> TENode (extract n) n)
-    <$> node'
+    <$> html'
+    <?> "HTML"
 
 exprApp :: Rule r (TExpr Range) -> Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprApp expr' expr'' =
@@ -346,6 +349,7 @@ exprLam expr' =
     <*> some' (fmap extractPositioned exprVarId)
     <*> token ExprArrow
     <*> expr'
+    <?> "lambda"
 
 exprPrj :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprPrj expr' =
@@ -356,18 +360,21 @@ exprPrj expr' =
 
 exprVar :: Rule r (TExpr Range)
 exprVar =
-  E.terminal $ \case
-    ExprVarId t :@ a ->
-      pure (TEVar a (TId t))
-    ExprConId t :@ a ->
-      pure (TEVar a (TId t))
-    _ ->
-      empty
+  E.terminal
+    (\case
+       ExprVarId t :@ a ->
+         pure (TEVar a (TId t))
+       ExprConId t :@ a ->
+         pure (TEVar a (TId t))
+       _ ->
+         empty)
+    <?> "variable"
 
 exprHole :: Rule r (TExpr Range)
 exprHole =
   TEHole
     <$> token ExprHole
+    <?> "hole"
 
 exprList :: Rule r (TExpr Range) -> Rule r (TExpr Range)
 exprList expr' =
@@ -375,6 +382,7 @@ exprList expr' =
     <$> token ExprListStart
     <*> sepBy expr' (token ExprListSep)
     <*> token ExprListEnd
+    <?> "list"
 
 exprCase :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (TExpr Range)
 exprCase expr' pat' =
@@ -383,6 +391,7 @@ exprCase expr' pat' =
     <*> expr'
     <*> token ExprCaseOf
     <*> exprAlts expr' pat'
+    <?> "case"
 
 exprAlts :: Rule r (TExpr Range) -> Rule r (TPattern Range) -> Rule r (NonEmpty (TAlt Range))
 exprAlts expr' pat' =

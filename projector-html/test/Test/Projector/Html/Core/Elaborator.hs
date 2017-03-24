@@ -32,7 +32,7 @@ tshow =
 -- unit / regression tests for now, generators are hard
 
 prop_hello =
-  once (elabProp [template|Hello, world!|])
+  once (elabProp [template|<h1>Hello, world!</h1>|])
 
 prop_foo_element =
   once (elabProp [template|\foo : Html -> Html =

@@ -46,7 +46,7 @@ import           P
 
 
 data Template a
-  = Template a (Maybe (TTypeSig a)) (THtml a)
+  = Template a (Maybe (TTypeSig a)) (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad Template where
@@ -195,7 +195,7 @@ data TExpr a
   | TEApp a (TExpr a) (TExpr a)
   | TECase a (TExpr a) (NonEmpty (TAlt a))
   | TEEach a (TExpr a) (TExpr a)
-  | TENode a (TNode a)
+  | TENode a (THtml a)
   | TEString a (TIString a)
   | TEList a [TExpr a]
   | TEPrj a (TExpr a) TId

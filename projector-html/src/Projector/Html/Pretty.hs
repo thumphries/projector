@@ -4,7 +4,6 @@
 module Projector.Html.Pretty (
     uglyPrintTemplate
   , templateTokens
-  , testTemplate
   ) where
 
 
@@ -76,51 +75,14 @@ uglyPrintTemplate =
         _ ->
           mempty
 
-testTemplate :: Template ()
-testTemplate =
-  Template
-    ()
-    (Just
-       (TTypeSig
-          ()
-          [ (TId "foo", (TTVar () (TId "Bar")))
-          , (TId "bar", (TTVar () (TId "Baz")))
-          ]
-          (TTVar () (TId "Quux"))))
-    (THtml
-       ()
-       [ TElement
-           ()
-           (TTag () "h1")
-           [ TAttribute
-               ()
-               (TAttrName "display")
-               (TQuotedAttrValue
-                  ()
-                  (TIString () [TStringChunk () "inline-block"]))
-           ]
-           (THtml () [TPlain () (TPlainText "Hello, world!")])
-       , TExprNode () (TEApp () (TEVar () (TId "foo")) (TEVar () (TId "bar")))
-       , TExprNode
-           ()
-           (TECase
-              ()
-              (TEVar () (TId "foo"))
-              ((TAlt
-                  ()
-                  (TPCon () (TConstructor "Foo") [TPVar () (TId "x")])
-                  (TEVar () (TId "x"))) :|
-               []))
-       ])
-
 -- -----------------------------------------------------------------------------
 -- Template to tokens
 
 templateTokens :: Template a -> [Token]
-templateTokens (Template _ mts html) =
+templateTokens (Template _ mts expr) =
   D.toList $
      maybe mempty typeSigTokens mts
-  <> htmlTokens html
+  <> exprTokens expr
 
 typeSigTokens :: TTypeSig a -> DList (Token)
 typeSigTokens (TTypeSig _ idts ty) =
@@ -247,8 +209,12 @@ exprTokens expr =
         , exprTokens g
         , [ExprRParen]
         ]
-    TENode _ n ->
-      nodeTokens n
+    TENode _ h ->
+      mconcat [
+          [ExprLParen]
+        , htmlTokens h
+        , [ExprRParen]
+        ]
     TEString _ s ->
       stringTokens s
     TEList _ es ->

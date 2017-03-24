@@ -34,13 +34,17 @@ prop_interpret_unit =
      pure $
        h
        ===
-       Nested [
-           Element "a" [] . Nested $ [
-               Whitespace " "
-             , Element "div" [Attribute "id" "a", Attribute "class" "b"] $ Plain "b"
-             ]
+       Nested
+         [ Element
+             "a"
+             []
+             (Element "div"
+               [ Attribute "id" "a"
+               , Attribute "class" "b"
+               ]
+               (Plain "b"))
          , Comment " c "
-         , VoidElement "hr" [Attribute "id" "d"]
+         , VoidElement "hr" [ Attribute "id" "d" ]
          , Raw "e"
          ]
 

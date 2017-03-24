@@ -50,7 +50,7 @@ newtype LexerState = LexerState {
 
 defaultLexerState :: LexerState
 defaultLexerState =
-  LexerState [HtmlMode]
+  LexerState []
 
 peek :: Parser (Maybe LexerMode)
 peek =
@@ -139,8 +139,8 @@ template =
 
 start :: Parser ()
 start =
-      (P.lookAhead (P.try (typeSigStart)) *> push TypeSigMode)
-  <|> push HtmlMode
+      (P.lookAhead (P.try (typeSigStart)) *> push ExprMode *> push TypeSigMode)
+  <|> push ExprMode
 
 token :: Parser Token
 token =
@@ -211,6 +211,7 @@ htmlToken =
   <|> exprCommentStart
   <|> exprStart
   <|> htmlExprEnd
+  <|> htmlRParen
   <|> plainText
 
 tagOpen :: Parser Token
@@ -225,7 +226,8 @@ plainText :: Parser Token
 plainText =
   fmap Plain . escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '{' || p == '}' || p == '\\'
+    p == '\n' || p == ' ' || p == '<' || p == '>' ||
+    p == '{' || p == '}' || p == '\\' || p == '(' || p == ')'
 
 exprStart :: Parser Token
 exprStart =
@@ -238,6 +240,10 @@ htmlExprEnd =
 tagCommentStart :: Parser Token
 tagCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
+
+htmlRParen :: Parser Token
+htmlRParen =
+  char ')' *> pure ExprRParen <* pop
 
 -- -----------------------------------------------------------------------------
 -- HTML comments - these can't be nested, they halt on the first '-->'
@@ -306,7 +312,7 @@ tagCloseToken =
 
 tagCloseClose :: Parser Token
 tagCloseClose =
-  char '>'*> pure TagClose <* pop <* pop
+  char '>' *> pure TagClose <* pop <* pop
 
 -- -----------------------------------------------------------------------------
 -- Expression tokens
@@ -331,6 +337,7 @@ exprToken =
   <|> exprCommentStart
   <|> exprStart
   <|> exprEnd
+  <|> exprHtmlCommentStart
   <|> exprHtmlStart
   <|> exprHole
   <|> exprConId
@@ -411,7 +418,12 @@ exprVarId =
 
 exprHtmlStart :: Parser Token
 exprHtmlStart =
-  char '<' *> pure TagOpen <* push TagOpenMode
+  char '<' *> pure TagOpen <* push HtmlMode <* push TagOpenMode
+
+exprHtmlCommentStart :: Parser Token
+exprHtmlCommentStart =
+  string "<!--" *> pure TagCommentStart <* push HtmlMode <* push HtmlCommentMode
+
 
 -- -----------------------------------------------------------------------------
 -- Expr comments - unlike HTML, these can be nested {- foo {- bar -} baz -}
