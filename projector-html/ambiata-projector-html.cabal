@@ -23,6 +23,7 @@ library
                      , Earley                          == 0.11.*
                      , filepath
                      , megaparsec                      == 5.1.*
+                     , parallel
                      , semigroups                      == 0.18.*
                      , template-haskell                == 2.10.*
                      , text                            == 1.2.*

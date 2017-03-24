@@ -33,7 +33,7 @@ module Projector.Html (
   , checkModules
   , codeGen
   , codeGenModule
-  , validateModules
+  , validateModule
   , warnModules
   -- * Templates
   , Template
@@ -47,6 +47,7 @@ module Projector.Html (
 
 
 import           Control.Comonad
+import           Control.Parallel.Strategies
 
 import qualified Data.Char as Char
 import           Data.Map.Strict (Map)
@@ -213,12 +214,15 @@ codeGen ::
   -> BuildArtefacts
   -> Either [e] [(FilePath, Text)]
 codeGen backend cgn pcons (BuildArtefacts nmap checked) = do
-  -- Run the backend's validation predicates
-  validateModules backend checked
-  -- Apply the CodeGenNamer and substitute any platform constants
-  let renamed = with checked (substPlatformConstants pcons . codeGenRename nmap cgn)
-  -- Generate code.
-  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) renamed)
+  let modules = M.toList checked
+      codegen n m = do
+        validateModule backend m
+        let m1 = codeGenRename nmap cgn m
+            m2 = substPlatformConstants pcons m1
+        first pure (codeGenModule backend n m2)
+      eithers = fmap (uncurry codegen) modules
+      result = sequenceEither (eithers `using` parTraversable rseq)
+  result
 
 codeGenModule ::
      HB.Backend a e
@@ -271,7 +275,8 @@ data BuildArtefacts = BuildArtefacts {
   , buildArtefactsHtmlModules :: HtmlModules
   } deriving (Eq, Show)
 
-type HtmlModules = Map HB.ModuleName (HB.Module HtmlType PrimT (HtmlType, SrcAnnotation))
+type HtmlModules = Map HB.ModuleName HtmlModule
+type HtmlModule = HB.Module HtmlType PrimT (HtmlType, SrcAnnotation)
 
 newtype DataModuleName = DataModuleName {
     unDataModuleName :: HB.ModuleName
@@ -344,9 +349,9 @@ libraryExprs =
   M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
 
 -- | Run a set of backend-specific predicates.
-validateModules :: HB.Backend a e -> Map HB.ModuleName (HB.Module HtmlType PrimT b) -> Either [e] ()
-validateModules backend mods =
-  fmap (const ()) (sequenceEither (with mods (HB.checkModule backend)))
+validateModule :: HB.Backend a e -> HB.Module HtmlType PrimT b -> Either [e] ()
+validateModule backend modl =
+  HB.checkModule backend modl *> pure ()
 
 -- | Look for anything we can warn about.
 warnModules :: HtmlDecls -> HtmlModules -> Either [HtmlError] ()
