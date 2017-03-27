@@ -119,10 +119,11 @@ checkTemplateIncremental ::
   -> Map Text (HtmlType, SrcAnnotation)
   -> Template Range
   -> Either HtmlError (HtmlType, HtmlExpr (HtmlType, SrcAnnotation))
-checkTemplateIncremental decls known t =
-  checkExprIncremental decls (known <> tcon) (Elab.elaborate t)
-  where
-    tcon = maybe mempty (\ty -> M.singleton defaultName (ty, TypeSignature (extract t))) (Elab.elaborateSig t)
+checkTemplateIncremental decls known t = do
+  ast <- first (HtmlCoreError . HC.HtmlElabError) (Elab.elaborate t)
+  sig <- first (HtmlCoreError . HC.HtmlElabError) (Elab.elaborateSig t)
+  let tcon = maybe mempty (\ty -> M.singleton defaultName (ty, TypeSignature (extract t))) sig
+  checkExprIncremental decls (known <> tcon) ast
 
 checkExpr ::
      HtmlDecls
@@ -380,15 +381,15 @@ smush mdm mnr hms (RawTemplates templates) = do
     known = fmap (M.keysSet . HB.moduleExprs) hms
     mkmod (nmap, acc) (fp, body) = do
       ast <- first (:[]) (parseTemplate fp body)
-      let esig = Elab.elaborateSig ast
-          core = Elab.elaborate ast
-          modn = pathToModuleName mnr fp
+      sig <- first (pure . HtmlCoreError . HC.HtmlElabError) (Elab.elaborateSig ast)
+      tex <- first (pure . HtmlCoreError . HC.HtmlElabError) (Elab.elaborate ast)
+      let modn = pathToModuleName mnr fp
           expn = filePathToExprName mnr fp
           res = (modn,  HB.Module {
               HB.moduleTypes = mempty
             , HB.moduleImports = M.fromList $
                 fmap (\(DataModuleName dm) -> (dm, HB.OpenImport)) mdm
-            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr esig core)
+            , HB.moduleExprs = M.singleton expn (HB.ModuleExpr sig tex)
             })
       pure (addToTemplateNameMap expn modn fp nmap, res:acc)
   -- Produce a module for each template and build up the template name map

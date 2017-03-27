@@ -46,6 +46,7 @@ import           Projector.Html.Data.Template (Template)
 
 data CoreError a
   = HtmlTypeError [PC.TypeError PrimT a]
+  | HtmlElabError (Elab.ElaboratorError a)
   deriving (Eq, Show, Ord)
 
 renderCoreError :: (a -> Text) -> (a -> Text) -> CoreError a -> Text
@@ -53,6 +54,8 @@ renderCoreError start end err =
   case err of
     HtmlTypeError tes ->
       T.unlines (fmap (PCP.ppTypeErrorDecorated start end) tes)
+    HtmlElabError e ->
+      Elab.renderElaboratorError start e
 
 renderCoreErrorAnnotation :: (a -> Text) -> CoreError (Annotation a) -> Text
 renderCoreErrorAnnotation f =
@@ -67,8 +70,9 @@ renderCoreWarningAnnotation f =
   renderCoreWarning (\r -> (renderAnnotation f r <> ": ")) (const mempty)
 
 templateToCore :: Template a -> Either (CoreError (Annotation a)) (HtmlType, HtmlExpr (HtmlType, Annotation a))
-templateToCore =
-  typeTree . Elab.elaborate
+templateToCore t = do
+  ast <- first HtmlElabError (Elab.elaborate t)
+  typeTree ast
 
 typeCheck :: HtmlExpr a -> Either (CoreError a) HtmlType
 typeCheck =
