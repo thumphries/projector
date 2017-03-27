@@ -1,7 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Projector.Html.Core.Elaborator (
-    elaborate
+    ElaboratorError (..)
+  , renderElaboratorError
+  , elaborate
   , elaborateSig
   ) where
 
@@ -19,33 +21,54 @@ import qualified Projector.Html.Core.Library as Lib
 import           Projector.Html.Data.Template
 
 
-elaborate :: Template a -> HtmlExpr (Annotation a)
-elaborate (Template _ mts expr) =
-  eTypeSigs mts (eExpr expr)
+data ElaboratorError a =
+    KindError a
+  deriving (Eq, Ord, Show)
 
-elaborateSig :: Template a -> Maybe HtmlType
-elaborateSig (Template _ mts _) = do
-  TTypeSig _ sigs ty <- mts
-  Just (foldr (\(_, u) t -> TArrow (eType u) t) (eType ty) sigs)
+renderElaboratorError :: (a -> Text) -> ElaboratorError a -> Text
+renderElaboratorError f e =
+  case e of
+    KindError a ->
+      -- This error could be better...
+      f a <> "illegal higher-kinded type"
 
-eTypeSigs :: Maybe (TTypeSig a) -> (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
+elaborate :: Template a -> Either (ElaboratorError (Annotation a)) (HtmlExpr (Annotation a))
+elaborate (Template _ mts expr) = do
+  f <- eTypeSigs mts
+  pure (f (eExpr expr))
+
+elaborateSig :: Template a -> Either (ElaboratorError (Annotation a)) (Maybe HtmlType)
+elaborateSig (Template _ mts _) =
+  for mts $ \(TTypeSig _ sigs ty) -> do
+    t0 <- eType ty
+    foldrM (\(_, u) t -> TArrow <$> eType u <*> pure t) t0 sigs
+
+eTypeSigs :: Maybe (TTypeSig a) -> Either (ElaboratorError (Annotation a)) (HtmlExpr (Annotation a) -> HtmlExpr (Annotation a))
 eTypeSigs mmsigs =
-  mcase mmsigs id $ \(TTypeSig a sigs _ty) ->
+  mcase mmsigs (pure id) $ \(TTypeSig a sigs _ty) ->
     -- We ignore the RHS of the type signature here, though it produces a constraint elsewhere.
-    foldl' (\f (TId x, ty) -> f . ELam (TypeSignature a) (Name x) (Just (eType ty))) id sigs
+    foldlM
+      (\f (TId x, ty) -> do
+         t2 <- eType ty
+         pure (f . ELam (TypeSignature a) (Name x) (Just t2)))
+      id
+      sigs
 
-eType :: TType a -> HtmlType
+eType :: TType a -> Either (ElaboratorError (Annotation a)) HtmlType
 eType ty =
   case ty of
     TTVar _ (TId x) ->
       case parsePrimT x of
         Just p ->
-          TLit p
+          pure (TLit p)
         _ ->
-          TVar (TypeName x)
+          pure (TVar (TypeName x))
 
-    TTApp _ f x ->
-      TArrow (eType f) (eType x)
+    TTApp _ (TTVar _ (TId "List")) x ->
+      TList <$> eType x
+
+    TTApp a _ _ ->
+      Left (KindError (TypeSignature a))
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml (THtml a nodes) =
