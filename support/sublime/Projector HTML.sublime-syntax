@@ -1,0 +1,98 @@
+%YAML 1.2
+---
+name: Projector HTML
+file_extensions: [prj]
+scope: source.prj
+
+contexts:
+  main:
+    - match: ^\\
+      scope: punctuation.section.group.begin.prj
+      push: typesig
+    - match: ''
+      push: expr
+  typesig:
+    - match: =
+      scope: punctuation.section.group.end.prj
+      pop: true
+      push: expr
+    - match: '->'
+      scope: punctuation.separator.prj
+    - match: ':'
+      scope: punctuation.separator.prj
+    - match: '[A-Z][a-zA-Z]*'
+      scope: variable.other.constant.prj 
+    - match: '[a-zA-Z0-9/\-_]+'
+      scope: variable.parameter.prj
+  expr:
+    - match: (each|text|blank|case|of)\b
+      scope: keyword.control.prj
+    - match: '[A-Z][A-Za-z0-9/\-_]*'
+      scope: variable.other.constant
+    - match: '[A-Za-z0-9/\-_]+'
+      scope: variable.other.prj
+    - match: \\
+      scope: keyword.control.prj
+      push: lam
+    - match: '->'
+      scope: punctuation.separator.prj
+    - match: ';'
+      scope: punctuation.terminator.prj
+    - match: '{'
+      scope: punctuation.section.group.begin.prj
+      push: expr
+    - match: '}'
+      scope: punctuation.section.group.end.prj
+      pop: true
+    - match: '\['
+      scope: punctuation.section.group.begin.prj
+    - match: '\]'
+      scope: punctuation.section.group.end.prj
+    - match: '"'
+      scope: punctuation.definition.string.begin.prj
+      push: string
+    - match: '<'
+      push: tagopen
+  lam:
+    - match: ->
+      pop: true
+    - match: '[A-Za-z0-9/\-_]+'
+      scope: variable.parameter.prj
+  string:
+    - match: '"'
+      scope: punctuation.definition.string.end.prj
+      pop: true
+    - match: '{'
+      scope: punctuation.section.group.begin.prj
+      push: expr
+    - match: '.*?'
+      scope: string.prj
+  tagopen:
+    - match: '[A-Za-z0-9]+'
+      scope: keyword.control.prj
+      pop: true
+      push: tagopen2
+  tagopen2:
+    - match: '/>'
+      pop: true
+    - match: '>'
+      push: html
+      pop: true
+    - match: '[A-Za-z]+'
+      scope: keyword.control.prj
+    - match: '"'
+      scope: punctuation.definition.string.begin.prj
+      push: string
+  tagclose:
+    - match: '>'
+      pop: true
+  html:
+    - match: '<'
+      push: tagopen
+    - match: '</'
+      push: tagclose
+      pop: true
+    - match: '{'
+      push: expr
+    - match: '[^<]*'
+      scope: text.html.prj
