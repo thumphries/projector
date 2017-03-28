@@ -418,11 +418,11 @@ exprVarId =
 
 exprHtmlStart :: Parser Token
 exprHtmlStart =
-  char '<' *> pure TagOpen <* push HtmlMode <* push TagOpenMode
+  char '<' *> pure TagOpen <* push TagOpenMode
 
 exprHtmlCommentStart :: Parser Token
 exprHtmlCommentStart =
-  string "<!--" *> pure TagCommentStart <* push HtmlMode <* push HtmlCommentMode
+  string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
 
 
 -- -----------------------------------------------------------------------------

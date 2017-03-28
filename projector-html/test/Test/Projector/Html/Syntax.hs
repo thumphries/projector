@@ -114,6 +114,24 @@ regression_brace =
 { baz quux }
 |]
 
+
+prop_parse_unit_case_html =
+  once $ isRight $ templateFromText this regression_case_html
+
+regression_case_html :: Text
+regression_case_html =
+  T.pack [s|{
+  case foo of
+    bar ->
+      <blink>party</blink>
+    baz ->
+      <marquee>cube</marquee>
+      <i>abcdefg</i>
+    Bap ->
+      <b>hell</b>
+      <i>foo</i>
+}|]
+
 this :: [Char]
 this = "Test.Projector.Html.Syntax"
 
