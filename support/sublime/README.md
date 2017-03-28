@@ -2,6 +2,8 @@
 
 This provides some rudimentary `.prj` syntax highlighting for Sublime Text 3.
 
+![](https://cloud.githubusercontent.com/assets/1013429/24392554/257415b0-13e0-11e7-90cb-8fb400509a16.png)
+
 ## Usage
 
 As long as the `Projector HTML.sublime-syntax` file is in `Packages`,
