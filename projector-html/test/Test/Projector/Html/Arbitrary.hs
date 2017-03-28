@@ -104,15 +104,27 @@ genHtml :: Int -> Jack (THtml ())
 genHtml k =
   let j = k `div` 2 in
   THtml () . everywhere (mkT mergePlain) <$>
-  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genHtmlExpr j])
+  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genHtmlExpr j, genHtmlWS j])
+
+genHtmlWS :: Int -> Jack (TNode ())
+genHtmlWS k =
+  (\(THtml () nodes) -> THtmlWS () nodes)
+    <$> genHtml k
 
 genElement :: Int -> Jack (TNode ())
 genElement k =
   let j = k `div` 2 in
-  TElement ()
-    <$> genTag
-    <*> listOfN 0 j (genAttribute (j `div` 2))
-    <*> genHtml j
+  reshrink
+    (\node ->
+      case node of
+        TElement () _tag _attrs (THtml _ nodes) ->
+          nodes
+        _ ->
+          [node])
+    (TElement ()
+      <$> genTag
+      <*> listOfN 0 j (genAttribute (j `div` 2))
+      <*> genHtml (j `div` 2))
 
 genVoidElement :: Int -> Jack (TNode ())
 genVoidElement k =
@@ -270,8 +282,14 @@ genTemplatePattern k =
   in if k <= 2 then oneOf nonrec else oneOf recc
 
 mergePlain :: THtml () -> THtml ()
-mergePlain (THtml a nodes) =
-  THtml a (go nodes)
+mergePlain html =
+  case html of
+    (THtml a nodes) ->
+      THtml a (mergePlain' nodes)
+
+mergePlain' :: [TNode ()] -> [TNode ()]
+mergePlain' =
+  go
   where
     go ((TPlain _ (TPlainText b)) : (TPlain _ (TPlainText c)) : xs) = go (TPlain () (TPlainText (b <> c)) : xs)
     go (x:xs) = x : go xs

@@ -153,7 +153,6 @@ dHtml =
     , (Constructor "Comment", [TLit TString])
     , (Constructor "Plain", [TLit TString])
     , (Constructor "Raw", [TLit TString])
-    , (Constructor "Whitespace", [])
     , (Constructor "Nested", [TList tHtml])
     ]
 

@@ -5,6 +5,7 @@ module Projector.Html.Syntax.Lexer.Tokenise (
     TokenError (..)
   , renderTokenError
   , tokenise
+  , debug
   ) where
 
 
@@ -38,6 +39,10 @@ tokenise :: FilePath -> Text -> Either TokenError [Positioned Token]
 tokenise =
   parse' template
 
+debug :: FilePath -> Text -> Either TokenError [(LexerMode, Positioned Token, LexerMode)]
+debug =
+  parse' templateDebug
+
 parse' :: Parser a -> FilePath -> Text -> Either TokenError a
 parse' p file =
   first TokenError . flip evalState defaultLexerState . P.runParserT (p <* P.eof) file
@@ -69,11 +74,24 @@ pop =
       [] ->
         LexerState []
 
-satisfyMode :: LexerMode -> Parser ()
-satisfyMode m = do
+satisfyMode :: LexerMode -> Parser a -> Parser a
+satisfyMode m p = do
   mmo <- peek
   let err = failWith (ModeMismatch m mmo)
-  if (mmo == Just m) then pure () else err
+  if (mmo == Just m)
+    then p
+    else err
+
+debugP :: Parser a -> Parser (LexerMode, a, LexerMode)
+debugP p =
+  (,,)
+    <$> peekFail
+    <*> p
+    <*> peekFail
+
+peekFail :: Parser LexerMode
+peekFail =
+  peek >>= maybe (failWith EmptyModeStack) pure
 
 -- -----------------------------------------------------------------------------
 -- Megaparsec boilerplate
@@ -85,6 +103,7 @@ data TokenErrorComponent =
   | ParseIndentError Ordering P.Pos P.Pos
   | TagMismatch (Text, Range) (Text, Range)
   | ModeMismatch LexerMode (Maybe LexerMode)
+  | EmptyModeStack
   deriving (Eq, Ord, Show)
 
 instance P.ErrorComponent TokenErrorComponent where
@@ -125,6 +144,8 @@ instance P.ShowErrorComponent TokenErrorComponent where
           ]
       ModeMismatch _ _ ->
         show ec
+      EmptyModeStack ->
+        "BUG: the lexer reached the bottom of its mode stack"
 
 failWith :: TokenErrorComponent -> Parser a
 failWith err =
@@ -137,6 +158,10 @@ template :: Parser [Positioned Token]
 template =
   start *> many (withPosition token)
 
+templateDebug :: Parser [(LexerMode, Positioned Token, LexerMode)]
+templateDebug =
+  start *> many (debugP (withPosition token))
+
 start :: Parser ()
 start =
       (P.lookAhead (P.try (typeSigStart)) *> push ExprMode *> push TypeSigMode)
@@ -144,14 +169,14 @@ start =
 
 token :: Parser Token
 token =
-      (satisfyMode HtmlMode *> htmlToken)
-  <|> (satisfyMode HtmlCommentMode *> htmlCommentToken)
-  <|> (satisfyMode TagOpenMode *> tagOpenToken)
-  <|> (satisfyMode TagCloseMode *> tagCloseToken)
-  <|> (satisfyMode ExprMode *> exprToken)
-  <|> (satisfyMode ExprCommentMode *> exprCommentToken)
-  <|> (satisfyMode StringMode *> stringToken)
-  <|> (satisfyMode TypeSigMode *> typeSigToken)
+      (satisfyMode HtmlMode htmlToken)
+  <|> (satisfyMode HtmlCommentMode htmlCommentToken)
+  <|> (satisfyMode TagOpenMode tagOpenToken)
+  <|> (satisfyMode TagCloseMode tagCloseToken)
+  <|> (satisfyMode ExprMode exprToken)
+  <|> (satisfyMode ExprCommentMode exprCommentToken)
+  <|> (satisfyMode StringMode stringToken)
+  <|> (satisfyMode TypeSigMode typeSigToken)
 
 
 -- -----------------------------------------------------------------------------
@@ -209,8 +234,10 @@ htmlToken =
   <|> tagCloseOpen
   <|> tagOpen
   <|> exprCommentStart
+  <|> wsExprStart
   <|> exprStart
   <|> htmlExprEnd
+  <|> htmlWsExprEnd
   <|> htmlRParen
   <|> plainText
 
@@ -226,8 +253,8 @@ plainText :: Parser Token
 plainText =
   fmap Plain . escaping $ \p ->
     -- characters that begin rules at the same level
-    p == '\n' || p == ' ' || p == '<' || p == '>' ||
-    p == '{' || p == '}' || p == '\\' || p == '(' || p == ')'
+    p == '\n' || p == ' ' || p == '<' || p == '>' || p == '\\' ||
+    p == '{'  || p == '}' || p == '(' || p == ')' || p == '|'
 
 exprStart :: Parser Token
 exprStart =
@@ -236,6 +263,14 @@ exprStart =
 htmlExprEnd :: Parser Token
 htmlExprEnd =
   char '}' *> pure ExprEnd <* pop <* pop
+
+wsExprStart :: Parser Token
+wsExprStart =
+  string "{|" *> pure ExprStartWS <* push HtmlMode
+
+htmlWsExprEnd :: Parser Token
+htmlWsExprEnd =
+  string "|}" *> pure ExprEndWS <* pop
 
 tagCommentStart :: Parser Token
 tagCommentStart =
@@ -276,6 +311,7 @@ tagOpenToken =
   <|> tagStringStart
   <|> exprCommentStart
   <|> exprStart
+  <|> wsExprStart
 
 
 tagIdent :: Parser Token
@@ -335,6 +371,8 @@ exprToken =
   <|> exprArrow
   <|> exprDot
   <|> exprCommentStart
+  <|> wsExprStart
+  <|> wsExprEnd
   <|> exprStart
   <|> exprEnd
   <|> exprHtmlCommentStart
@@ -424,6 +462,10 @@ exprHtmlCommentStart :: Parser Token
 exprHtmlCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
 
+wsExprEnd :: Parser Token
+wsExprEnd =
+  string "|}" *> pure ExprEndWS <* pop
+
 
 -- -----------------------------------------------------------------------------
 -- Expr comments - unlike HTML, these can be nested {- foo {- bar -} baz -}
@@ -450,6 +492,7 @@ stringToken :: Parser Token
 stringToken =
       stringChunk
   <|> exprCommentStart
+  <|> wsExprStart
   <|> stringExprStart
   <|> stringEnd
 

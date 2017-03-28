@@ -58,6 +58,13 @@ prop_parse_unit_case_html =
 prop_parse_unit_conid =
   regressionFile "conid"
 
+prop_parse_unit_sensitive_layout =
+  regressionFile "sensitive_layout"
+
+prop_parse_unit_sensitive_space =
+  regressionFile "sensitive_space"
+
+
 -- -----------------------------------------------------------------------------
 
 this :: [Char]
@@ -77,13 +84,40 @@ regressionFile fp =
     fin <- T.readFile ("test/syntax/" <> fp <> ".in")
     out <- T.readFile ("test/syntax/" <> fp <> ".out")
     pure $
-      fmap (T.pack . ppShow) (parse' fp fin) === pure out
+      let result = fmap (T.pack . ppShow) (parse' fp fin) in
+        (either
+          (counterexample . T.unpack . renderSyntaxError)
+          (counterexample . T.unpack . textDiff out)
+          result)
+        (property (result == pure out))
 
 mkRegression :: FilePath -> Text -> IO ()
 mkRegression fp t = do
   T.writeFile ("test/syntax/" <> fp <> ".in") t
   for_ (parse' fp t) $
     T.writeFile ("test/syntax/" <> fp <> ".out") . T.pack . ppShow
+
+updateRegression :: FilePath -> IO ()
+updateRegression fp = do
+  fin <- T.readFile ("test/syntax/" <> fp <> ".in")
+  for_ (parse' fp fin) $
+    T.writeFile ("test/syntax/" <> fp <> ".out") . T.pack . ppShow
+
+textDiff :: Text -> Text -> Text
+textDiff a b =
+  let la = T.lines a
+      lb = T.lines b
+  in T.unlines (go la lb mempty)
+  where
+    go :: [Text] -> [Text] -> [Text] -> [Text]
+    go [] [] acc = acc
+    go [] ys acc = acc <> fmap ("+" <>) ys
+    go xs [] acc = acc <> fmap ("-" <>) xs
+    go (x:xs) (y:ys) acc =
+      go xs ys $
+        acc <> if x == y
+                 then [" " <> x]
+                 else ["-" <> x, "+" <> y]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

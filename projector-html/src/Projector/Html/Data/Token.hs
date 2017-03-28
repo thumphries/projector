@@ -35,7 +35,7 @@ data Token
   | AttValueQ Text  -- "true"
   | AttValue Text   -- true
   -- Misc
-  | WhiteSpace      -- [ \t\r\n]+
+  | WhiteSpace Int  -- [ \t\r\n]+
   | HtmlComment Text -- <!-- foo -->
   | HtmlText Text   -- Hello!
   | StringStart     -- "
@@ -44,6 +44,8 @@ data Token
   -- Exprs
   | ExprStart       -- {
   | ExprEnd         -- }
+  | ExprStartWS     -- {|
+  | ExprEndWS       -- |}
   | ExprIdent Text  -- foo
   | ExprLParen      -- (
   | ExprRParen      -- )
@@ -90,7 +92,7 @@ renderToken tok =
     AttValueQ t     -> "\"" <> escape t <> "\""
     AttValue t      -> t
 
-    WhiteSpace      -> " "
+    WhiteSpace x    -> T.replicate x " "
     HtmlComment t   -> "<!--" <> t <> "-->" -- TODO this should be three tokens
     HtmlText t      -> escape t
     StringStart     -> "\""
@@ -99,6 +101,8 @@ renderToken tok =
 
     ExprStart       -> "{"
     ExprEnd         -> "}"
+    ExprStartWS     -> "{|"
+    ExprEndWS       -> "|}"
     ExprIdent t     -> t
     ExprLParen      -> "("
     ExprRParen      -> ")"

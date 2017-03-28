@@ -31,12 +31,12 @@ Template
                          (TTag () "span")
                          []
                          (THtml () [ TPlain () TPlainText { unTPlainText = "baz" } ])
-                     , TWhiteSpace ()
+                     , TWhiteSpace () 1
                      , TElement
                          ()
                          (TTag () "h1")
                          []
                          (THtml () [ TPlain () TPlainText { unTPlainText = "quux" } ])
-                     , TWhiteSpace ()
+                     , TWhiteSpace () 1
                      ])))
         ]))

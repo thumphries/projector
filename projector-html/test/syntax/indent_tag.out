@@ -20,6 +20,6 @@ Template
                       (TQuotedAttrValue
                          () (TIString () [ TExprChunk () (TEVar () TId { unTId = "x" }) ]))
                   ]
-                  (THtml () [ TWhiteSpace () ])
+                  (THtml () [ TWhiteSpace () 1 ])
               ])) :|
         []))

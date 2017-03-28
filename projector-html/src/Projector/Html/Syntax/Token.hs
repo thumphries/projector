@@ -45,6 +45,7 @@ data Token =
   | TagEquals             -- =
   | Plain Text            -- hello
   | ExprStart             -- {
+  | ExprStartWS           -- {|
 
   -- Expr mode
   | ExprLParen            -- (
@@ -64,6 +65,7 @@ data Token =
   | ExprCommentChunk Text -- foo
   | ExprCommentEnd        -- -}
   | ExprEnd               -- }
+  | ExprEndWS             -- |}
   | ExprHole              -- _
   -- TODO remove this
   | ExprEach              -- each
@@ -100,6 +102,7 @@ renderToken tok =
     TagEquals             -> "="
     Plain t               -> t
     ExprStart             -> "{"
+    ExprStartWS           -> "{|"
 
     -- Expr mode
     ExprLParen            -> "("
@@ -119,6 +122,7 @@ renderToken tok =
     ExprCommentChunk t    -> t
     ExprCommentEnd        -> "-}"
     ExprEnd               -> "}"
+    ExprEndWS             -> "|}"
     ExprEach              -> "each"
     ExprHole              -> "_"
 

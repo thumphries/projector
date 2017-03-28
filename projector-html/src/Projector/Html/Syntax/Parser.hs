@@ -82,7 +82,7 @@ template :: Grammar r (Template Range)
 template = mdo
   tsig' <- typeSignatures
   expr' <- expr html'
-  node' <- E.rule (htmlNode expr' html')
+  node' <- E.rule (htmlNode expr' node' html')
   html' <- html node'
   E.rule (template' tsig' expr')
 
@@ -155,33 +155,53 @@ sigIdent =
 
 html :: Rule r (TNode Range) -> Grammar r (THtml Range)
 html node' = mdo
-  E.rule (someHtml node' <?> "HTML")
+  html1 <- E.rule $
+        someHtml node'
+    <?> "HTML"
+  pure html1
 
 someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
 someHtml node' =
   (\nss -> THtml (someRange nss) (toList nss))
-    <$> some' (node' <|> htmlPlain)
+    <$> some' (node' <|> htmlPlain <|> htmlCollapseWhitespace)
 
-htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
-htmlNode expr' html' =
+htmlWS :: Rule r (TNode Range) -> Rule r (TNode Range)
+htmlWS node' =
+  (\a nss b -> THtmlWS (a <> b) (toList nss))
+    <$> token ExprStartWS
+    <*> some' (node' <|> htmlPlain <|> htmlPreserveWhitespace)
+    <*> token ExprEndWS
+
+htmlNode :: Rule r (TExpr Range) -> Rule r (TNode Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
+htmlNode expr' node' html' =
       htmlVoidElement expr'
   <|> htmlElement expr' html'
   <|> htmlComment
   <|> htmlExpr expr'
-  <|> htmlWhitespace
+  <|> htmlWS node'
 
 htmlPlain :: Rule r (TNode Range)
 htmlPlain =
   (\ne -> TPlain (extractPosition ne) (TPlainText (extractPositioned ne)))
     <$> htmlText
 
-htmlWhitespace :: Rule r (TNode Range)
-htmlWhitespace =
+htmlCollapseWhitespace :: Rule r (TNode Range)
+htmlCollapseWhitespace =
   E.terminal $ \case
     Whitespace _ :@ a ->
-      pure (TWhiteSpace a)
+      pure (TWhiteSpace a 1)
     Newline :@ a ->
-      pure (TWhiteSpace a)
+      pure (TWhiteSpace a 1)
+    _ ->
+      empty
+
+htmlPreserveWhitespace :: Rule r (TNode Range)
+htmlPreserveWhitespace =
+  E.terminal $ \case
+    Whitespace x :@ a ->
+      pure (TWhiteSpace a x)
+    Newline :@ a ->
+      pure (TNewline a)
     _ ->
       empty
 

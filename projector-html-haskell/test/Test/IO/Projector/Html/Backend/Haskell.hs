@@ -43,7 +43,7 @@ prop_library_runtime =
 
 prop_hello_world =
   once $ runProp name (text <> "\nmain = putStr (Hydrant.toText helloWorld)\n")
-    (=== "Hello, world!<div class=\"table\"> </div>")
+    (=== "Hello, world!<div class=\"table\"></div>")
   where
     (name, text) =
       either (fail . T.unpack) id $ do

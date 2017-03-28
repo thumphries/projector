@@ -24,7 +24,6 @@ import           Projector.Html.Data.Prim
 data Html =
     Plain !Text
   | Raw !Text
-  | Whitespace !Text
   | Comment !Text
   | Element !Text ![Attribute] !Html
   | VoidElement !Text ![Attribute]
@@ -79,8 +78,6 @@ interpret' e =
            Plain <$> value t
         (Constructor "Raw", [t]) ->
            Raw <$> value t
-        (Constructor "Whitespace", []) ->
-           pure $ Whitespace " "
         (Constructor "Comment", [t]) ->
            Comment <$> value t
         (Constructor "Element", [ECon _ (Constructor "Tag") _ [t], EList _ attrs, body]) -> do

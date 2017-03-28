@@ -113,14 +113,19 @@ typeTokens ty =
         ]
 
 htmlTokens :: THtml a -> DList (Token)
-htmlTokens (THtml _ nodes) =
-  foldMap nodeTokens nodes
+htmlTokens html =
+  case html of
+    (THtml _ nodes) ->
+      foldMap nodeTokens nodes
 
 nodeTokens :: TNode a -> DList (Token)
 nodeTokens node =
   case node of
-    TWhiteSpace _ ->
-      [WhiteSpace]
+    TWhiteSpace _ x ->
+      [WhiteSpace x]
+
+    TNewline _ ->
+      [HtmlText "\n"]
 
     TElement _ (TTag _ tag) attrs html ->
       mconcat [
@@ -150,6 +155,13 @@ nodeTokens node =
         , exprTokens expr
         , [ExprEnd]
         ]
+    (THtmlWS _ nodes) ->
+      mconcat [
+          [ExprStartWS]
+        , foldMap nodeTokens nodes
+        , [ExprEndWS]
+        ]
+
 
 attrTokens :: TAttribute a -> DList (Token)
 attrTokens attr =
