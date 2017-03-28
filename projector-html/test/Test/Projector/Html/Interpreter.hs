@@ -29,7 +29,7 @@ prop_interpret_unit =
        ma = M.fromList [("a", (at, LibraryFunction (Name "a")))]
        na = M.fromList [(Name "a", a)]
      (_, b) <- first show . checkTemplateIncremental mempty ma $
-       [template|<a>{ a "b" }</a><!-- c --><hr id="d" />e|]
+       [template|<a>{ a "b" }</a><!-- c --><hr id="d" />|]
      h <- first show . interpret mempty na $ b
      pure $
        h
@@ -45,7 +45,6 @@ prop_interpret_unit =
                (Plain "b"))
          , Comment " c "
          , VoidElement "hr" [ Attribute "id" "d" ]
-         , Raw "e"
          ]
 
 
