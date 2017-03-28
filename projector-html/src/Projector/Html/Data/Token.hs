@@ -61,6 +61,8 @@ data Token
   | ListSep         -- ,
   | ExprDot         -- .
   | ExprHole        -- _
+  | TextExprStart   -- {{
+  | TextExprEnd     -- }}
   -- Patterns
   | PatCon Text     -- Just
   | PatId Text      -- x
@@ -118,6 +120,8 @@ renderToken tok =
     ListSep         -> ","
     ExprDot         -> "."
     ExprHole        -> "_"
+    TextExprStart   -> "{{"
+    TextExprEnd     -> "}}"
 
     PatCon t        -> t
     PatId t         -> t

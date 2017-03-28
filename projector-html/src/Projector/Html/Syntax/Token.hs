@@ -25,7 +25,7 @@ data LexerMode =
   deriving (Eq, Ord, Show)
 
 data Token =
-  -- Type signatures (OLD FORMAT)
+  -- Type signatures
     TypeSigStart          -- \
   | TypeSigSep            -- ->
   | TypeSigEnd            -- =
@@ -33,6 +33,7 @@ data Token =
   | TypeIdent Text        -- foo | Foo
   | TypeLParen            -- (
   | TypeRParen            -- )
+
   -- HTML mode
   | TagOpen               -- <
   | TagClose              -- >
@@ -46,6 +47,7 @@ data Token =
   | Plain Text            -- hello
   | ExprStart             -- {
   | ExprStartWS           -- {|
+  | TextExprStart         -- {{
 
   -- Expr mode
   | ExprLParen            -- (
@@ -66,8 +68,10 @@ data Token =
   | ExprCommentEnd        -- -}
   | ExprEnd               -- }
   | ExprEndWS             -- |}
+  | TextExprEnd           -- }}
   | ExprHole              -- _
-  -- TODO remove this
+
+  -- TODO remove this, can be an app
   | ExprEach              -- each
 
   -- General ambiguous
@@ -103,6 +107,7 @@ renderToken tok =
     Plain t               -> t
     ExprStart             -> "{"
     ExprStartWS           -> "{|"
+    TextExprStart         -> "{{"
 
     -- Expr mode
     ExprLParen            -> "("
@@ -123,6 +128,7 @@ renderToken tok =
     ExprCommentEnd        -> "-}"
     ExprEnd               -> "}"
     ExprEndWS             -> "|}"
+    TextExprEnd           -> "}}"
     ExprEach              -> "each"
     ExprHole              -> "_"
 

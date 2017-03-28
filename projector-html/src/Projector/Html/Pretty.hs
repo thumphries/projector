@@ -163,6 +163,13 @@ nodeTokens node =
         ]
 
 
+    TTextExprNode _ expr ->
+      mconcat [
+          [TextExprStart]
+        , exprTokens expr
+        , [TextExprEnd]
+        ]
+
 attrTokens :: TAttribute a -> DList (Token)
 attrTokens attr =
   case attr of
@@ -259,9 +266,9 @@ chunkTokens chunk =
       [StringChunk t]
     TExprChunk _ e ->
       mconcat [
-         [ExprStart]
+         [TextExprStart]
        , exprTokens e
-       , [ExprEnd]
+       , [TextExprEnd]
        ]
 
 altsTokens :: NonEmpty (TAlt a) -> DList (Token)

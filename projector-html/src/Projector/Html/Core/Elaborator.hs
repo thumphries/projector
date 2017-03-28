@@ -109,6 +109,8 @@ eNode node =
         ]
     THtmlWS a nodes ->
       nested a nodes
+    TTextExprNode a e ->
+      ECon (TextExpr a) (Constructor "Plain") Lib.nHtml (pure (eExpr e))
 
 eTag :: TTag a -> HtmlExpr (Annotation a)
 eTag (TTag a t) =
