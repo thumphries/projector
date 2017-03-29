@@ -1,0 +1,25 @@
+Template
+  ()
+  Nothing
+  (TECase
+     ()
+     (TEVar () TId { unTId = "x" })
+     (TAlt
+        ()
+        (TPVar () TId { unTId = "y" })
+        (TENode
+           ()
+           (THtml
+              ()
+              [ TElement
+                  ()
+                  (TTag () "a")
+                  [ TAttribute
+                      ()
+                      TAttrName { unTAttrName = "b" }
+                      (TQuotedAttrValue
+                         () (TIString () [ TExprChunk () (TEVar () TId { unTId = "x" }) ]))
+                  ]
+                  (THtml () [ TWhiteSpace () ])
+              ])) :|
+        []))

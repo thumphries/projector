@@ -1,0 +1,19 @@
+Template
+  ()
+  Nothing
+  (TECase
+     ()
+     (TEVar () TId { unTId = "foo" })
+     (TAlt
+        ()
+        (TPCon () TConstructor { unTConstructor = "Abc" } [])
+        (TEString () (TIString () [ TStringChunk () "def" ])) :|
+        [ TAlt
+            ()
+            (TPCon () TConstructor { unTConstructor = "Ghi" } [])
+            (TEString () (TIString () [ TStringChunk () "jkl" ]))
+        , TAlt
+            ()
+            (TPCon () TConstructor { unTConstructor = "Mno" } [])
+            (TEString () (TIString () [ TStringChunk () "pqr" ]))
+        ]))

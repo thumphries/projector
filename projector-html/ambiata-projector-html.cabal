@@ -101,6 +101,7 @@ test-suite test
                      , semigroups                      == 0.18.*
                      , text
                      , containers
+                     , pretty-show
 
 test-suite test-io
   type:                exitcode-stdio-1.0
