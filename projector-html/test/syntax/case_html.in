@@ -1,0 +1,11 @@
+{
+  case foo of
+    bar ->
+      <blink>party</blink>
+    baz ->
+      <marquee>cube</marquee>
+      <i>abcdefg</i>
+    Bap ->
+      <b>hell</b>
+      <i>foo</i>
+}

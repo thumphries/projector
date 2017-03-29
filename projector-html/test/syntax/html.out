@@ -1,0 +1,42 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TExprNode
+            ()
+            (TEApp
+               ()
+               (TEApp
+                  ()
+                  (TEVar () TId { unTId = "foo" })
+                  (TENode
+                     ()
+                     (THtml
+                        ()
+                        [ TElement
+                            ()
+                            (TTag () "b")
+                            []
+                            (THtml () [ TPlain () TPlainText { unTPlainText = "bar" } ])
+                        ])))
+               (TENode
+                  ()
+                  (THtml
+                     ()
+                     [ TElement
+                         ()
+                         (TTag () "span")
+                         []
+                         (THtml () [ TPlain () TPlainText { unTPlainText = "baz" } ])
+                     , TWhiteSpace ()
+                     , TElement
+                         ()
+                         (TTag () "h1")
+                         []
+                         (THtml () [ TPlain () TPlainText { unTPlainText = "quux" } ])
+                     , TWhiteSpace ()
+                     ])))
+        ]))

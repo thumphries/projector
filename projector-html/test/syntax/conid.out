@@ -1,0 +1,11 @@
+Template
+  ()
+  Nothing
+  (TECase
+     ()
+     (TEVar () TId { unTId = "foo" })
+     (TAlt
+        ()
+        (TPCon () TConstructor { unTConstructor = "Bar_B_Q" } [])
+        (TEVar () TId { unTId = "Baz" }) :|
+        []))

@@ -1,0 +1,23 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TExprNode
+            ()
+            (TEApp
+               ()
+               (TEApp
+                  ()
+                  (TEApp
+                     ()
+                     (TEApp
+                        ()
+                        (TEPrj () (TEVar () TId { unTId = "foo" }) TId { unTId = "bar" })
+                        (TEPrj () (TEVar () TId { unTId = "baz" }) TId { unTId = "quux" }))
+                     (TEPrj () (TEVar () TId { unTId = "wem" }) TId { unTId = "quib" }))
+                  (TEVar () TId { unTId = "pil" }))
+               (TEVar () TId { unTId = "mun" }))
+        ]))

@@ -1,0 +1,21 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TExprNode
+            ()
+            (TEApp
+               ()
+               (TEVar () TId { unTId = "foo" })
+               (TEVar () TId { unTId = "bar" }))
+        , TWhiteSpace ()
+        , TExprNode
+            ()
+            (TEApp
+               ()
+               (TEVar () TId { unTId = "baz" })
+               (TEVar () TId { unTId = "quux" }))
+        ]))

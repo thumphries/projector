@@ -1,0 +1,21 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TElement
+            ()
+            (TTag () "a")
+            []
+            (THtml
+               ()
+               [ TWhiteSpace ()
+               , TExprNode
+                   () (TENode () (THtml () [ TVoidElement () (TTag () "b") [] ]))
+               , TWhiteSpace ()
+               ])
+        , TWhiteSpace ()
+        , TElement () (TTag () "c") [] (THtml () [])
+        ]))

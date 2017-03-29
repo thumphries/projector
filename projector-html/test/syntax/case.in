@@ -1,0 +1,7 @@
+case foo of
+  Abc ->
+    "def"
+  Ghi ->
+    "jkl"
+  Mno ->
+    "pqr"
