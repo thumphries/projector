@@ -410,7 +410,7 @@ exprCommentStart =
 
 exprConId :: Parser Token
 exprConId =
-  fmap (ExprConId . T.pack) ((:) <$> P.upperChar <*> many P.alphaNumChar)
+  fmap (ExprConId . T.pack) ((:) <$> P.upperChar <*> many (P.alphaNumChar <|> P.char '-' <|> P.char '_'))
 
 exprVarId :: Parser Token
 exprVarId =
