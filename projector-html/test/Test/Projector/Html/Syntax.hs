@@ -7,10 +7,8 @@ module Test.Projector.Html.Syntax where
 
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 
 import           Disorder.Core hiding (tripping)
-import           Disorder.Core.IO (testIO)
 import           Disorder.Jack
 
 import           P
@@ -19,11 +17,10 @@ import           Projector.Html
 import           Projector.Html.Pretty
 import           Projector.Html.Syntax
 
-import           System.IO (IO, FilePath)
+import           System.IO (FilePath, IO)
 
 import           Test.Projector.Html.Arbitrary
-
-import           Text.Show.Pretty (ppShow)
+import           Test.Projector.Html.Expect
 
 
 prop_parse_roundtrip =
@@ -80,44 +77,16 @@ parse' fp t =
 
 regressionFile :: FilePath -> Property
 regressionFile fp =
-  once . testIO $ do
-    fin <- T.readFile ("test/syntax/" <> fp <> ".in")
-    out <- T.readFile ("test/syntax/" <> fp <> ".out")
-    pure $
-      let result = fmap (T.pack . ppShow) (parse' fp fin) in
-        (either
-          (counterexample . T.unpack . renderSyntaxError)
-          (counterexample . T.unpack . textDiff out)
-          result)
-        (property (result == pure out))
+  expectFile "test/syntax" fp renderSyntaxError (parse' fp)
 
 mkRegression :: FilePath -> Text -> IO ()
-mkRegression fp t = do
-  T.writeFile ("test/syntax/" <> fp <> ".in") t
-  for_ (parse' fp t) $
-    T.writeFile ("test/syntax/" <> fp <> ".out") . T.pack . ppShow
+mkRegression fp t =
+  ecase (parse' fp t) (fail . T.unpack . renderSyntaxError) (mkExpect "test/syntax" fp t)
 
 updateRegression :: FilePath -> IO ()
 updateRegression fp = do
-  fin <- T.readFile ("test/syntax/" <> fp <> ".in")
-  for_ (parse' fp fin) $
-    T.writeFile ("test/syntax/" <> fp <> ".out") . T.pack . ppShow
+  updateExpect "test/syntax" fp (parse' fp)
 
-textDiff :: Text -> Text -> Text
-textDiff a b =
-  let la = T.lines a
-      lb = T.lines b
-  in T.unlines (go la lb mempty)
-  where
-    go :: [Text] -> [Text] -> [Text] -> [Text]
-    go [] [] acc = acc
-    go [] ys acc = acc <> fmap ("+" <>) ys
-    go xs [] acc = acc <> fmap ("-" <>) xs
-    go (x:xs) (y:ys) acc =
-      go xs ys $
-        acc <> if x == y
-                 then [" " <> x]
-                 else ["-" <> x, "+" <> y]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal
