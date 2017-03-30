@@ -67,19 +67,31 @@ prop_interpreter_unit_pre_multiline =
 prop_interpreter_unit_whitespace =
   regressionFile "whitespace"
 
+prop_interpreter_unit_foo =
+  regressionFile "foo"
+
+prop_interpreter_unit_foo_each =
+  regressionFile "foo_each"
+
+prop_interpreter_unit_fizz =
+  regressionFile "fizz"
+
 -- -----------------------------------------------------------------------------
 
 decls :: HtmlDecls
 decls =
-  mempty
+    declareType (TypeName "Fizz") (DRecord [(FieldName "name", TLit TString)])
+  $ mempty
 
 bnds :: Map Name (HtmlExpr (HtmlType, SrcAnnotation))
 bnds =
-  mempty
+  M.fromList [
+      (Name "foo", ELit (TLit TString, LibraryFunction (Name "foo")) (VString "foo"))
+    ]
 
 bndst :: Map Text (HtmlType, SrcAnnotation)
 bndst =
-  mempty
+  fmap (extractAnnotation) (M.mapKeys unName bnds)
 
 interpretText :: FilePath -> Text -> Either Text Html
 interpretText fp t = do

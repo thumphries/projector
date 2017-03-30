@@ -1,0 +1,1 @@
+case Fizz "xyz" of Fizz name -> text name
