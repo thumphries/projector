@@ -61,6 +61,9 @@ prop_interpreter_unit_foobar =
 prop_interpreter_unit_pre =
   regressionFile "pre"
 
+prop_interpreter_unit_pre_multiline =
+  regressionFile "pre_multiline"
+
 prop_interpreter_unit_whitespace =
   regressionFile "whitespace"
 

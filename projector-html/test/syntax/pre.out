@@ -1,0 +1,48 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ THtmlWS
+            ()
+            [ TElement
+                ()
+                (TTag () "pre")
+                []
+                (THtml
+                   ()
+                   [ TElement
+                       ()
+                       (TTag () "code")
+                       []
+                       (THtml
+                          ()
+                          [ TWhiteSpace () 4
+                          , TPlain () TPlainText { unTPlainText = "foo" }
+                          , TNewline ()
+                          , TWhiteSpace () 4
+                          , TPlain () TPlainText { unTPlainText = "bar" }
+                          , TNewline ()
+                          , TWhiteSpace () 2
+                          , TPlain () TPlainText { unTPlainText = "baz" }
+                          , TNewline ()
+                          , TPlain () TPlainText { unTPlainText = "quux" }
+                          , TNewline ()
+                          , TWhiteSpace () 3
+                          , TPlain () TPlainText { unTPlainText = "wom" }
+                          , TNewline ()
+                          , TWhiteSpace () 4
+                          , TPlain () TPlainText { unTPlainText = "lop" }
+                          , TNewline ()
+                          , TWhiteSpace () 4
+                          ])
+                   ])
+            ]
+        , TElement
+            ()
+            (TTag () "span")
+            []
+            (THtml () [ TPlain () TPlainText { unTPlainText = "code" } ])
+        ]))
