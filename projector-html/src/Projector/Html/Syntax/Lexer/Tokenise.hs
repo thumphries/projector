@@ -251,10 +251,10 @@ tagCloseOpen =
 
 plainText :: Parser Token
 plainText =
-  fmap Plain . escaping $ \p ->
+  fmap Plain . escaping $ \p m ->
     -- characters that begin rules at the same level
     p == '\n' || p == ' ' || p == '<' || p == '>' || p == '\\' ||
-    p == '{'  || p == '}' || p == '(' || p == ')' || p == '|'
+    p == '{'  || p == '}' || p == '(' || p == ')' || (p == '|' && m == pure '}')
 
 exprStart :: Parser Token
 exprStart =
@@ -510,7 +510,7 @@ stringChunk =
 
 stringChunkText :: Parser Text
 stringChunkText =
-  escaping $ \p ->
+  escaping $ \p _ ->
     -- characters that begin rules at the same level
     p == '"' || p == '{' || p == '\\'
 
@@ -542,21 +542,23 @@ someTill :: Parser Char -> Parser a -> Parser Text
 someTill m end =
   T.pack <$> someTill' m end
 
-escaping' :: Char -> (Char -> Bool) -> Parser Char
+escaping' :: Char -> (Char -> Maybe Char -> Bool) -> Parser Char
 escaping' echar breaks = do
   c <- P.anyChar
   if c == echar
     then do
       d <- optional P.anyChar
-      maybe empty (\p -> if breaks p then pure p else empty) d
-    else
-      if breaks c then empty else pure c
+      l <- optional (P.try (P.lookAhead P.anyChar))
+      maybe empty (\p -> if breaks p l then pure p else empty) d
+    else do
+      l <- optional (P.try (P.lookAhead P.anyChar))
+      if breaks c l then empty else pure c
 
 escapeChar :: Char
 escapeChar =
   '\\'
 
-escaping :: (Char -> Bool) -> Parser Text
+escaping :: (Char -> Maybe Char -> Bool) -> Parser Text
 escaping breaks =
   T.pack <$> some (P.try (escaping' escapeChar breaks))
 
