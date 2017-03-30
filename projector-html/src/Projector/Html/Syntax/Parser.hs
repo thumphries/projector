@@ -155,12 +155,15 @@ sigIdent =
 
 html :: Rule r (TNode Range) -> Grammar r (THtml Range)
 html node' = mdo
-  E.rule (someHtml node' <?> "HTML")
+  html1 <- E.rule $
+        someHtml node'
+    <?> "HTML"
+  pure html1
 
 someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
 someHtml node' =
   (\nss -> THtml (someRange nss) (toList nss))
-    <$> some' (node' <|> htmlPlain)
+    <$> some' (node' <|> htmlPlain <|> htmlPreserveWhitespace)
 
 htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
 htmlNode expr' html' =
@@ -168,22 +171,29 @@ htmlNode expr' html' =
   <|> htmlElement expr' html'
   <|> htmlComment
   <|> htmlExpr expr'
-  <|> htmlWhitespace
+  <|> htmlWS html'
 
 htmlPlain :: Rule r (TNode Range)
 htmlPlain =
   (\ne -> TPlain (extractPosition ne) (TPlainText (extractPositioned ne)))
     <$> htmlText
 
-htmlWhitespace :: Rule r (TNode Range)
-htmlWhitespace =
+htmlPreserveWhitespace :: Rule r (TNode Range)
+htmlPreserveWhitespace =
   E.terminal $ \case
-    Whitespace _ :@ a ->
-      pure (TWhiteSpace a)
+    Whitespace x :@ a ->
+      pure (TWhiteSpace a x)
     Newline :@ a ->
-      pure (TWhiteSpace a)
+      pure (TNewline a)
     _ ->
       empty
+
+htmlWS :: Rule r (THtml Range) -> Rule r (TNode Range)
+htmlWS html' =
+  (\a (THtml _ nodes) b -> THtmlWS (a <> b) nodes)
+    <$> token ExprStartWS
+    <*> html'
+    <*> token ExprEndWS
 
 htmlExpr :: Rule r (TExpr Range) -> Rule r (TNode Range)
 htmlExpr expr' =

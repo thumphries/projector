@@ -1,0 +1,38 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TExprNode
+            ()
+            (TENode
+               ()
+               (THtml
+                  ()
+                  [ THtmlWS
+                      ()
+                      [ TElement
+                          ()
+                          (TTag () "a")
+                          []
+                          (THtml
+                             ()
+                             [ TElement
+                                 ()
+                                 (TTag () "a")
+                                 []
+                                 (THtml
+                                    ()
+                                    [ THtmlWS () [ TComment () TPlainText { unTPlainText = "foo" } ]
+                                    ])
+                             ])
+                      ]
+                  , TElement
+                      ()
+                      (TTag () "h1")
+                      []
+                      (THtml () [ TVoidElement () (TTag () "a") [] ])
+                  ]))
+        ]))

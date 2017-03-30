@@ -7,10 +7,8 @@ module Test.Projector.Html.Syntax where
 
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
 
 import           Disorder.Core hiding (tripping)
-import           Disorder.Core.IO (testIO)
 import           Disorder.Jack
 
 import           P
@@ -19,11 +17,10 @@ import           Projector.Html
 import           Projector.Html.Pretty
 import           Projector.Html.Syntax
 
-import           System.IO (IO, FilePath)
+import           System.IO (FilePath, IO)
 
 import           Test.Projector.Html.Arbitrary
-
-import           Text.Show.Pretty (ppShow)
+import           Test.Projector.Html.Expect
 
 
 prop_parse_roundtrip =
@@ -58,6 +55,18 @@ prop_parse_unit_case_html =
 prop_parse_unit_conid =
   regressionFile "conid"
 
+prop_parse_unit_sensitive_layout =
+  regressionFile "sensitive_layout"
+
+prop_parse_unit_sensitive_space =
+  regressionFile "sensitive_space"
+
+prop_parse_unit_pipe =
+  regressionFile "pipe"
+
+prop_parse_unit_pre =
+  regressionFile "pre"
+
 -- -----------------------------------------------------------------------------
 
 this :: [Char]
@@ -73,17 +82,16 @@ parse' fp t =
 
 regressionFile :: FilePath -> Property
 regressionFile fp =
-  once . testIO $ do
-    fin <- T.readFile ("test/syntax/" <> fp <> ".in")
-    out <- T.readFile ("test/syntax/" <> fp <> ".out")
-    pure $
-      fmap (T.pack . ppShow) (parse' fp fin) === pure out
+  expectFile "test/syntax" fp renderSyntaxError (parse' fp)
 
 mkRegression :: FilePath -> Text -> IO ()
-mkRegression fp t = do
-  T.writeFile ("test/syntax/" <> fp <> ".in") t
-  for_ (parse' fp t) $
-    T.writeFile ("test/syntax/" <> fp <> ".out") . T.pack . ppShow
+mkRegression fp t =
+  ecase (parse' fp t) (fail . T.unpack . renderSyntaxError) (mkExpect "test/syntax" fp t)
+
+updateRegression :: FilePath -> IO ()
+updateRegression fp = do
+  updateExpect "test/syntax" fp (parse' fp)
+
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

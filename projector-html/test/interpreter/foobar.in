@@ -1,0 +1,1 @@
+<a>{ text "foo! bar! baz!"}{ blank }{ text "QUUX" }</a><b/>

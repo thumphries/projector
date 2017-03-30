@@ -1,0 +1,19 @@
+Template
+  ()
+  Nothing
+  (TEApp
+     ()
+     (TENode
+        ()
+        (THtml
+           ()
+           [ THtmlWS
+               ()
+               [ TElement
+                   ()
+                   (TTag () "a")
+                   []
+                   (THtml () [ TVoidElement () (TTag () "marquee") [] ])
+               ]
+           ]))
+     (TEPrj () (TEHole ()) TId { unTId = "basin" }))

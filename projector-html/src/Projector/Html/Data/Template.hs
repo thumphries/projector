@@ -109,14 +109,15 @@ instance Comonad THtml where
   extend f h@(THtml _ nodes) =
     THtml (f h) (fmap (extend (const (f h))) nodes)
 
-
 data TNode a
   = TElement a (TTag a) [TAttribute a] (THtml a)
   | TVoidElement a (TTag a) [TAttribute a]
   | TComment a TPlainText
   | TPlain a TPlainText
-  | TWhiteSpace a
+  | TWhiteSpace a Int
+  | TNewline a
   | TExprNode a (TExpr a)
+  | THtmlWS a [TNode a]
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TNode where
@@ -128,11 +129,15 @@ instance Comonad TNode where
         a
       TComment a _ ->
         a
-      TWhiteSpace a ->
+      TWhiteSpace a _ ->
+        a
+      TNewline a ->
         a
       TExprNode a _ ->
         a
       TPlain a _ ->
+        a
+      THtmlWS a _ ->
         a
   extend f node =
     case node of
@@ -146,13 +151,16 @@ instance Comonad TNode where
         TVoidElement (f node) (extend (const (f node)) t) (fmap (extend (const (f node))) a)
       TComment _ t ->
         TComment (f node) t
-      TWhiteSpace _ ->
-        TWhiteSpace (f node)
+      TWhiteSpace _ x ->
+        TWhiteSpace (f node) x
+      TNewline _ ->
+        TNewline (f node)
       TExprNode _ e ->
         TExprNode (f node) (extend (const (f node)) e)
       TPlain _ t ->
         TPlain (f node) t
-
+      THtmlWS _ nodes ->
+        THtmlWS (f node) (fmap (extend (const (f node))) nodes)
 
 data TAttribute a
   = TAttribute a TAttrName (TAttrValue a)

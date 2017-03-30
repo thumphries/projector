@@ -47,10 +47,6 @@ rules =
                pure (apply (rawTextNode a) [x])
              _ ->
                empty)
-    , (\case ECon a (Constructor "Whitespace") _ _ ->
-               pure (apply (rawTextNode a) [(ELit a (VString " "))])
-             _ ->
-               empty)
     , (\case ECon a (Constructor "Element") _ [tag, attrs, body] ->
                pure (apply (parentNode a) [tag, attrs, body])
              _ ->

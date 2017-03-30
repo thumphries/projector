@@ -28,6 +28,7 @@ data Scope =
   | CaseAlt -- expecting case separator
   | Paren -- explicit parentheses
   | Brace -- explicit braces { }
+  | LineBrace -- whitespace braces {| |}
   | Block -- an implicit scope for which we inject parens
   | Indent -- an implicit scope we ignore for indent tracking purposes
   | Html -- an implicit scope for html closed only by brace, eof, indent
@@ -37,6 +38,19 @@ newtype IndentLevel = IndentLevel {
     _unIndentLevel :: Int
   } deriving (Eq, Ord, Show)
 
+data WSMode =
+    PreserveWS
+  | CollapseWS
+  deriving (Eq, Ord, Show)
+
+wsf :: [WSMode] -> Positioned Token -> [Positioned Token]
+wsf (PreserveWS : _) t = [t]
+wsf (CollapseWS : _) _ = []
+wsf [] t = [t]
+
+wnl :: Range -> [WSMode] -> Positioned Token
+wnl a (CollapseWS : _) = Whitespace 1 :@ a
+wnl a _ = Newline :@ a
 
 -- -----------------------------------------------------------------------------
 
@@ -44,14 +58,14 @@ newtype IndentLevel = IndentLevel {
 -- take care of leading indentation when it exists
 applyLayout'' :: [IndentLevel] -> [Positioned Token] -> [Positioned Token]
 applyLayout'' il xs@(TypeSigStart :@ a : _) =
-  applyLayout' a [TypeSigMode, ExprMode] il [] xs
+  applyLayout' a [TypeSigMode, ExprMode] [CollapseWS] il [] xs
 applyLayout'' il xs@(_ :@ a : _) =
-  applyLayout' a [ExprMode] il [] xs
+  applyLayout' a [ExprMode] [CollapseWS] il [] xs
 applyLayout'' _ [] =
   []
 
 
-applyLayout' :: Range -> [LexerMode] -> [IndentLevel] -> [Scope] -> [Positioned Token] -> [Positioned Token]
+applyLayout' :: Range -> [LexerMode] -> [WSMode] -> [IndentLevel] -> [Scope] -> [Positioned Token] -> [Positioned Token]
 
 
 --
@@ -59,51 +73,80 @@ applyLayout' :: Range -> [LexerMode] -> [IndentLevel] -> [Scope] -> [Positioned 
 --
 
 -- Drop out of signature mode on sig end, with optional newline
-applyLayout' _ (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ _) : Newline :@ z : xs) =
-  end : applyLayout' z ms il ss xs
-applyLayout' _ (TypeSigMode : ms) il ss (end@(TypeSigEnd :@ z) : xs) =
-  end : applyLayout' z ms il ss xs
+applyLayout' _ (TypeSigMode : ms) ws il ss (end@(TypeSigEnd :@ _) : Newline :@ z : xs) =
+  end : applyLayout' z ms ws il ss xs
+applyLayout' _ (TypeSigMode : ms) ws il ss (end@(TypeSigEnd :@ z) : xs) =
+  end : applyLayout' z ms ws il ss xs
 
 -- Drop whitespace and newlines in the type signature
-applyLayout' _ mms@(TypeSigMode : _) il ss (Whitespace _ :@ z : xs) =
-  applyLayout' z mms il ss xs
-applyLayout' _ mms@(TypeSigMode : _) il ss (Newline :@ z : xs) =
-  applyLayout' z mms il ss xs
+applyLayout' _ mms@(TypeSigMode : _) ws il ss (Whitespace _ :@ z : xs) =
+  applyLayout' z mms ws il ss xs
+applyLayout' _ mms@(TypeSigMode : _) ws il ss (Newline :@ z : xs) =
+  applyLayout' z mms ws il ss xs
 
+
+--
+-- whitespace sensitivity
+--
+
+-- Push whitespace mode and go to HTMLMode on {|
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprStartWS :@ z) : xs) =
+  ExprLParen :@ z : est : applyLayout' z (HtmlMode : HtmlMode : mms) (PreserveWS : ws) il (LineBrace : Html : ss) xs
+applyLayout' _ mms@(HtmlMode : _) ws il ss (est@(ExprStartWS :@ z) : xs) =
+  est : applyLayout' z (HtmlMode : mms) (PreserveWS : ws) il (LineBrace : ss) xs
+applyLayout' _ ms ws il ss (est@(ExprStartWS :@ z) : xs) =
+  est : applyLayout' z (HtmlMode : ms) (PreserveWS : ws) il (LineBrace : ss) xs
+
+-- Pop whitespace mode and close scopes on |} on |}
+applyLayout' _ (HtmlMode : ms) (PreserveWS : ws) il ss ((ExprEndWS :@ z) : xs) =
+  closeEmThen z LineBrace ss il $ \ils sss toks ->
+    toks <> applyLayout' z ms ws ils sss xs
+applyLayout' _ ms (PreserveWS : ws) il ss ((ExprEndWS :@ z) : xs) =
+  closeEmThen z LineBrace ss il $ \ils sss toks ->
+    toks <> applyLayout' z ms ws ils sss xs
 
 --
 -- html mode
 --
 
 -- Drop into expr mode on left brace
-applyLayout' _ mms@(HtmlMode : _) il ss (est@(ExprStart :@ z) : xs) =
-  est : applyLayout' z (ExprMode : mms) il (Brace : ss) xs
+applyLayout' _ mms@(HtmlMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
 
 -- Drop into tag open mode on tagopen
-applyLayout' _ mms@(HtmlMode : _) il ss (top@(TagOpen :@ z) : xs) =
-  top : applyLayout' z (TagOpenMode : mms) il ss xs
+applyLayout' _ mms@(HtmlMode : _) ws il ss (top@(TagOpen :@ z) : xs) =
+  top : applyLayout' z (TagOpenMode : mms) ws il ss xs
 
 -- Drop into tag close mode on tag close
-applyLayout' _ (HtmlMode : ms) il ss (tcl@(TagCloseOpen :@ z) : xs) =
-  tcl : applyLayout' z (TagCloseMode : ms) il ss xs
+applyLayout' _ (HtmlMode : ms) ws il ss (tcl@(TagCloseOpen :@ z) : xs) =
+  tcl : applyLayout' z (TagCloseMode : ms) ws il ss xs
 
 -- Close scopes and pop layout on expr end
-applyLayout' _ (HtmlMode : ExprMode : ms) il ss (ExprEnd :@ a : xs) =
+applyLayout' _ (HtmlMode : ExprMode : ms) ws il ss (ExprEnd :@ a : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
-    toks <> applyLayout' a ms ils sss xs
+    toks <> applyLayout' a ms ws ils sss xs
+
+applyLayout' _ (HtmlMode : ms) ws il ss (ExprEnd :@ a : xs) =
+  closeEmThen a Brace ss il $ \ils sss toks ->
+    toks <> applyLayout' a ms ws ils sss xs
+
 
 -- Close scopes and pop layout on right paren
-applyLayout' _ (HtmlMode : ms) il ss (ExprRParen :@ a : xs) =
+applyLayout' _ (HtmlMode : ms) ws il ss (ExprRParen :@ a : xs) =
   closeEmThen a Paren ss il $ \ils sss toks ->
-    toks <> applyLayout' a ms ils sss xs
+    toks <> applyLayout' a ms ws ils sss xs
 
 -- Track indent/dedent
-applyLayout' _ ms@(HtmlMode : _) il ss (n@(Newline :@ _) : (Whitespace x :@ b) : xs) =
-  n : newline ms il ss b x xs
-applyLayout' _ ms@(HtmlMode : _) il ss (n1@(Newline :@ a) : n2@(Newline :@ _) : xs) =
-  n1 : applyLayout' a ms il ss (n2:xs)
-applyLayout' _ ms@(HtmlMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
-  n : newline ms il ss b 0 xs
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ z : w@(Whitespace x :@ b) : xs) =
+  wnl z ws : wsf ws w <> newline ms ws il ss b x xs
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ a : n2@(Newline :@ _) : xs) =
+  wnl a ws : applyLayout' a ms ws il ss (n2:xs)
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ a : xs@(_ :@ b : _)) =
+  wnl a ws : newline ms ws il ss b 0 xs
+
+-- Collapse whitespace when appropriate
+applyLayout' _ ms@(HtmlMode : _) ws@(CollapseWS : _) il ss (Whitespace _ :@ b : xs) =
+  Whitespace 1 :@ b : applyLayout' b ms ws il ss xs
 
 
 --
@@ -111,125 +154,125 @@ applyLayout' _ ms@(HtmlMode : _) il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
 --
 
 -- Drop into html mode on tagclose
-applyLayout' _ (TagOpenMode : ms) il ss (tcl@(TagClose :@ z) : xs) =
-  tcl : applyLayout' z (HtmlMode : ms) il ss xs
+applyLayout' _ (TagOpenMode : ms) ws il ss (tcl@(TagClose :@ z) : xs) =
+  tcl : applyLayout' z (HtmlMode : ms) ws il ss xs
 
 -- drop into expr mode on tagopen
-applyLayout' _ mms@(TagOpenMode : _) il ss (est@(ExprStart :@ z) : xs) =
-  est : applyLayout' z (ExprMode : mms) il (Brace : ss) xs
+applyLayout' _ mms@(TagOpenMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
 
 -- Pop mode on tagselfclose
-applyLayout' _ (TagOpenMode : ms) il ss (tsc@(TagSelfClose :@ z) : xs) =
-  tsc : applyLayout' z ms il ss xs
+applyLayout' _ (TagOpenMode : ms) ws il ss (tsc@(TagSelfClose :@ z) : xs) =
+  tsc : applyLayout' z ms ws il ss xs
 
 -- Drop whitespace, newlines
-applyLayout' _ mms@(TagOpenMode : _) il ss (Whitespace _ :@ z : xs) =
-  applyLayout' z mms il ss xs
-applyLayout' _ mms@(TagOpenMode : _) il ss (Newline :@ z : xs) =
-  applyLayout' z mms il ss xs
+applyLayout' _ mms@(TagOpenMode : _) ws il ss (Whitespace _ :@ z : xs) =
+  applyLayout' z mms ws il ss xs
+applyLayout' _ mms@(TagOpenMode : _) ws il ss (Newline :@ z : xs) =
+  applyLayout' z mms ws il ss xs
 
 --
 -- tag close mode
 --
 
 -- Pop mode on tag close
-applyLayout' _ (TagCloseMode : ms) il ss (tcl@(TagClose :@ z) : xs) =
-  tcl : applyLayout' z ms il ss xs
+applyLayout' _ (TagCloseMode : ms) ws il ss (tcl@(TagClose :@ z) : xs) =
+  tcl : applyLayout' z ms ws il ss xs
 
 -- Drop whitespace, newlines
-applyLayout' _ mms@(TagCloseMode : _) il ss (Whitespace _ :@ z : xs) =
-  applyLayout' z mms il ss xs
-applyLayout' _ mms@(TagCloseMode : _) il ss (Newline :@ z : xs) =
-  applyLayout' z mms il ss xs
+applyLayout' _ mms@(TagCloseMode : _) ws il ss (Whitespace _ :@ z : xs) =
+  applyLayout' z mms ws il ss xs
+applyLayout' _ mms@(TagCloseMode : _) ws il ss (Newline :@ z : xs) =
+  applyLayout' z mms ws il ss xs
 
 --
 -- html comment mode
 --
 
 -- Pop mode on tag close
-applyLayout' _ (HtmlCommentMode : ms) il ss (tce@(TagCommentEnd :@ _) : tc@(TagClose :@ z) : xs) =
-  tce : tc : applyLayout' z ms il ss xs
+applyLayout' _ (HtmlCommentMode : ms) ws il ss (tce@(TagCommentEnd :@ _) : tc@(TagClose :@ z) : xs) =
+  tce : tc : applyLayout' z ms ws il ss xs
 
 --
 -- string mode
 --
 
 -- Pop mode on string end
-applyLayout' _ (StringMode : ms) il ss (ese@(StringEnd :@ a) : xs) =
-  ese : applyLayout' a ms il ss xs
+applyLayout' _ (StringMode : ms) ws il ss (ese@(StringEnd :@ a) : xs) =
+  ese : applyLayout' a ms ws il ss xs
 
 -- Push expr mode on exprstart
-applyLayout' _ mms@(StringMode : _) il ss (est@(ExprStart :@ z) : xs) =
-  est : applyLayout' z (ExprMode : mms) il (Brace : ss) xs
+applyLayout' _ mms@(StringMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
 
 --
 -- expr mode
 --
 
 -- Drop into tag open mode on tagopen
-applyLayout' _ mms@(ExprMode : _) il ss (top@(TagOpen :@ a) : xs) =
-  ExprLParen :@ a : top : applyLayout' a (TagOpenMode : HtmlMode : mms) il (Html : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (top@(TagOpen :@ a) : xs) =
+  ExprLParen :@ a : top : applyLayout' a (TagOpenMode : HtmlMode : mms) ws il (Html : ss) xs
 
 -- Likewise for TagCommentStart
-applyLayout' _ mms@(ExprMode : _) il ss (tcs@(TagCommentStart :@ a) : xs) =
-  ExprLParen :@ a : tcs : applyLayout' a (HtmlCommentMode : HtmlMode : mms) il (Html : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (tcs@(TagCommentStart :@ a) : xs) =
+  ExprLParen :@ a : tcs : applyLayout' a (HtmlCommentMode : HtmlMode : mms) ws il (Html : ss) xs
 
 -- Enter string mode on string start
-applyLayout' _ mms@(ExprMode : _) il ss (ess@(StringStart :@ a) : xs) =
-  ess : applyLayout' a (StringMode : mms) il ss xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (ess@(StringStart :@ a) : xs) =
+  ess : applyLayout' a (StringMode : mms) ws il ss xs
 
 -- Pop mode on expr end
-applyLayout' _ (ExprMode : ms) il ss ((ExprEnd :@ a) : xs) =
+applyLayout' _ (ExprMode : ms) ws il ss ((ExprEnd :@ a) : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
-    toks <> applyLayout' a ms ils sss xs
+    toks <> applyLayout' a ms ws ils sss xs
 
 -- Nested expr mode
-applyLayout' _ mms@(ExprMode : _) il ss (est@(ExprStart :@ z) : xs) =
-  ExprLParen :@ z : est : applyLayout' z (ExprMode : HtmlMode : mms) il (Brace : Html : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
+  ExprLParen :@ z : est : applyLayout' z (ExprMode : HtmlMode : mms) ws il (Brace : Html : ss) xs
 
 -- Enter block scope on lambda
-applyLayout' _ mms@(ExprMode : _) il ss (est@(ExprLamStart :@ a) : xs) =
-  ExprLParen :@ a : est : applyLayout' a mms il (Block : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprLamStart :@ a) : xs) =
+  ExprLParen :@ a : est : applyLayout' a mms ws il (Block : ss) xs
 
 -- Enter Cases block scope on case start
-applyLayout' _ mms@(ExprMode : _) il ss (est@(ExprCaseStart :@ a) : xs) =
-  ExprLParen :@ a : est : applyLayout' a mms il (Cases : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprCaseStart :@ a) : xs) =
+  ExprLParen :@ a : est : applyLayout' a mms ws il (Cases : ss) xs
 
 -- Enter pattern mode on case of
-applyLayout' _ mms@(ExprMode : _) il ss (cof@(ExprCaseOf :@ z) : xs) =
-  cof : applyLayout' z (ExprPatternMode : mms) il ss xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (cof@(ExprCaseOf :@ z) : xs) =
+  cof : applyLayout' z (ExprPatternMode : mms) ws il ss xs
 
 -- Enter block scope on arrow
-applyLayout' _ mms@(ExprMode : _) il ss (arr@(ExprArrow :@ a) : xs) =
-  arr : ExprLParen :@ a : applyLayout' a mms il (Block : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (arr@(ExprArrow :@ a) : xs) =
+  arr : ExprLParen :@ a : applyLayout' a mms ws il (Block : ss) xs
 
 -- close block scope on casesep, push pattern mode
-applyLayout' _ mms@(ExprMode : _) il ss (est@(ExprCaseSep :@ a) : xs) =
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprCaseSep :@ a) : xs) =
   closeEmThen a CaseAlt ss il $ \ils sss toks ->
-    toks <> (est : applyLayout' a (ExprPatternMode : mms) ils sss xs)
+    toks <> (est : applyLayout' a (ExprPatternMode : mms) ws ils sss xs)
 
 -- enter paren scopes on left paren
-applyLayout' _ mms@(ExprMode : _) il ss (elp@(ExprLParen :@ z) : xs) =
-  elp : applyLayout' z mms il (Paren : ss) xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (elp@(ExprLParen :@ z) : xs) =
+  elp : applyLayout' z mms ws il (Paren : ss) xs
 
 -- close scopes on right paren
-applyLayout' _ mms@(ExprMode : _) il ss ((ExprRParen :@ a) : xs) =
+applyLayout' _ mms@(ExprMode : _) ws il ss ((ExprRParen :@ a) : xs) =
   closeEmThen a Paren ss il $ \ils sss toks ->
-    toks <> applyLayout' a mms ils sss xs
+    toks <> applyLayout' a mms ws ils sss xs
 
 -- Track indent/dedent
-applyLayout' _ ms@(ExprMode : _) il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
-  newline ms il ss b x xs
-applyLayout' _ ms@(ExprMode : _) il ss (Newline :@ a : n2@(Newline :@ _) : xs) =
-  applyLayout' a ms il ss (n2:xs)
-applyLayout' _ ms@(ExprMode : _) il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
-  newline ms il ss b 0 xs
+applyLayout' _ ms@(ExprMode : _) ws il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
+  newline ms ws il ss b x xs
+applyLayout' _ ms@(ExprMode : _) ws il ss (Newline :@ a : n2@(Newline :@ _) : xs) =
+  applyLayout' a ms ws il ss (n2:xs)
+applyLayout' _ ms@(ExprMode : _) ws il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
+  newline ms ws il ss b 0 xs
 
 -- Drop whitespace and newlines
-applyLayout' _ mms@(ExprMode : _) il ss (Whitespace _ :@ z : xs) =
-  applyLayout' z mms il ss xs
-applyLayout' _ mms@(ExprMode : _) il ss (Newline :@ z : xs) =
-  applyLayout' z mms il ss xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (Whitespace _ :@ z : xs) =
+  applyLayout' z mms ws il ss xs
+applyLayout' _ mms@(ExprMode : _) ws il ss (Newline :@ z : xs) =
+  applyLayout' z mms ws il ss xs
 
 
 --
@@ -237,34 +280,34 @@ applyLayout' _ mms@(ExprMode : _) il ss (Newline :@ z : xs) =
 --
 
 -- open case scope and pop mode on arrow
-applyLayout' _ (ExprPatternMode : ms) il ss (arr@(ExprArrow :@ a) : xs) =
-  arr : ExprLParen :@ a : applyLayout' a ms il (CaseAlt : ss) xs
+applyLayout' _ (ExprPatternMode : ms) ws il ss (arr@(ExprArrow :@ a) : xs) =
+  arr : ExprLParen :@ a : applyLayout' a ms ws il (CaseAlt : ss) xs
 
 -- Track indent/dedent
-applyLayout' _ ms@(ExprPatternMode : _) il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
-  newline ms il ss b x xs
-applyLayout' _ ms@(ExprPatternMode : _) il ss (n1@(Newline :@ a) : n2@(Newline :@ _) : xs) =
-  n1 : applyLayout' a ms il ss (n2:xs)
-applyLayout' _ ms@(ExprPatternMode : _) il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
-  newline ms il ss b 0 xs
+applyLayout' _ ms@(ExprPatternMode : _) ws il ss ((Newline :@ _) : (Whitespace x :@ b) : xs) =
+  newline ms ws il ss b x xs
+applyLayout' _ ms@(ExprPatternMode : _) ws il ss (n1@(Newline :@ a) : n2@(Newline :@ _) : xs) =
+  n1 : applyLayout' a ms ws il ss (n2:xs)
+applyLayout' _ ms@(ExprPatternMode : _) ws il ss ((Newline :@ _) : xs@(_ :@ b : _)) =
+  newline ms ws il ss b 0 xs
 
 -- Handle left and right parens
-applyLayout' _ ms@(ExprPatternMode : _) il ss (elp@(ExprLParen :@ z) : xs) =
-  elp : applyLayout' z ms il (Paren : ss) xs
-applyLayout' _ mms@(ExprPatternMode : _) il ss ((ExprRParen :@ a) : xs) =
+applyLayout' _ ms@(ExprPatternMode : _) ws il ss (elp@(ExprLParen :@ z) : xs) =
+  elp : applyLayout' z ms ws il (Paren : ss) xs
+applyLayout' _ mms@(ExprPatternMode : _) ws il ss ((ExprRParen :@ a) : xs) =
   closeEmThen a Paren ss il $ \ils sss toks ->
-    toks <> applyLayout' a mms ils sss xs
+    toks <> applyLayout' a mms ws ils sss xs
 
 -- pop mode on expr brace
-applyLayout' _ (ExprPatternMode : ms) il ss ((ExprEnd :@ a) : xs) =
+applyLayout' _ (ExprPatternMode : ms) ws il ss ((ExprEnd :@ a) : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
-    toks <> applyLayout' a ms ils sss xs
+    toks <> applyLayout' a ms ws ils sss xs
 
 -- drop whitespace and newlines
-applyLayout' _ mms@(ExprPatternMode : _) il ss (Whitespace _ :@ z : xs) =
-  applyLayout' z mms il ss xs
-applyLayout' _ mms@(ExprPatternMode : _) il ss (Newline :@ z : xs) =
-  applyLayout' z mms il ss xs
+applyLayout' _ mms@(ExprPatternMode : _) ws il ss (Whitespace _ :@ z : xs) =
+  applyLayout' z mms ws il ss xs
+applyLayout' _ mms@(ExprPatternMode : _) ws il ss (Newline :@ z : xs) =
+  applyLayout' z mms ws il ss xs
 
 
 --
@@ -272,24 +315,24 @@ applyLayout' _ mms@(ExprPatternMode : _) il ss (Newline :@ z : xs) =
 --
 
 -- Drop expr comments
-applyLayout' _ ms il ss (ExprCommentStart :@ z : xs) =
-  applyLayout' z ms il ss xs
-applyLayout' _ ms il ss (ExprCommentChunk _ :@ z : xs) =
-  applyLayout' z ms il ss xs
-applyLayout' _ ms il ss (ExprCommentEnd :@ z : xs) =
-  applyLayout' z ms il ss xs
+applyLayout' _ ms ws il ss (ExprCommentStart :@ z : xs) =
+  applyLayout' z ms ws il ss xs
+applyLayout' _ ms ws il ss (ExprCommentChunk _ :@ z : xs) =
+  applyLayout' z ms ws il ss xs
+applyLayout' _ ms ws il ss (ExprCommentEnd :@ z : xs) =
+  applyLayout' z ms ws il ss xs
 
 
 -- Drop trailing newline and close implicit scopes at EOF
-applyLayout' _ _ il ss (Newline :@ a : []) =
+applyLayout' _ _ _ il ss (Newline :@ a : []) =
   fmap (:@ a) (closeImplicitScopes ss il)
 
 -- Pass over any ignored tokens
-applyLayout' _ ms il ss (x:xs) =
-  x : applyLayout' (extractPosition x) ms il ss xs
+applyLayout' _ ms ws il ss (x:xs) =
+  x : applyLayout' (extractPosition x) ms ws il ss xs
 
 -- lose implicit scopes at EOF
-applyLayout' a _ il ss [] =
+applyLayout' a _ _ il ss [] =
   fmap (:@ a) (closeImplicitScopes ss il)
 
 closeEmThen ::
@@ -311,9 +354,9 @@ closeEmThen a s ss il k =
 
 -- | Given a new indent level, insert indent or dedent tokens
 -- accordingly, then continue with applyLayout.
-newline :: [LexerMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positioned Token] -> [Positioned Token]
+newline :: [LexerMode] -> [WSMode] -> [IndentLevel] -> [Scope] -> Range -> Int -> [Positioned Token] -> [Positioned Token]
 
-newline ms iis@(IndentLevel i : _) ss a x xs
+newline ms ws iis@(IndentLevel i : _) ss a x xs
   | i == x =
     -- same level
     -- this is reason enough to close a case
@@ -321,44 +364,44 @@ newline ms iis@(IndentLevel i : _) ss a x xs
     case ss of
       CaseAlt : _ ->
         closeEmThen a Indent ss iis $ \iiis sss toks ->
-          toks <> applyLayout' a (ExprPatternMode : ms) iiis sss xs
+          toks <> applyLayout' a (ExprPatternMode : ms) ws iiis sss xs
       _ ->
-        applyLayout' a ms iis ss xs
+        applyLayout' a ms ws iis ss xs
 
   | i > x =
     -- indent decreased
     -- close an indent scope
     -- trace (show ms) $
     maybe
-      (applyLayout' a ms iis ss xs)
-      (\(toks, iiis, sss) -> fmap (:@ a) toks <> newline ms iiis sss a x xs)
+      (applyLayout' a ms ws iis ss xs)
+      (\(toks, iiis, sss) -> fmap (:@ a) toks <> newline ms ws iiis sss a x xs)
       (closeScopes Indent ss iis)
 
   | otherwise {- i < x -} =
     -- indent increased
     -- open an indent scope
-    applyLayout' a ms (IndentLevel x : iis) (Indent : ss) xs
+    applyLayout' a ms ws (IndentLevel x : iis) (Indent : ss) xs
 
-newline ms [] ss a x xs
+newline ms ws [] ss a x xs
   | x == 0 =
     -- initial unindented
-    applyLayout' a ms [] ss xs
+    applyLayout' a ms ws [] ss xs
 
   | otherwise =
     -- initially indented
-    applyLayout' a ms [IndentLevel x] (Indent : ss) xs
+    applyLayout' a ms ws [IndentLevel x] (Indent : ss) xs
 
 
 -- -----------------------------------------------------------------------------
 
 closeScopes :: Scope -> [Scope] -> [IndentLevel] -> Maybe ([Token], [IndentLevel], [Scope])
 closeScopes s =
-  --trace (show s) .
+--  trace (show s) .
   closeScopes' (closeScope s)
 
 closeScopes' :: (Scope -> ScopeClose) -> [Scope] -> [IndentLevel] -> Maybe ([Token], [IndentLevel], [Scope])
 closeScopes' fs sss ils =
-  --trace ("closes " <> show result <> " from " <> show sss <> "(" <> show ils <> ")")  $
+--  trace ("closes " <> show result <> " from " <> show sss <> "(" <> show ils <> ")")  $
   result
   where
     result = splits (go (fmap fs sss))
@@ -380,6 +423,7 @@ closeImplicitScopes ss ils =
     CaseAlt -> CloseAndContinue [ExprRParen, ExprCaseSep]
     Html -> CloseAndContinue [ExprRParen]
     Brace -> Stop
+    LineBrace -> Stop
     Paren -> Stop)
     ss
     ils
@@ -408,6 +452,16 @@ closeScope Brace Indent = Continue
 closeScope Brace Html = CloseAndContinue [ExprRParen]
 -- braces can't close explicit parens
 closeScope Brace Paren = Stop
+closeScope Brace LineBrace = Stop
+
+closeScope LineBrace LineBrace = CloseAndStop [ExprEndWS]
+closeScope LineBrace Block = CloseAndContinue [ExprRParen]
+closeScope LineBrace Cases = CloseAndContinue [ExprRParen]
+closeScope LineBrace CaseAlt = CloseAndContinue [ExprRParen, ExprCaseSep]
+closeScope LineBrace Indent = Continue
+closeScope LineBrace Html = CloseAndContinue [ExprRParen]
+closeScope LineBrace Brace = Stop
+closeScope LineBrace Paren = Stop
 
 -- parens close other parens
 closeScope Paren Paren = CloseAndStop [ExprRParen]
@@ -420,6 +474,7 @@ closeScope Paren CaseAlt = CloseAndContinue [ExprRParen, ExprCaseSep]
 closeScope Paren Html = CloseAndContinue [ExprRParen]
 -- parens cant close braces or cases
 closeScope Paren Brace = Stop
+closeScope Paren LineBrace = Stop
 
 
 closeScope CaseAlt CaseAlt = CloseAndStop [ExprRParen]
@@ -430,6 +485,7 @@ closeScope CaseAlt Html = CloseAndContinue [ExprRParen]
 closeScope CaseAlt Cases = Stop
 closeScope CaseAlt Paren = Stop
 closeScope CaseAlt Brace = Stop
+closeScope CaseAlt LineBrace = Stop
 
 
 -- soft indent closes itself
@@ -441,6 +497,7 @@ closeScope Indent Cases = CloseAndContinue [ExprRParen]
 closeScope Indent CaseAlt = CloseAndStop [ExprRParen, ExprCaseSep]
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
+closeScope Indent LineBrace = Stop
 closeScope Indent Paren = Stop
 closeScope Indent Html = CloseAndContinue [ExprRParen]
 

@@ -57,8 +57,7 @@ helloWorld =
       (Just Lib.tHtml)
       (fmap (const EmptyAnnotation) $ ECon () (Constructor "Nested") Lib.nHtml [
         EList () [
-            ECon () (Constructor "Plain") Lib.nHtml [ELit () (Prim.VString "Hello,")]
-          , ECon () (Constructor "Whitespace") Lib.nHtml []
+            ECon () (Constructor "Plain") Lib.nHtml [ELit () (Prim.VString "Hello, ")]
           , EApp () (EVar () Lib.nHtmlText) (ELit () (Prim.VString "world!"))
           , ECon () (Constructor "Element") Lib.nHtml [
                 ECon () (Constructor "Tag") Lib.nTag [ELit () (Prim.VString "div")]
@@ -68,7 +67,7 @@ helloWorld =
                     , EApp () (EVar () Lib.nHtmlAttrValue) (ELit () (Prim.VString "table"))
                     ]
                   ]
-              , ECon () (Constructor "Nested") Lib.nHtml [EList () [ECon () (Constructor "Whitespace") Lib.nHtml []]]
+              , ECon () (Constructor "Nested") Lib.nHtml [EList () []]
               ]
           , EVar () Lib.nHtmlBlank
           ]

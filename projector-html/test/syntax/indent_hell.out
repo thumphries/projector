@@ -11,11 +11,11 @@ Template
             []
             (THtml
                ()
-               [ TWhiteSpace ()
+               [ TWhiteSpace () 1
                , TExprNode
                    () (TENode () (THtml () [ TVoidElement () (TTag () "b") [] ]))
-               , TWhiteSpace ()
+               , TWhiteSpace () 1
                ])
-        , TWhiteSpace ()
+        , TWhiteSpace () 1
         , TElement () (TTag () "c") [] (THtml () [])
         ]))

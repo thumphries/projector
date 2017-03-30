@@ -11,7 +11,7 @@ Template
                ()
                (TEVar () TId { unTId = "foo" })
                (TEVar () TId { unTId = "bar" }))
-        , TWhiteSpace ()
+        , TWhiteSpace () 1
         , TExprNode
             ()
             (TEApp

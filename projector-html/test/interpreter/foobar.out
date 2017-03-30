@@ -1,0 +1,4 @@
+Nested
+  [ Element "a" [] (Nested [ Plain "foo! bar! baz!" , Plain "QUUX" ])
+  , VoidElement "b" []
+  ]

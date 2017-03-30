@@ -1,0 +1,19 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ THtmlWS
+            ()
+            [ TWhiteSpace () 10
+            , TPlain () TPlainText { unTPlainText = "|" }
+            , TWhiteSpace () 10
+            ]
+        , TElement
+            ()
+            (TTag () "a")
+            []
+            (THtml () [ TPlain () TPlainText { unTPlainText = "|" } ])
+        ]))

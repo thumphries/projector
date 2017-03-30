@@ -10,6 +10,7 @@ module Projector.Html.Core.Elaborator (
 
 import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Text as T
 
 import           P
 
@@ -71,14 +72,22 @@ eType ty =
       Left (KindError (TypeSignature a))
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
-eHtml (THtml a nodes) =
+eHtml html =
+  case html of
+    THtml a nodes ->
+      nested a nodes
+
+nested :: a -> [TNode a] -> HtmlExpr (Annotation a)
+nested a nodes =
   ECon (HtmlBlock a) (Constructor "Nested") Lib.nHtml [EList (SourceAnnotation a) (fmap eNode nodes)]
 
 eNode :: TNode a -> HtmlExpr (Annotation a)
 eNode node =
   case node of
-    TWhiteSpace a ->
-      ECon (SourceAnnotation a) (Constructor "Whitespace") Lib.nHtml []
+    TWhiteSpace a x ->
+      ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtml [stringLit a (T.replicate x " ")]
+    TNewline a ->
+      ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtml [stringLit a "\n"]
     TPlain a (TPlainText t) ->
       ECon (SourceAnnotation a) (Constructor "Raw") Lib.nHtml [stringLit a t]
     TComment a (TPlainText t) ->
@@ -98,6 +107,8 @@ eNode node =
       ECon (HtmlExpression a) (Constructor "Nested") Lib.nHtml [
           EList (SourceAnnotation a) [eExpr expr]
         ]
+    THtmlWS a nodes ->
+      nested a nodes
 
 eTag :: TTag a -> HtmlExpr (Annotation a)
 eTag (TTag a t) =

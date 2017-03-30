@@ -1,0 +1,29 @@
+Nested
+  [ Element
+      "pre"
+      []
+      (Element
+         "code"
+         []
+         (Nested
+            [ Raw "    "
+            , Raw "foo"
+            , Raw "\n"
+            , Raw "    "
+            , Raw "bar"
+            , Raw "\n"
+            , Raw "  "
+            , Raw "baz"
+            , Raw "\n"
+            , Raw "quux"
+            , Raw "\n"
+            , Raw "   "
+            , Raw "wom"
+            , Raw "\n"
+            , Raw "    "
+            , Raw "lop"
+            , Raw "\n"
+            , Raw "    "
+            ]))
+  , Element "span" [] (Raw "code")
+  ]

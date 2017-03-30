@@ -22,7 +22,7 @@ Template
                             (TTag () "blink")
                             []
                             (THtml () [ TPlain () TPlainText { unTPlainText = "party" } ])
-                        , TWhiteSpace ()
+                        , TWhiteSpace () 1
                         ])) :|
                   [ TAlt
                       ()
@@ -31,19 +31,19 @@ Template
                          ()
                          (THtml
                             ()
-                            [ TWhiteSpace ()
+                            [ TWhiteSpace () 1
                             , TElement
                                 ()
                                 (TTag () "marquee")
                                 []
                                 (THtml () [ TPlain () TPlainText { unTPlainText = "cube" } ])
-                            , TWhiteSpace ()
+                            , TWhiteSpace () 1
                             , TElement
                                 ()
                                 (TTag () "i")
                                 []
                                 (THtml () [ TPlain () TPlainText { unTPlainText = "abcdefg" } ])
-                            , TWhiteSpace ()
+                            , TWhiteSpace () 1
                             ]))
                   , TAlt
                       ()
@@ -52,19 +52,19 @@ Template
                          ()
                          (THtml
                             ()
-                            [ TWhiteSpace ()
+                            [ TWhiteSpace () 1
                             , TElement
                                 ()
                                 (TTag () "b")
                                 []
                                 (THtml () [ TPlain () TPlainText { unTPlainText = "hell" } ])
-                            , TWhiteSpace ()
+                            , TWhiteSpace () 1
                             , TElement
                                 ()
                                 (TTag () "i")
                                 []
                                 (THtml () [ TPlain () TPlainText { unTPlainText = "foo" } ])
-                            , TWhiteSpace ()
+                            , TWhiteSpace () 1
                             ]))
                   ]))
         ]))
