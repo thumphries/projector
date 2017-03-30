@@ -18,7 +18,6 @@ import           Projector.Html
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 import           Projector.Html.Interpreter
-import           Projector.Html.Syntax
 import           Projector.Html.Syntax.QQ  (template)
 
 import           System.IO (FilePath, IO)
@@ -62,6 +61,8 @@ prop_interpreter_unit_foobar =
 prop_interpreter_unit_pre =
   regressionFile "pre"
 
+prop_interpreter_unit_whitespace =
+  regressionFile "whitespace"
 
 -- -----------------------------------------------------------------------------
 
@@ -79,8 +80,8 @@ bndst =
 
 interpretText :: FilePath -> Text -> Either Text Html
 interpretText fp t = do
-  t <- first renderHtmlError (parseTemplate fp t)
-  (_ty, expr) <- first renderHtmlError (checkTemplateIncremental decls bndst t)
+  ast <- first renderHtmlError (parseTemplate fp t)
+  (_ty, expr) <- first renderHtmlError (checkTemplateIncremental decls bndst ast)
   first (T.pack . ppShow) (interpret decls bnds expr)
 
 regressionFile :: FilePath -> Property

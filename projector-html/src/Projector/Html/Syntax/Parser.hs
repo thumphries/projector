@@ -82,7 +82,7 @@ template :: Grammar r (Template Range)
 template = mdo
   tsig' <- typeSignatures
   expr' <- expr html'
-  node' <- E.rule (htmlNode expr' node' html')
+  node' <- E.rule (htmlNode expr' html')
   html' <- html node'
   E.rule (template' tsig' expr')
 
@@ -163,37 +163,20 @@ html node' = mdo
 someHtml :: Rule r (TNode Range) -> Rule r (THtml Range)
 someHtml node' =
   (\nss -> THtml (someRange nss) (toList nss))
-    <$> some' (node' <|> htmlPlain <|> htmlCollapseWhitespace)
+    <$> some' (node' <|> htmlPlain <|> htmlPreserveWhitespace)
 
-htmlWS :: Rule r (TNode Range) -> Rule r (TNode Range)
-htmlWS node' =
-  (\a nss b -> THtmlWS (a <> b) (toList nss))
-    <$> token ExprStartWS
-    <*> some' (node' <|> htmlPlain <|> htmlPreserveWhitespace)
-    <*> token ExprEndWS
-
-htmlNode :: Rule r (TExpr Range) -> Rule r (TNode Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
-htmlNode expr' node' html' =
+htmlNode :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
+htmlNode expr' html' =
       htmlVoidElement expr'
   <|> htmlElement expr' html'
   <|> htmlComment
   <|> htmlExpr expr'
-  <|> htmlWS node'
+  <|> htmlWS html'
 
 htmlPlain :: Rule r (TNode Range)
 htmlPlain =
   (\ne -> TPlain (extractPosition ne) (TPlainText (extractPositioned ne)))
     <$> htmlText
-
-htmlCollapseWhitespace :: Rule r (TNode Range)
-htmlCollapseWhitespace =
-  E.terminal $ \case
-    Whitespace _ :@ a ->
-      pure (TWhiteSpace a 1)
-    Newline :@ a ->
-      pure (TWhiteSpace a 1)
-    _ ->
-      empty
 
 htmlPreserveWhitespace :: Rule r (TNode Range)
 htmlPreserveWhitespace =
@@ -204,6 +187,13 @@ htmlPreserveWhitespace =
       pure (TNewline a)
     _ ->
       empty
+
+htmlWS :: Rule r (THtml Range) -> Rule r (TNode Range)
+htmlWS html' =
+  (\a (THtml _ nodes) b -> THtmlWS (a <> b) nodes)
+    <$> token ExprStartWS
+    <*> html'
+    <*> token ExprEndWS
 
 htmlExpr :: Rule r (TExpr Range) -> Rule r (TNode Range)
 htmlExpr expr' =

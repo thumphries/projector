@@ -48,6 +48,10 @@ wsf (PreserveWS : _) t = [t]
 wsf (CollapseWS : _) _ = []
 wsf [] t = [t]
 
+wnl :: Range -> [WSMode] -> Positioned Token
+wnl a (CollapseWS : _) = Whitespace 1 :@ a
+wnl a _ = Newline :@ a
+
 -- -----------------------------------------------------------------------------
 
 -- peek, decide to enter sig mode or html mode.
@@ -133,13 +137,16 @@ applyLayout' _ (HtmlMode : ms) ws il ss (ExprRParen :@ a : xs) =
     toks <> applyLayout' a ms ws ils sss xs
 
 -- Track indent/dedent
-applyLayout' _ ms@(HtmlMode : _) ws il ss (n@(Newline :@ _) : w@(Whitespace x :@ b) : xs) =
-  n : wsf ws w <> newline ms ws il ss b x xs
-applyLayout' _ ms@(HtmlMode : _) ws il ss (n1@(Newline :@ a) : n2@(Newline :@ _) : xs) =
-  n1 : applyLayout' a ms ws il ss (n2:xs)
-applyLayout' _ ms@(HtmlMode : _) ws il ss (n@(Newline :@ _) : xs@(_ :@ b : _)) =
-  n : newline ms ws il ss b 0 xs
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ z : w@(Whitespace x :@ b) : xs) =
+  wnl z ws : wsf ws w <> newline ms ws il ss b x xs
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ a : n2@(Newline :@ _) : xs) =
+  wnl a ws : applyLayout' a ms ws il ss (n2:xs)
+applyLayout' _ ms@(HtmlMode : _) ws il ss (Newline :@ a : xs@(_ :@ b : _)) =
+  wnl a ws : newline ms ws il ss b 0 xs
 
+-- Collapse whitespace when appropriate
+applyLayout' _ ms@(HtmlMode : _) ws@(CollapseWS : _) il ss (Whitespace _ :@ b : xs) =
+  Whitespace 1 :@ b : applyLayout' b ms ws il ss xs
 
 
 --

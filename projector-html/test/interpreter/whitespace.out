@@ -1,0 +1,5 @@
+Nested
+  [ Element
+      "a" [] (Nested [ Raw "  " , Element "a" [] (Raw "   ") , Raw " " ])
+  , Element "a" [] (Raw " ")
+  ]
