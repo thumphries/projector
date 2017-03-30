@@ -61,6 +61,9 @@ prop_parse_unit_sensitive_layout =
 prop_parse_unit_sensitive_space =
   regressionFile "sensitive_space"
 
+prop_parse_unit_pipe =
+  regressionFile "pipe"
+
 
 -- -----------------------------------------------------------------------------
 

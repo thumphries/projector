@@ -12,6 +12,7 @@ import           Disorder.Jack
 import           P
 
 import           System.FilePath ((</>), (<.>))
+import           System.IO (FilePath, IO)
 
 import           Text.Show.Pretty (ppShow)
 
