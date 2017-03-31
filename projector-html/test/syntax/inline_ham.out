@@ -1,0 +1,24 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TElement
+            ()
+            (TTag () "ul")
+            []
+            (THtml
+               ()
+               [ TPlain () TPlainText { unTPlainText = "Ham" }
+               , TWhiteSpace () 1
+               , TPlain () TPlainText { unTPlainText = "(" }
+               , TElement
+                   ()
+                   (TTag () "code")
+                   []
+                   (THtml () [ TPlain () TPlainText { unTPlainText = "jamon" } ])
+               , TPlain () TPlainText { unTPlainText = ")" }
+               ])
+        ]))

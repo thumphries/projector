@@ -1,0 +1,54 @@
+Template
+  ()
+  Nothing
+  (TENode
+     ()
+     (THtml
+        ()
+        [ TElement
+            ()
+            (TTag () "ul")
+            []
+            (THtml
+               ()
+               [ TWhiteSpace () 1
+               , TElement
+                   ()
+                   (TTag () "li")
+                   []
+                   (THtml
+                      ()
+                      [ TWhiteSpace () 1
+                      , TPlain () TPlainText { unTPlainText = "Ham" }
+                      , TWhiteSpace () 1
+                      , TPlain () TPlainText { unTPlainText = "(" }
+                      , TElement
+                          ()
+                          (TTag () "code")
+                          []
+                          (THtml () [ TPlain () TPlainText { unTPlainText = "jamon" } ])
+                      , TPlain () TPlainText { unTPlainText = ")." }
+                      , TWhiteSpace () 1
+                      ])
+               , TWhiteSpace () 1
+               , TElement
+                   ()
+                   (TTag () "li")
+                   []
+                   (THtml
+                      ()
+                      [ TWhiteSpace () 1
+                      , TPlain () TPlainText { unTPlainText = "Turkey" }
+                      , TWhiteSpace () 1
+                      , TPlain () TPlainText { unTPlainText = "(" }
+                      , TElement
+                          ()
+                          (TTag () "code")
+                          []
+                          (THtml () [ TPlain () TPlainText { unTPlainText = "turquia" } ])
+                      , TPlain () TPlainText { unTPlainText = ")." }
+                      , TWhiteSpace () 1
+                      ])
+               , TWhiteSpace () 1
+               ])
+        ]))

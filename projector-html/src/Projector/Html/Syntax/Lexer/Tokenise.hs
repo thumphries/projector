@@ -238,7 +238,6 @@ htmlToken =
   <|> exprStart
   <|> htmlExprEnd
   <|> htmlWsExprEnd
-  <|> htmlRParen
   <|> plainText
 
 tagOpen :: Parser Token
@@ -275,10 +274,6 @@ htmlWsExprEnd =
 tagCommentStart :: Parser Token
 tagCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
-
-htmlRParen :: Parser Token
-htmlRParen =
-  char ')' *> pure ExprRParen <* pop
 
 -- -----------------------------------------------------------------------------
 -- HTML comments - these can't be nested, they halt on the first '-->'
