@@ -254,7 +254,7 @@ plainText =
   fmap Plain . escaping $ \p m ->
     -- characters that begin rules at the same level
     p == '\n' || p == ' ' || p == '<' || p == '>' || p == '\\' ||
-    p == '{'  || p == '}' || p == '(' || p == ')' || (p == '|' && m == pure '}')
+    p == '{'  || p == '}' || (p == '|' && m == pure '}')
 
 exprStart :: Parser Token
 exprStart =
