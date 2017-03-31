@@ -1,0 +1,28 @@
+Template
+  ()
+  Nothing
+  (TEApp
+     ()
+     (TEApp
+        ()
+        (TEApp
+           ()
+           (TEVar () TId { unTId = "foo" })
+           (TENode
+              ()
+              (THtml
+                 ()
+                 [ TElement
+                     ()
+                     (TTag () "a")
+                     []
+                     (THtml () [ TPlain () TPlainText { unTPlainText = "(call/cc)" } ])
+                 ])))
+        (TEVar () TId { unTId = "bar" }))
+     (TENode
+        ()
+        (THtml
+           ()
+           [ TElement () (TTag () "b") [] (THtml () [])
+           , TVoidElement () (TTag () "c") []
+           ])))

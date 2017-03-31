@@ -67,6 +67,15 @@ prop_parse_unit_pipe =
 prop_parse_unit_pre =
   regressionFile "pre"
 
+prop_parse_unit_paren_plain =
+  regressionFile "paren_plain"
+
+prop_parse_unit_inline_ham =
+  regressionFile "inline_ham"
+
+prop_parse_unit_ul =
+  regressionFile "ul"
+
 -- -----------------------------------------------------------------------------
 
 this :: [Char]

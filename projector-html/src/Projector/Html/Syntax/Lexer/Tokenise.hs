@@ -238,7 +238,6 @@ htmlToken =
   <|> exprStart
   <|> htmlExprEnd
   <|> htmlWsExprEnd
-  <|> htmlRParen
   <|> plainText
 
 tagOpen :: Parser Token
@@ -254,7 +253,7 @@ plainText =
   fmap Plain . escaping $ \p m ->
     -- characters that begin rules at the same level
     p == '\n' || p == ' ' || p == '<' || p == '>' || p == '\\' ||
-    p == '{'  || p == '}' || p == '(' || p == ')' || (p == '|' && m == pure '}')
+    p == '{'  || p == '}' || (p == '|' && m == pure '}')
 
 exprStart :: Parser Token
 exprStart =
@@ -275,10 +274,6 @@ htmlWsExprEnd =
 tagCommentStart :: Parser Token
 tagCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
-
-htmlRParen :: Parser Token
-htmlRParen =
-  char ')' *> pure ExprRParen <* pop
 
 -- -----------------------------------------------------------------------------
 -- HTML comments - these can't be nested, they halt on the first '-->'
