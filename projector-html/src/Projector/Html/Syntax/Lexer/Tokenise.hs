@@ -443,7 +443,7 @@ exprCommentStart =
 
 exprConId :: Parser Token
 exprConId =
-  fmap (ExprConId . T.pack) ((:) <$> P.upperChar <*> many (P.alphaNumChar <|> P.char '-' <|> P.char '_'))
+  fmap (ExprConId . T.pack) ((:) <$> P.upperChar <*> many (P.alphaNumChar <|> P.char '_'))
 
 exprVarId :: Parser Token
 exprVarId =
