@@ -239,6 +239,10 @@ matchesExpr expr pat =
       if (c1 == c2) && (length ps == length es)
         then zipWithM_ matchesExpr es ps
         else empty
+    (PCon _ (Constructor c1) ps, ERec _ (TypeName c2) fes) ->
+      if (c1 == c2) && (length ps == length fes)
+        then zipWithM_ matchesExpr (fmap snd fes) ps
+        else empty
     (PCon _ _ _, _) ->
       empty
 
