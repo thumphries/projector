@@ -11,7 +11,7 @@ cabal.sandbox.config
 /tmp
 gen
 *.aux
-*.out
+grammar.out
 *.pdf
 output
 bower_components
