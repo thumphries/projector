@@ -104,6 +104,11 @@ rules =
                pure x
              _ ->
                empty)
+      -- concat of a singleton: id
+    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.concat") _) (EList _ [x]) ->
+               pure x
+             _ ->
+               empty)
       -- adjacent raw plaintext nodes can be merged
     , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList b nodes) -> do
                nodes' <- foldRaw nodes
