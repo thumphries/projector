@@ -118,6 +118,7 @@ data TNode a
   | TNewline a
   | TExprNode a (TExpr a)
   | THtmlWS a [TNode a]
+  | TTextExprNode a (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TNode where
@@ -134,6 +135,8 @@ instance Comonad TNode where
       TNewline a ->
         a
       TExprNode a _ ->
+        a
+      TTextExprNode a _ ->
         a
       TPlain a _ ->
         a
@@ -157,6 +160,8 @@ instance Comonad TNode where
         TNewline (f node)
       TExprNode _ e ->
         TExprNode (f node) (extend (const (f node)) e)
+      TTextExprNode _ e ->
+        TTextExprNode (f node) (extend (const (f node)) e)
       TPlain _ t ->
         TPlain (f node) t
       THtmlWS _ nodes ->

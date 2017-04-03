@@ -29,6 +29,7 @@ data Scope =
   | Paren -- explicit parentheses
   | Brace -- explicit braces { }
   | LineBrace -- whitespace braces {| |}
+  | DoubleBrace -- text braces {{ }}
   | Block -- an implicit scope for which we inject parens
   | Indent -- an implicit scope we ignore for indent tracking purposes
   | Html -- an implicit scope for html closed only by brace, eof, indent
@@ -113,6 +114,10 @@ applyLayout' _ ms (PreserveWS : ws) il ss ((ExprEndWS :@ z) : xs) =
 applyLayout' _ mms@(HtmlMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
   est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
 
+-- Drop into expr mode on left text brace
+applyLayout' _ mms@(HtmlMode : _) ws il ss (est@(TextExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (DoubleBrace : ss) xs
+
 -- Drop into tag open mode on tagopen
 applyLayout' _ mms@(HtmlMode : _) ws il ss (top@(TagOpen :@ z) : xs) =
   top : applyLayout' z (TagOpenMode : mms) ws il ss xs
@@ -130,6 +135,11 @@ applyLayout' _ (HtmlMode : ms) ws il ss (ExprEnd :@ a : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
     toks <> applyLayout' a ms ws ils sss xs
 
+
+-- Likewise for text exprs
+applyLayout' _ (HtmlMode : ExprMode : ms) ws il ss (TextExprEnd :@ a : xs) =
+  closeEmThen a DoubleBrace ss il $ \ils sss toks ->
+    toks <> applyLayout' a ms ws ils sss xs
 
 -- Close scopes and pop layout on right paren
 applyLayout' _ (HtmlMode : ms) ws il ss (ExprRParen :@ a : xs) =
@@ -160,6 +170,10 @@ applyLayout' _ (TagOpenMode : ms) ws il ss (tcl@(TagClose :@ z) : xs) =
 -- drop into expr mode on tagopen
 applyLayout' _ mms@(TagOpenMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
   est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
+
+-- drop into expr mode on {{
+applyLayout' _ mms@(TagOpenMode : _) ws il ss (est@(TextExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (DoubleBrace : ss) xs
 
 -- Pop mode on tagselfclose
 applyLayout' _ (TagOpenMode : ms) ws il ss (tsc@(TagSelfClose :@ z) : xs) =
@@ -205,6 +219,9 @@ applyLayout' _ (StringMode : ms) ws il ss (ese@(StringEnd :@ a) : xs) =
 applyLayout' _ mms@(StringMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
   est : applyLayout' z (ExprMode : mms) ws il (Brace : ss) xs
 
+applyLayout' _ mms@(StringMode : _) ws il ss (est@(TextExprStart :@ z) : xs) =
+  est : applyLayout' z (ExprMode : mms) ws il (DoubleBrace : ss) xs
+
 --
 -- expr mode
 --
@@ -226,9 +243,18 @@ applyLayout' _ (ExprMode : ms) ws il ss ((ExprEnd :@ a) : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
     toks <> applyLayout' a ms ws ils sss xs
 
+-- Pop mode on }}
+applyLayout' _ (ExprMode : ms) ws il ss ((TextExprEnd :@ a) : xs) =
+  closeEmThen a DoubleBrace ss il $ \ils sss toks ->
+    toks <> applyLayout' a ms ws ils sss xs
+
 -- Nested expr mode
 applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprStart :@ z) : xs) =
   ExprLParen :@ z : est : applyLayout' z (ExprMode : HtmlMode : mms) ws il (Brace : Html : ss) xs
+
+-- Nested text-expr mode
+applyLayout' _ mms@(ExprMode : _) ws il ss (est@(TextExprStart :@ z) : xs) =
+  ExprLParen :@ z : est : applyLayout' z (ExprMode : HtmlMode : mms) ws il (DoubleBrace : Html : ss) xs
 
 -- Enter block scope on lambda
 applyLayout' _ mms@(ExprMode : _) ws il ss (est@(ExprLamStart :@ a) : xs) =
@@ -301,6 +327,10 @@ applyLayout' _ mms@(ExprPatternMode : _) ws il ss ((ExprRParen :@ a) : xs) =
 -- pop mode on expr brace
 applyLayout' _ (ExprPatternMode : ms) ws il ss ((ExprEnd :@ a) : xs) =
   closeEmThen a Brace ss il $ \ils sss toks ->
+    toks <> applyLayout' a ms ws ils sss xs
+
+applyLayout' _ (ExprPatternMode : ms) ws il ss ((TextExprEnd :@ a) : xs) =
+  closeEmThen a DoubleBrace ss il $ \ils sss toks ->
     toks <> applyLayout' a ms ws ils sss xs
 
 -- drop whitespace and newlines
@@ -424,6 +454,7 @@ closeImplicitScopes ss ils =
     Html -> CloseAndContinue [ExprRParen]
     Brace -> Stop
     LineBrace -> Stop
+    DoubleBrace -> Stop
     Paren -> Stop)
     ss
     ils
@@ -453,6 +484,7 @@ closeScope Brace Html = CloseAndContinue [ExprRParen]
 -- braces can't close explicit parens
 closeScope Brace Paren = Stop
 closeScope Brace LineBrace = Stop
+closeScope Brace DoubleBrace = Stop
 
 closeScope LineBrace LineBrace = CloseAndStop [ExprEndWS]
 closeScope LineBrace Block = CloseAndContinue [ExprRParen]
@@ -462,6 +494,24 @@ closeScope LineBrace Indent = Continue
 closeScope LineBrace Html = CloseAndContinue [ExprRParen]
 closeScope LineBrace Brace = Stop
 closeScope LineBrace Paren = Stop
+closeScope LineBrace DoubleBrace = Stop
+
+-- brace scopes are closed by braces
+closeScope DoubleBrace DoubleBrace = CloseAndStop [TextExprEnd]
+-- braces close blocks
+closeScope DoubleBrace Block = CloseAndContinue [ExprRParen]
+-- braces close case statements
+closeScope DoubleBrace Cases = CloseAndContinue [ExprRParen]
+-- braces close case alts
+closeScope DoubleBrace CaseAlt = CloseAndContinue [ExprRParen, ExprCaseSep]
+-- braces close soft indent
+closeScope DoubleBrace Indent = Continue
+-- braces close html
+closeScope DoubleBrace Html = CloseAndContinue [ExprRParen]
+-- braces can't close explicit parens
+closeScope DoubleBrace Paren = Stop
+closeScope DoubleBrace Brace = Stop
+closeScope DoubleBrace LineBrace = Stop
 
 -- parens close other parens
 closeScope Paren Paren = CloseAndStop [ExprRParen]
@@ -475,6 +525,7 @@ closeScope Paren Html = CloseAndContinue [ExprRParen]
 -- parens cant close braces or cases
 closeScope Paren Brace = Stop
 closeScope Paren LineBrace = Stop
+closeScope Paren DoubleBrace = Stop
 
 
 closeScope CaseAlt CaseAlt = CloseAndStop [ExprRParen]
@@ -486,6 +537,7 @@ closeScope CaseAlt Cases = Stop
 closeScope CaseAlt Paren = Stop
 closeScope CaseAlt Brace = Stop
 closeScope CaseAlt LineBrace = Stop
+closeScope CaseAlt DoubleBrace = Stop
 
 
 -- soft indent closes itself
@@ -498,6 +550,7 @@ closeScope Indent CaseAlt = CloseAndStop [ExprRParen, ExprCaseSep]
 -- soft indent can't close braces or parens
 closeScope Indent Brace = Stop
 closeScope Indent LineBrace = Stop
+closeScope Indent DoubleBrace = Stop
 closeScope Indent Paren = Stop
 closeScope Indent Html = CloseAndContinue [ExprRParen]
 

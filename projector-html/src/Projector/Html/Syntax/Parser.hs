@@ -172,6 +172,7 @@ htmlNode expr' html' =
   <|> htmlComment
   <|> htmlExpr expr'
   <|> htmlWS html'
+  <|> htmlTextExpr expr'
 
 htmlPlain :: Rule r (TNode Range)
 htmlPlain =
@@ -202,6 +203,14 @@ htmlExpr expr' =
     <*> expr'
     <*> token ExprEnd
     <?> "expression"
+
+htmlTextExpr :: Rule r (TExpr Range) -> Rule r (TNode Range)
+htmlTextExpr expr' =
+  (\a e b -> TTextExprNode (a <> b) e)
+    <$> token TextExprStart
+    <*> expr'
+    <*> token TextExprEnd
+    <?> "text expression"
 
 htmlElement :: Rule r (TExpr Range) -> Rule r (THtml Range) -> Rule r (TNode Range)
 htmlElement expr' html' =
@@ -432,7 +441,7 @@ interpolatedString :: Rule r (TExpr Range) -> Rule r (TIString Range)
 interpolatedString expr' =
   (\a ss b -> TIString (a <> b) ss)
     <$> token StringStart
-    <*> many (stringChunk <|> exprChunk expr')
+    <*> many (stringChunk <|> exprChunk expr' <|> textExprChunk expr')
     <*> token StringEnd
 
 stringChunk :: Rule r (TIChunk Range)
@@ -449,6 +458,13 @@ exprChunk expr' =
     <$> token ExprStart
     <*> expr'
     <*> token ExprEnd
+
+textExprChunk :: Rule r (TExpr Range) -> Rule r (TIChunk Range)
+textExprChunk expr' =
+  (\a e b -> TExprChunk (a <> b) e)
+    <$> token TextExprStart
+    <*> expr'
+    <*> token TextExprEnd
 
 -- -----------------------------------------------------------------------------
 

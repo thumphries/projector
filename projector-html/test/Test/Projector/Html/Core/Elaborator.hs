@@ -34,6 +34,9 @@ tshow =
 prop_hello =
   once (elabProp [template|<h1>Hello, world!</h1>|])
 
+prop_hello_text =
+  once (elabProp [template|\ x : String -> Html ={{ x }}|])
+
 prop_foo_element =
   once (elabProp [template|\foo : Html -> Html =
       <blink>{ foo }</blink>

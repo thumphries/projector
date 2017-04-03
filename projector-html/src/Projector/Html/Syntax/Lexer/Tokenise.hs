@@ -235,7 +235,9 @@ htmlToken =
   <|> tagOpen
   <|> exprCommentStart
   <|> wsExprStart
+  <|> textExprStart
   <|> exprStart
+  <|> htmlTextExprEnd
   <|> htmlExprEnd
   <|> htmlWsExprEnd
   <|> plainText
@@ -271,6 +273,10 @@ htmlWsExprEnd :: Parser Token
 htmlWsExprEnd =
   string "|}" *> pure ExprEndWS <* pop
 
+htmlTextExprEnd :: Parser Token
+htmlTextExprEnd =
+  string "}}" *> pure TextExprStart <* pop <* pop
+
 tagCommentStart :: Parser Token
 tagCommentStart =
   string "<!--" *> pure TagCommentStart <* push HtmlCommentMode
@@ -305,6 +311,7 @@ tagOpenToken =
   <|> tagIdent
   <|> tagStringStart
   <|> exprCommentStart
+  <|> textExprStart
   <|> exprStart
   <|> wsExprStart
 
@@ -368,7 +375,9 @@ exprToken =
   <|> exprCommentStart
   <|> wsExprStart
   <|> wsExprEnd
+  <|> textExprStart
   <|> exprStart
+  <|> textExprEnd
   <|> exprEnd
   <|> exprHtmlCommentStart
   <|> exprHtmlStart
@@ -461,6 +470,13 @@ wsExprEnd :: Parser Token
 wsExprEnd =
   string "|}" *> pure ExprEndWS <* pop
 
+textExprStart :: Parser Token
+textExprStart =
+  string "{{" *> pure TextExprStart <* push ExprMode
+
+textExprEnd :: Parser Token
+textExprEnd =
+  string "}}" *> pure TextExprEnd <* pop
 
 -- -----------------------------------------------------------------------------
 -- Expr comments - unlike HTML, these can be nested {- foo {- bar -} baz -}
@@ -488,12 +504,17 @@ stringToken =
       stringChunk
   <|> exprCommentStart
   <|> wsExprStart
+  <|> stringTextExprStart
   <|> stringExprStart
   <|> stringEnd
 
 stringEnd :: Parser Token
 stringEnd =
   char '"' *> pure StringEnd <* pop
+
+stringTextExprStart :: Parser Token
+stringTextExprStart =
+  string "{{" *> pure TextExprStart <* push ExprMode
 
 stringExprStart :: Parser Token
 stringExprStart =

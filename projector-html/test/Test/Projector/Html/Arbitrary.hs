@@ -102,9 +102,19 @@ genTVar =
 
 genHtml :: Int -> Jack (THtml ())
 genHtml k =
-  let j = k `div` 2 in
-  THtml () . everywhere (mkT mergePlain) <$>
-  listOfN 1 (k+1) (oneOf [genElement j, genVoidElement j, genComment, genHtmlExpr j, genHtmlWS j])
+  let j = k `div` 2
+  in THtml () . everywhere (mkT mergePlain) <$>
+     listOfN
+       1
+       (k + 1)
+       (oneOf
+          [ genElement j
+          , genVoidElement j
+          , genComment
+          , genHtmlExpr j
+          , genHtmlWS j
+          , genHtmlTextExpr j
+          ])
 
 genHtmlWS :: Int -> Jack (TNode ())
 genHtmlWS k =
@@ -161,6 +171,10 @@ mangle =
 genHtmlExpr :: Int -> Jack (TNode ())
 genHtmlExpr k =
   TExprNode () <$> genTemplateExpr k
+
+genHtmlTextExpr :: Int -> Jack (TNode ())
+genHtmlTextExpr k =
+  TTextExprNode () <$> genTemplateExpr k
 
 genAttribute :: Int -> Jack (TAttribute ())
 genAttribute k =
