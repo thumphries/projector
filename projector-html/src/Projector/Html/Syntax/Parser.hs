@@ -441,7 +441,7 @@ interpolatedString :: Rule r (TExpr Range) -> Rule r (TIString Range)
 interpolatedString expr' =
   (\a ss b -> TIString (a <> b) ss)
     <$> token StringStart
-    <*> many (stringChunk <|> exprChunk expr' <|> textExprChunk expr')
+    <*> many (stringChunk <|> textExprChunk expr')
     <*> token StringEnd
 
 stringChunk :: Rule r (TIChunk Range)
@@ -451,13 +451,6 @@ stringChunk =
       pure (TStringChunk a t)
     _ ->
       empty
-
-exprChunk :: Rule r (TExpr Range) -> Rule r (TIChunk Range)
-exprChunk expr' =
-  (\a e b -> TExprChunk (a <> b) e)
-    <$> token ExprStart
-    <*> expr'
-    <*> token ExprEnd
 
 textExprChunk :: Rule r (TExpr Range) -> Rule r (TIChunk Range)
 textExprChunk expr' =
