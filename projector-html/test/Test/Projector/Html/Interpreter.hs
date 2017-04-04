@@ -32,7 +32,7 @@ import           Text.Show.Pretty (ppShow)
 prop_interpret_unit =
   once . either (flip counterexample False) id $ do
      (at, a) <- first show . checkTemplate mempty $
-       [template|\t : String -> Html = <div id="a" class="{ t }">{ text t }</div>|]
+       [template|\t : String -> Html = <div id="a" class="{{ t }}">{{ t }}</div>|]
      let
        ma = M.fromList [("a", (at, LibraryFunction (Name "a")))]
        na = M.fromList [(Name "a", a)]
