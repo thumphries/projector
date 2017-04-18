@@ -66,6 +66,7 @@ data TypeError l a
   | TypeHole (Type l, a) a
   | RecordInferenceError [(FieldName, Type l)] a
   | InfiniteType (Type l, a) (Type l, a)
+  | Annotated a (TypeError l a)
 
 deriving instance (Ground l, Eq a) => Eq (TypeError l a)
 deriving instance (Ground l, Show a) => Show (TypeError l a)
@@ -117,14 +118,14 @@ typeCheckAll' decls known exprs = do
       localConstraints = sConstraints sstate
       -- constraints provided by the user in type signatures
       userConstraints = D.fromList . M.elems $
-        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const Equal)) known exprTypes
+        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
       -- assumptions we made about free variables
       Assumptions assums = sAssumptions sstate
       -- types biased towards 'known' over 'inferred', since they may be user constraints
       types = known <> exprTypes
       -- constraints for free variables we know stuff about
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
-        maybe mempty (with itys . Equal) (M.lookup n types)
+        maybe mempty (with itys . (Equal Nothing)) (M.lookup n types)
       -- all the constraints mashed together in a dlist
       constraints = D.toList (localConstraints <> userConstraints <> globalConstraints)
       -- all variables let-bound
@@ -386,7 +387,7 @@ freshOpenRecord a fs =
 -- Constraints
 
 data Constraint l a
-  = Equal (IType l a) (IType l a)
+  = Equal (Maybe a) (IType l a) (IType l a)
   deriving (Eq, Ord, Show)
 
 -- | Record a new constraint.
@@ -484,7 +485,7 @@ generateConstraints' decls expr =
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
       ta <- maybe (freshTypeVar a) (pure . hoistType decls a) mta
-      for_ as (addConstraint . Equal ta)
+      for_ as (addConstraint . Equal (Just a) ta)
       let ty = IArrow a ta (extractType e')
       pure (ELam (ty, a) n mta e')
 
@@ -495,7 +496,7 @@ generateConstraints' decls expr =
       f' <- generateConstraints' decls f
       g' <- generateConstraints' decls g
       t <- freshTypeVar a
-      addConstraint (Equal (IArrow a (extractType g') t) (extractType f'))
+      addConstraint (Equal (Just a) (IArrow a (extractType g') t) (extractType f'))
       pure (EApp (t, a) f' g')
 
     EList a es -> do
@@ -503,7 +504,7 @@ generateConstraints' decls expr =
       -- Constrain each type to be the annotated 'ty'.
       es' <- for es (generateConstraints' decls)
       te <- freshTypeVar a
-      for_ es' (addConstraint . Equal te . extractType)
+      for_ es' (addConstraint . Equal (Just a) te . extractType)
       let ty = IList a te
       pure (EList (ty, a) es')
 
@@ -513,8 +514,8 @@ generateConstraints' decls expr =
       g' <- generateConstraints' decls g
       ta <- freshTypeVar a
       tb <- freshTypeVar a
-      addConstraint (Equal (IArrow a ta tb) (extractType f'))
-      addConstraint (Equal (IList a ta) (extractType g'))
+      addConstraint (Equal (Just a) (IArrow a ta tb) (extractType f'))
+      addConstraint (Equal (Just a) (IList a ta) (extractType g'))
       let ty = IList a tb
       pure (EMap (ty, a) f' g')
 
@@ -527,7 +528,7 @@ generateConstraints' decls expr =
           unless (length ts == length es) (throwError (BadConstructorArity c (length ts) (length es) a))
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
-            (\(expected, inferred) -> addConstraint (Equal expected inferred))
+            (\(expected, inferred) -> addConstraint (Equal (Just a) expected inferred))
           let ty' = IVar a tn
           pure (ECon (ty', a) c tn es')
 
@@ -550,7 +551,7 @@ generateConstraints' decls expr =
           -- Order matters here, patCons consumes the assumptions from genCons.
           pe' <- generateConstraints' decls pe
           pat' <- patternConstraints decls (extractType e') pat
-          addConstraint (Equal ty (extractType pe'))
+          addConstraint (Equal (Just a) ty (extractType pe'))
           pure (pat', pe')
         pure res
       pure (ECase (ty, a) e' pes')
@@ -568,7 +569,7 @@ generateConstraints' decls expr =
             -- When an extraneous field is present
             (M.traverseMissing (\fn ty -> throwError (ExtraRecordField tn fn (flattenIType ty) a)))
             -- When present in both, add a constraint
-            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal twant thave)))
+            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal (Just a) twant thave)))
             need
             have
           -- catch duplicate fields too
@@ -590,7 +591,7 @@ generateConstraints' decls expr =
       e' <- generateConstraints' decls e
       tp <- freshTypeVar a
       rt <- freshOpenRecord a (field fn tp)
-      addConstraint (Equal rt (extractType e'))
+      addConstraint (Equal (Just a) rt (extractType e'))
       pure (EPrj (tp, a) e' fn)
 
     EForeign a n ty -> do
@@ -612,7 +613,7 @@ patternConstraints decls ty pat =
   case pat of
     PVar a x -> do
       as <- lookupAssumptions x
-      for_ as (addConstraint . Equal ty)
+      for_ as (addConstraint . Equal (Just a) ty)
       pure (PVar (ty, a) x)
 
     PCon a c pats ->
@@ -621,7 +622,7 @@ patternConstraints decls ty pat =
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
           let ty' = hoistType decls a (TVar tn)
-          addConstraint (Equal ty' ty)
+          addConstraint (Equal (Just a) ty' ty)
           pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) (uncurry (patternConstraints decls))
           pure (PCon (ty', a) c pats')
 
@@ -842,8 +843,8 @@ solveConstraints constraints =
     -- Solve all the constraints independently.
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
-        Equal t1 t2 ->
-          fmap (first D.fromList) (mostGeneralUnifierST points t1 t2)
+        Equal ma t1 t2 ->
+          fmap (first (D.fromList . fmap (maybe id Annotated ma))) (mostGeneralUnifierST points t1 t2)
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
