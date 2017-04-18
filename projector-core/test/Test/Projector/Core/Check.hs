@@ -142,7 +142,7 @@ prop_record_unit_prj_extra =
   once $
     typeCheck dRecord rexpr
     ===
-    Left [ ExtraRecordField nRecord (FieldName "quux") (TVar (TypeName "b"), ()) () ]
+    Left [ Annotated () (ExtraRecordField nRecord (FieldName "quux") (TVar (TypeName "b"), ()) ()) ]
   where
     rexpr =
       EApp ()

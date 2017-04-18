@@ -130,6 +130,8 @@ ppTypeError' err =
       WL.annotate a . WL.hang 2 $
         text "Found hole with type:"
           WL.<$$> text (ppType ty)
+    Annotated a te ->
+      WL.annotate a $ ppTypeError' te
 
 
 annNL :: a -> Doc a -> Doc a
