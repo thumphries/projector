@@ -42,7 +42,7 @@ renderParseError pe =
     Unexpected loc expect got ->
       T.unlines [
           renderRange loc <> ": Parse error:"
-        , "  " <> "Unexpected " <> T.pack (show got)
+        , "  " <> "Unexpected '" <> renderToken got <> "' (" <> T.pack (show got) <> ")"
         , "  " <> renderExpected expect
         ]
     AmbiguousParse x _ts ->
