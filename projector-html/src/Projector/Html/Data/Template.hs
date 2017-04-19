@@ -170,6 +170,7 @@ instance Comonad TNode where
 data TAttribute a
   = TAttribute a TAttrName (TAttrValue a)
   | TEmptyAttribute a TAttrName
+  | TAttributeExpr a (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TAttribute where
@@ -179,15 +180,20 @@ instance Comonad TAttribute where
         a
       TEmptyAttribute a _ ->
         a
+      TAttributeExpr a _ ->
+        a
   extend f attr =
     case attr of
       TAttribute _ n v ->
         TAttribute (f attr) n (extend (const (f attr)) v)
       TEmptyAttribute _ n ->
         TEmptyAttribute (f attr) n
+      TAttributeExpr _ e ->
+        TAttributeExpr (f attr) (extend (const (f attr)) e)
 
 data TAttrValue a
   = TQuotedAttrValue a (TIString a)
+  -- TODO rename this
   | TAttrExpr a (TExpr a)
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
