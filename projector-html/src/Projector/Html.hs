@@ -354,8 +354,9 @@ warnModules :: HtmlDecls -> HtmlModules -> Either [HtmlError] ()
 warnModules decls mods =
   let binds = S.fromList (M.keys (HB.extractModuleBindings mods))
       exprs = fmap (fmap snd) (HB.extractModuleExprs mods)
+      types = decls <> Library.types <> Prim.types
       shadowing = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnShadowing binds) exprs))
-      exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity decls) exprs))
+      exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity types) exprs))
   in shadowing *> exhaustiv
 
 userConstants :: UserConstants -> Map PC.Name (HtmlType, SrcAnnotation)

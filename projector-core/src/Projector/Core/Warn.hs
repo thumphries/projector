@@ -29,6 +29,7 @@ import           X.Control.Monad.Trans.Either as XE
 data Warning l a
   = ShadowedName a Name
   | InexhaustiveCase a [Constructor]
+  | Invariant Text
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 -- -----------------------------------------------------------------------------
@@ -128,7 +129,7 @@ matchTier (MatchTree mt) =
 
 checkSet :: Ground l => a -> TypeDecls l -> Set Constructor -> Either (Warning l a) ()
 checkSet a decls seen =
-  fromMaybe (Left (InexhaustiveCase a [])) $ do
+  fromMaybe (Left (Invariant "BUG: Could not determine type (checkSet)")) $ do
     witness <- head seen
     (tn, _tys) <- lookupConstructor witness decls
     defn <- lookupType tn decls

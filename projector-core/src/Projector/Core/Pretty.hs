@@ -156,7 +156,8 @@ ppWarning' w =
       WL.annotate a (text ("This binding for '" <> n <> "' shadows an existing definition."))
     InexhaustiveCase a cs ->
       WL.annotate a (text ("Patterns not matched: " <> T.intercalate ", " (fmap unConstructor cs)))
-
+    Invariant t ->
+      text t
 
 -- -----------------------------------------------------------------------------
 
