@@ -95,7 +95,7 @@ typeCheckIncremental ::
   -> Map PC.Name (HtmlExpr a)
   -> Either (CoreError a) (Map PC.Name (HtmlType, HtmlExpr (HtmlType, a)))
 typeCheckIncremental typs known =
-  first HtmlTypeError . fmap (fmap (\e -> (extractType e, e))) . PC.typeCheckIncremental (typs <> htmlTypes) known
+  first HtmlTypeError . fmap (fmap (\e -> (extractType e, e))) . PC.typeCheckIncremental (htmlTypes <> typs) known
 
 htmlTypes :: HtmlDecls
 htmlTypes =
