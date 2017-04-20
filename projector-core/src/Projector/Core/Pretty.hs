@@ -192,6 +192,9 @@ ppType' ctx verbose t =
     Type (TListF ty) ->
       "[" <> ppType ty <> "]"
 
+    Type (TForallF as b) ->
+      "forall " <> T.intercalate " " (fmap unTypeName as) <> ". " <> ppType b
+
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =
   T.intercalate " | " . fmap (\(Constructor n, rts) -> T.unwords (n : fmap ppType rts))

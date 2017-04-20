@@ -179,6 +179,7 @@ data IType l a
   | IClosedRecord a TypeName (Fields l a)
   | IOpenRecord a Int (Fields l a)
   | IList a (IType l a)
+  | IForall a [TypeName] (IType l a)
   deriving (Eq, Ord, Show)
 
 newtype Fields l a = Fields {
@@ -202,12 +203,15 @@ hoistType decls a (Type ty) =
         Just (DRecord fts) ->
           IClosedRecord a tn (hoistFields decls a fts)
         Nothing ->
-          -- This is an error? Should probably be in Either here.
+          -- 'a' or an unknown type.
+          -- FIXME should be threading type bindings around so we know can handle bindings properly
           IVar a tn
     TArrowF f g ->
       IArrow a (hoistType decls a f) (hoistType decls a g)
     TListF f ->
       IList a (hoistType decls a f)
+    TForallF ps t ->
+      IForall a ps (hoistType decls a t)
 
 hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l a
 hoistFields decls a =
@@ -218,8 +222,10 @@ hoistFields decls a =
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
 lowerIType ity =
   case ity of
-    IDunno a _ ->
-      Left (InferenceError a)
+    IDunno _ x ->
+      -- FIXME should gather the dunnos on the outside as a forall, not inside
+      let tv = dunnoTypeVar x in
+      pure (TForall [tv] (TVar tv))
     IHole a _ Nothing ->
       Left (InferenceError a)
     IHole a _ (Just i) ->
@@ -237,6 +243,8 @@ lowerIType ity =
       Left (RecordInferenceError fs' a)
     IList _ f ->
       TList <$> lowerIType f
+    IForall _ bs t ->
+      TForall bs <$> lowerIType t
 
 -- Produce concrete type name for a fresh variable.
 dunnoTypeVar :: Int -> TypeName
@@ -269,6 +277,8 @@ flattenIType ity =
       IOpenRecord a _ _ ->
         a
       IList a _ ->
+        a
+      IForall a _ _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
@@ -290,6 +300,8 @@ flattenIType' ity =
       TVar tn
     IList _ ty ->
       TList (flattenIType' ty)
+    IForall _ ps t ->
+      TForall ps (flattenIType' t)
 
 -- | Report a unification error.
 unificationError :: IType l a -> IType l a -> TypeError l a
@@ -669,6 +681,9 @@ substituteType subs top ty =
     IOpenRecord _ x _ ->
       maybe ty (substituteType subs False) (M.lookup x (unSubstitutions subs))
 
+    IForall a bs t ->
+      IForall a bs (substituteType subs False t)
+
     IClosedRecord _ _ _ ->
       ty
 
@@ -795,6 +810,8 @@ occurs a q ity =
             else traverse_ (go x) fs
         IList _ f ->
           go x f
+        IForall _ _ t ->
+          go x t
 {-# INLINE occurs #-}
 
 unifyOpenFields ::
