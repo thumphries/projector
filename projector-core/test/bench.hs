@@ -172,4 +172,3 @@ nth n = app succ (nth (n - 1))
 mul :: Int -> Int -> Expr TestLitT ()
 mul m n =
   app (app mult (nth m)) (nth n)
-

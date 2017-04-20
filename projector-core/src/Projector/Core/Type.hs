@@ -16,6 +16,7 @@ module Projector.Core.Type (
   , pattern TVar
   , pattern TArrow
   , pattern TList
+  , pattern TForall
   , mapGroundType
   -- *** Type functor
   , TypeF (..)
@@ -47,6 +48,7 @@ pattern TLit l = Type (TLitF l)
 pattern TVar x = Type (TVarF x)
 pattern TArrow a b = Type (TArrowF a b)
 pattern TList a = Type (TListF a)
+pattern TForall a b = Type (TForallF a b)
 
 -- | Type functor.
 data TypeF l a
@@ -54,6 +56,7 @@ data TypeF l a
   | TVarF TypeName
   | TArrowF a a
   | TListF a
+  | TForallF [TypeName] a
   deriving (Functor, Foldable, Traversable)
 
 deriving instance (Eq l, Eq a) => Eq (TypeF l a)
@@ -75,6 +78,9 @@ mapGroundType tmap (Type ty) =
 
     TListF a ->
       TListF (mapGroundType tmap a)
+
+    TForallF as bs ->
+      TForallF as (mapGroundType tmap bs)
 
 -- | Declared types.
 data Decl l
