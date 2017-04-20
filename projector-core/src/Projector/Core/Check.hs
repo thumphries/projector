@@ -23,7 +23,7 @@ module Projector.Core.Check (
 
 import           Control.Monad.ST (ST, runST)
 import           Control.Monad.Trans.Class (MonadTrans(..))
-import           Control.Monad.Trans.State.Strict (State, runState, gets, modify')
+import           Control.Monad.Trans.State.Strict (State, StateT, runState, runStateT, get, gets, modify', put)
 
 import           Data.Char (chr, ord)
 import           Data.DList (DList)
@@ -217,34 +217,51 @@ hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l
 hoistFields decls a =
   Fields . M.fromList . fmap (fmap (hoistType decls a))
 
--- | Assert that we have a monotype. Returns 'InferenceError' if we
--- encounter a unification variable.
+-- | Convert our internal type representation back to the concrete.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
-lowerIType ity =
-  case ity of
-    IDunno _ x ->
-      -- FIXME should gather the dunnos on the outside as a forall, not inside
-      let tv = dunnoTypeVar x in
-      pure (TForall [tv] (TVar tv))
-    IHole a _ Nothing ->
-      Left (InferenceError a)
-    IHole a _ (Just i) ->
-      Left (TypeHole (flattenIType i) a)
-    ILit _ l ->
-      pure (TLit l)
-    IVar _ tn ->
-      pure (TVar tn)
-    IArrow _ f g ->
-      TArrow <$> lowerIType f <*> lowerIType g
-    IClosedRecord _ tn _fs ->
-      pure (TVar tn)
-    IOpenRecord a _x (Fields fs) -> do
-      fs' <- traverse (traverse lowerIType) (M.toList fs)
-      Left (RecordInferenceError fs' a)
-    IList _ f ->
-      TList <$> lowerIType f
-    IForall _ bs t ->
-      TForall bs <$> lowerIType t
+lowerIType ity' = do
+  (ty, (_, ms)) <- flip runStateT (0, mempty) (go ity')
+  pure $ case M.elems ms of
+    [] ->
+      ty
+    ps ->
+      TForall ps ty
+  where
+    go ity = case ity of
+      IDunno _ x -> do
+        -- FIX this doesn't do the right thing for nested foralls - need to figure out free variables first
+        tv <- freeTVar x
+        pure (TVar tv)
+      IHole a _ Nothing ->
+        lift $ Left (InferenceError a)
+      IHole a _ (Just i) ->
+        lift $ Left (TypeHole (flattenIType i) a)
+      ILit _ l ->
+        pure (TLit l)
+      IVar _ tn ->
+        pure (TVar tn)
+      IArrow _ f g ->
+        TArrow <$> go f <*> go g
+      IClosedRecord _ tn _fs ->
+        pure (TVar tn)
+      IOpenRecord a _x (Fields fs) -> do
+        fs' <- traverse (traverse go) (M.toList fs)
+        lift $ Left (RecordInferenceError fs' a)
+      IList _ f ->
+        TList <$> go f
+      IForall _ bs t ->
+        TForall bs <$> go t
+
+freeTVar :: Int -> StateT (Int, Map Int TypeName) (Either (TypeError l a)) TypeName
+freeTVar x = do
+  (y, m) <- get
+  case M.lookup x m of
+    Just tn ->
+      pure tn
+    Nothing -> do
+      let tv = dunnoTypeVar y
+      put (y+1, M.insert x tv m)
+      pure tv
 
 -- Produce concrete type name for a fresh variable.
 dunnoTypeVar :: Int -> TypeName
