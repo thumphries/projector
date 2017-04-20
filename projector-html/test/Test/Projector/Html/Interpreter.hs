@@ -76,6 +76,12 @@ prop_interpreter_unit_foo_each =
 prop_interpreter_unit_fizz =
   regressionFile "fizz"
 
+prop_interpreter_unit_bool_con =
+  regressionFile "bool_con"
+
+prop_interpreter_unit_bool_con_false =
+  regressionFile "bool_con_false"
+
 -- -----------------------------------------------------------------------------
 
 decls :: HtmlDecls

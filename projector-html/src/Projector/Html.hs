@@ -144,8 +144,8 @@ checkExprIncremental decls known =
   . HC.typeCheckIncremental decls allSigs
   . M.singleton (PC.Name defaultName)
   where
-    conFunTypes = HC.constructorFunctionTypes decls
-    conFunExprs = HC.constructorFunctions decls
+    conFunTypes = HC.constructorFunctionTypes (decls <> Library.types <> Prim.types)
+    conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allSigs = conFunTypes <> libraryExprs <> M.mapKeys PC.Name known
 
@@ -166,8 +166,8 @@ checkModule decls known (HB.Module typs imps exps) = do
   where
     exprTypes = M.fromList . catMaybes . fmap sequenceA . M.toList $
       with exps (\(HB.ModuleExpr mt x) -> with mt (\t -> (t, PC.extractAnnotation x)))
-    conFunTypes = HC.constructorFunctionTypes decls
-    conFunExprs = HC.constructorFunctions decls
+    conFunTypes = HC.constructorFunctionTypes (decls <> Library.types <> Prim.types)
+    conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allDecls = decls <> typs
     allSigs = conFunTypes <> libraryExprs <> exprTypes <> known
@@ -185,10 +185,10 @@ checkModules decls known exprs =
   first HtmlCoreError (fmap fst (foldM fun (mempty, initialKnown) deps))
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
-    conFunTypes = HC.constructorFunctionTypes decls
+    conFunTypes = HC.constructorFunctionTypes (decls <> Library.types <> Prim.types)
     initialKnown = conFunTypes <> libraryExprs <> known
     --
-    conFunExprs = HC.constructorFunctions decls
+    conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     --
     fun (res, acc) n =
@@ -354,8 +354,9 @@ warnModules :: HtmlDecls -> HtmlModules -> Either [HtmlError] ()
 warnModules decls mods =
   let binds = S.fromList (M.keys (HB.extractModuleBindings mods))
       exprs = fmap (fmap snd) (HB.extractModuleExprs mods)
+      types = decls <> Library.types <> Prim.types
       shadowing = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnShadowing binds) exprs))
-      exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity decls) exprs))
+      exhaustiv = void (sequenceEither (fmap (first (fmap HtmlCoreWarning) . PC.warnExhaustivity types) exprs))
   in shadowing *> exhaustiv
 
 userConstants :: UserConstants -> Map PC.Name (HtmlType, SrcAnnotation)
