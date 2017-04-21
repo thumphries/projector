@@ -394,7 +394,7 @@ data Constraint l a
 addConstraint :: Ground l => Constraint l a -> Check l a ()
 addConstraint c =
   Check . lift $
-    modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
+    modify' (\s -> s { sConstraints = D.cons c (sConstraints s) })
 
 
 -- -----------------------------------------------------------------------------
@@ -655,9 +655,10 @@ substituteType subs top ty =
       maybe
         ty
         (\sty ->
+          let res = substituteType subs False sty in
           if top
-          then IHole a x (Just sty)
-          else substituteType subs False sty)
+          then IHole a x (Just res)
+          else res)
         (M.lookup x (unSubstitutions subs))
 
     IArrow a t1 t2 ->
