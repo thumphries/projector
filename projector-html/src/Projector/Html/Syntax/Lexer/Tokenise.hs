@@ -318,7 +318,7 @@ tagOpenToken =
 
 tagIdent :: Parser Token
 tagIdent =
-  TagIdent . T.pack <$> ((:) <$> P.letterChar <*> many P.alphaNumChar)
+  TagIdent . T.pack <$> ((:) <$> P.letterChar <*> many (P.alphaNumChar <|> P.char '-'))
 
 tagEquals :: Parser Token
 tagEquals =
