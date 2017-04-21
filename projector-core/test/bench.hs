@@ -173,3 +173,34 @@ mul :: Int -> Int -> Expr TestLitT ()
 mul m n =
   app (app mult (nth m)) (nth n)
 
+--
+
+declTwo :: Decl TestLitT
+declTwo =
+  DRecord [
+      (FieldName "a", TVar (TypeName "Foo"))
+    , (FieldName "b", TVar (TypeName "Foo"))
+    ]
+
+declFoo :: Decl TestLitT
+declFoo =
+  DRecord [
+      (FieldName "foo", TList (TLit TString))
+    ]
+
+testDecls :: TypeDecls TestLitT
+testDecls =
+    declareType (TypeName "Bar") declTwo
+  . declareType (TypeName "Foo") declFoo
+  $ mempty
+
+testFun :: Expr TestLitT ()
+testFun =
+  lam_ "ss" (Just (TList (TVar (TypeName "Bar")))) $
+    EMap ()
+      (lam_ "s" Nothing $
+        (EList () [
+            (EPrj () (EPrj () (var_ "s") (FieldName "a")) (FieldName "foo"))
+          , (EPrj () (EPrj () (var_ "s") (FieldName "b")) (FieldName "foo"))
+          ]))
+      (var_ "ss")
