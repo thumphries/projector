@@ -423,8 +423,7 @@ data Constraint l a
 addConstraint :: Ground l => Constraint l a -> Check l a ()
 addConstraint c =
   Check . lift $
-    modify' (\s -> s { sConstraints = D.snoc (sConstraints s) c })
-
+    modify' (\s -> s { sConstraints = D.cons c (sConstraints s)})
 
 -- -----------------------------------------------------------------------------
 -- Assumptions

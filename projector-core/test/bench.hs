@@ -200,7 +200,7 @@ testFun =
     EMap ()
       (lam_ "s" Nothing $
         (EList () [
-            (EPrj () (EPrj () (var_ "s") (FieldName "a")) (FieldName "foo"))
-          , (EPrj () (EPrj () (var_ "s") (FieldName "b")) (FieldName "foo"))
+            (EPrj () (EPrj () (var_ "s") (FieldName "b")) (FieldName "foo"))
+          , (EPrj () (EPrj () (var_ "s") (FieldName "a")) (FieldName "foo"))
           ]))
       (var_ "ss")
