@@ -9,6 +9,8 @@ module Projector.Html.Backend.Haskell.Rewrite (
   ) where
 
 
+import qualified Control.Monad.Trans.State as State
+
 import           P
 
 import           Projector.Core
@@ -73,28 +75,29 @@ rules =
                pure (EForeign a (Name "Projector.Html.Runtime.concat") ty)
              _ ->
                empty)
-    , (\case ECon a (Constructor "Tag") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.Tag") tn es)
+    , (\case ECon a c tn es ->
+               ECon a
+                 <$> qualifyConstructor c
+                 <*> pure tn
+                 <*> pure es
              _ ->
                empty)
-    , (\case ECon a (Constructor "Attribute") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.Attribute") tn es)
-             _ ->
-               empty)
-    , (\case ECon a (Constructor "AttributeKey") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.AttributeKey") tn es)
-             _ ->
-               empty)
-    , (\case ECon a (Constructor "AttributeValue") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.AttributeValue") tn es)
-             _ ->
-               empty)
-    , (\case ECon a (Constructor "True") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.True") tn es)
-             _ ->
-               empty)
-    , (\case ECon a (Constructor "False") tn es ->
-               pure (ECon a (Constructor "Projector.Html.Runtime.False") tn es)
+    , (\case ECase a e ps ->
+               let
+                 go p =
+                   case p of
+                     PVar pa n ->
+                       pure $ PVar pa n
+                     PCon pa c ps' ->
+                       PCon pa
+                         -- Keep track of any time we need to qualify and return the full Just ECase later
+                         <$> (maybe (pure c) (\c' -> State.put True >> pure c') . qualifyConstructor) c
+                         <*> mapM go ps'
+                 (ec, updated) =
+                   flip State.runState False $
+                     ECase a e <$> mapM (\(p, e') -> fmap (flip (,) e') . go $ p) ps
+               in
+                 valueOrEmpty updated ec
              _ ->
                empty)
 
@@ -121,6 +124,24 @@ rules =
       -- hoist nested foldHtmls up to the top level
     ]
 
+
+qualifyConstructor :: Constructor -> Maybe Constructor
+qualifyConstructor c =
+  case c of
+    Constructor "Tag" ->
+      pure $ Constructor "Projector.Html.Runtime.Tag"
+    Constructor "Attribute" ->
+      pure $ Constructor "Projector.Html.Runtime.Attribute"
+    Constructor "AttributeKey" ->
+      pure $ Constructor "Projector.Html.Runtime.AttributeKey"
+    Constructor "AttributeValue" ->
+      pure $ Constructor "Projector.Html.Runtime.AttributeValue"
+    Constructor "True" ->
+      pure $ Constructor "Projector.Html.Runtime.True"
+    Constructor "False" ->
+      pure $ Constructor "Projector.Html.Runtime.False"
+    _ ->
+      empty
 
 textNode :: a -> Expr PrimT a
 textNode a =
