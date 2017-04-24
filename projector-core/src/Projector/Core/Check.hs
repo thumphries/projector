@@ -893,20 +893,64 @@ solveConstraints constraints =
     -- Initialise mutable state.
     points <- lift $ ST.newSTRef (Points M.empty)
 
+    let mgu ma t1 t2 =
+          fmap (first (D.fromList . fmap (maybe id Annotated ma))) (lift $ mostGeneralUnifierST points t1 t2)
+
     -- Solve all the constraints independently.
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
         Equal ma t1 t2 ->
-          fmap (first (D.fromList . fmap (maybe id Annotated ma))) (lift $ mostGeneralUnifierST points t1 t2)
-        ExplicitInstance ma t1 t2 ->
-          -- We can instantiate t2 with unification vars right here, right now, and just chuck it into mgu.
-          -- this requires a name supply, though.
-          undefined
+          mgu ma t1 t2
+        ExplicitInstance ma want have -> do
+          inst <- instantiate want
+          mgu ma inst have
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- lift $ ST.readSTRef points
     lift . for (first D.toList es) $ \_ -> do
       substitutionMap solvedPoints
+
+instantiate :: (Monad m) => IType l a -> StateT NameSupply m (IType l a)
+instantiate ty =
+  case ty of
+    IForall _a vars ity -> do
+      bnds <- traverse (const nextSVar) (M.fromList (fmap (\v -> (v, ())) vars))
+      pure (subst bnds ity)
+    _ ->
+      pure ty
+
+subst :: Map TypeName Var -> IType l a -> IType l a
+subst bnds' ty' =
+  go bnds' ty'
+  where
+    go bnds ity =
+      case ity of
+        IVar a tn ->
+          maybe ity (IDunno a) (M.lookup tn bnds)
+        IForall a bs t ->
+          IForall a bs (go (foldl' (flip M.delete) bnds bs) t)
+        IArrow a t1 t2 ->
+          IArrow a (go bnds t1) (go bnds t2)
+        IList a t1 ->
+          IList a (go bnds t1)
+        IHole a x mty ->
+          IHole a x (fmap (go bnds) mty)
+        ILit _ _ ->
+          ity
+        IDunno _ _ ->
+          ity
+        IClosedRecord _ _ _ ->
+          ity
+        -- FIXME not sure about this one
+        IOpenRecord _ _ _ ->
+          ity
+
+
+nextSVar :: Monad m => StateT NameSupply m Var
+nextSVar = do
+  NameSupply x <- get
+  put (NameSupply (x + 1))
+  pure (S x)
 
 substitutionMap :: Points s l a -> ST s (Substitutions l a)
 substitutionMap points = do
