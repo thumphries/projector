@@ -23,7 +23,7 @@ module Projector.Core.Check (
 
 import           Control.Monad.ST (ST, runST)
 import           Control.Monad.Trans.Class (MonadTrans(..))
-import           Control.Monad.Trans.State.Strict (State, StateT, runState, runStateT, get, gets, modify', put)
+import           Control.Monad.Trans.State.Strict (State, StateT, evalStateT, runState, runStateT, get, gets, modify', put)
 
 import           Data.Char (chr, ord)
 import           Data.DList (DList)
@@ -889,23 +889,23 @@ unifyClosedFields points (Fields have) tn (Fields want) = do
 
 solveConstraints :: Ground l => Traversable f => f (Constraint l a) -> Either [TypeError l a] (Substitutions l a)
 solveConstraints constraints =
-  runST $ do
+  runST $ flip evalStateT (NameSupply 0) $ do
     -- Initialise mutable state.
-    points <- ST.newSTRef (Points M.empty)
+    points <- lift $ ST.newSTRef (Points M.empty)
 
     -- Solve all the constraints independently.
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
         Equal ma t1 t2 ->
-          fmap (first (D.fromList . fmap (maybe id Annotated ma))) (mostGeneralUnifierST points t1 t2)
+          fmap (first (D.fromList . fmap (maybe id Annotated ma))) (lift $ mostGeneralUnifierST points t1 t2)
         ExplicitInstance ma t1 t2 ->
           -- We can instantiate t2 with unification vars right here, right now, and just chuck it into mgu.
           -- this requires a name supply, though.
           undefined
 
     -- Retrieve the remaining points and produce a substitution map
-    solvedPoints <- ST.readSTRef points
-    for (first D.toList es) $ \_ -> do
+    solvedPoints <- lift $ ST.readSTRef points
+    lift . for (first D.toList es) $ \_ -> do
       substitutionMap solvedPoints
 
 substitutionMap :: Points s l a -> ST s (Substitutions l a)
