@@ -118,14 +118,14 @@ typeCheckAll' decls known exprs = do
       localConstraints = sConstraints sstate
       -- constraints provided by the user in type signatures
       userConstraints = D.fromList . M.elems $
-        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
+        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (ExplicitInstance Nothing))) known exprTypes
       -- assumptions we made about free variables
       Assumptions assums = sAssumptions sstate
       -- types biased towards 'known' over 'inferred', since they may be user constraints
       types = known <> exprTypes
       -- constraints for free variables we know stuff about
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
-        maybe mempty (with itys . (Equal Nothing)) (M.lookup n types)
+        maybe mempty (with itys . (ExplicitInstance Nothing)) (M.lookup n types)
       -- all the constraints mashed together in a dlist
       constraints = D.toList (localConstraints <> userConstraints <> globalConstraints)
       -- all variables let-bound
@@ -168,16 +168,25 @@ typeTree decls expr = do
 -- -----------------------------------------------------------------------------
 -- Types
 
+-- Unification variables.
+-- These can come from the constraint set or the solver,
+-- and I don't really want to thread a name supply around between them.
+data Var =
+    C {-# UNPACK #-} !Int
+  | S {-# UNPACK #-} !Int
+  deriving (Eq, Ord, Show)
+
+
 -- | We have an internal notion of type inside the checker.
 -- Looks a bit like regular types, extended with unification variables.
 data IType l a
-  = IDunno a Int
-  | IHole a Int (Maybe (IType l a))
+  = IDunno a Var
+  | IHole a Var (Maybe (IType l a))
   | IVar a TypeName -- maybe remove?
   | ILit a l
   | IArrow a (IType l a) (IType l a)
   | IClosedRecord a TypeName (Fields l a)
-  | IOpenRecord a Int (Fields l a)
+  | IOpenRecord a Var (Fields l a)
   | IList a (IType l a)
   | IForall a [TypeName] (IType l a)
   deriving (Eq, Ord, Show)
@@ -252,26 +261,34 @@ lowerIType ity' = do
       IForall _ bs t ->
         TForall bs <$> go t
 
-freeTVar :: Int -> StateT (Int, Map Int TypeName) (Either (TypeError l a)) TypeName
+freeTVar :: Var -> StateT (Int, Map Var TypeName) (Either (TypeError l a)) TypeName
 freeTVar x = do
   (y, m) <- get
   case M.lookup x m of
     Just tn ->
       pure tn
     Nothing -> do
-      let tv = dunnoTypeVar y
+      let tv = dunnoTypeVar (C y)
       put (y+1, M.insert x tv m)
       pure tv
 
 -- Produce concrete type name for a fresh variable.
-dunnoTypeVar :: Int -> TypeName
-dunnoTypeVar x =
+dunnoTypeVar :: Var -> TypeName
+dunnoTypeVar v =
+  case v of
+    C x ->
+      dunnoTypeVar' "" x
+    S x ->
+      dunnoTypeVar' "s" x
+
+dunnoTypeVar' :: Text -> Int -> TypeName
+dunnoTypeVar' p x =
   let letter j = chr (ord 'a' + j)
   in case (x `mod` 26, x `div` 26) of
     (i, 0) ->
-      TypeName (T.pack [letter i])
+      TypeName (p <> T.pack [letter i])
     (m, n) ->
-      TypeName (T.pack [letter m] <> renderIntegral n)
+      TypeName (p <> T.pack [letter m] <> renderIntegral n)
 
 -- Produce a regular type, concretising fresh variables.
 -- This is currently used for error reporting.
@@ -329,13 +346,14 @@ lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Ty
 lowerExpr =
   ET.sequenceEither . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
 
-typeVar :: IType l a -> Maybe Int
+typeVar :: IType l a -> Maybe Var
 typeVar ty =
   case ty of
     IDunno _ x ->
       pure x
     IOpenRecord _ x _ ->
       pure x
+    -- FIXME do we need IHole here?
     _ ->
       Nothing
 
@@ -392,12 +410,12 @@ emptyNameSupply :: NameSupply
 emptyNameSupply =
   NameSupply 0
 
-nextUnificationVar :: Check l a Int
+nextUnificationVar :: Check l a Var
 nextUnificationVar =
   Check . lift $ do
     v <- gets (nextVar . sSupply)
     modify' (\s -> s { sSupply = NameSupply (v + 1) })
-    pure v
+    pure (C v)
 
 -- | Grab a fresh type variable.
 freshTypeVar :: a -> Check l a (IType l a)
@@ -417,6 +435,7 @@ freshOpenRecord a fs =
 
 data Constraint l a
   = Equal (Maybe a) (IType l a) (IType l a)
+  | ExplicitInstance (Maybe a) (IType l a) (IType l a)
   deriving (Eq, Ord, Show)
 
 -- | Record a new constraint.
@@ -666,7 +685,7 @@ extractType =
 -- Constraint solving
 
 newtype Substitutions l a
-  = Substitutions { unSubstitutions :: Map Int (IType l a) }
+  = Substitutions { unSubstitutions :: Map Var (IType l a) }
   deriving (Eq, Ord, Show)
 
 substitute :: Ground l => Substitutions l a -> Expr l (IType l a, a) -> Expr l (IType l a, a)
@@ -712,7 +731,7 @@ substituteType subs top ty =
 {-# INLINE substituteType #-}
 
 newtype Points s l a = Points {
-    unPoints :: Map Int (UF.Point s (IType l a))
+    unPoints :: Map Var (UF.Point s (IType l a))
   }
 
 mostGeneralUnifierST ::
@@ -780,7 +799,7 @@ mguST points t1 t2 =
     (_, _) ->
       left [unificationError t1 t2]
 
-unifyVar :: Ground l => STRef s (Points s l a) -> a -> Int -> IType l a -> EitherT [TypeError l a] (ST s) (IType l a)
+unifyVar :: Ground l => STRef s (Points s l a) -> a -> Var -> IType l a -> EitherT [TypeError l a] (ST s) (IType l a)
 unifyVar points a x t2 = do
   mt1 <- lift (getRepr points x)
   let safeUnion c z u2 = do
@@ -801,7 +820,7 @@ unifyVar points a x t2 = do
 -- | Check that a given unification variable isn't present inside the
 -- type it's being unified with. This is necessary for typechecking
 -- to be sound, it prevents us from constructing the infinite type.
-occurs :: a -> Int -> IType l a -> Either (TypeError l a) ()
+occurs :: a -> Var -> IType l a -> Either (TypeError l a) ()
 occurs a q ity =
   go q ity
   where
@@ -879,6 +898,10 @@ solveConstraints constraints =
       case c of
         Equal ma t1 t2 ->
           fmap (first (D.fromList . fmap (maybe id Annotated ma))) (mostGeneralUnifierST points t1 t2)
+        ExplicitInstance ma t1 t2 ->
+          -- We can instantiate t2 with unification vars right here, right now, and just chuck it into mgu.
+          -- this requires a name supply, though.
+          undefined
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- ST.readSTRef points
@@ -914,7 +937,7 @@ getPoint mref ty =
       UF.fresh ty
 {-# INLINE getPoint #-}
 
-getRepr :: STRef s (Points s l a) -> Int -> ST s (Maybe (IType l a))
+getRepr :: STRef s (Points s l a) -> Var -> ST s (Maybe (IType l a))
 getRepr points x = do
   ps <- ST.readSTRef points
   for (M.lookup x (unPoints ps)) (UF.descriptor <=< UF.repr)
