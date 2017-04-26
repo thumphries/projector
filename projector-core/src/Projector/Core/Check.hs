@@ -189,6 +189,7 @@ data IType l a
   | IOpenRecord a Var (Fields l a)
   | IList a (IType l a)
   | IForall a [TypeName] (IType l a)
+  | IKind a TypeName (IType l a)
   deriving (Eq, Ord, Show)
 
 newtype Fields l a = Fields {
@@ -221,6 +222,8 @@ hoistType decls a (Type ty) =
       IList a (hoistType decls a f)
     TForallF ps t ->
       IForall a ps (hoistType decls a t)
+    TKindF tn t ->
+      IKind a tn (hoistType decls a t)
 
 hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l a
 hoistFields decls a =
@@ -260,6 +263,8 @@ lowerIType ity' = do
         TList <$> go f
       IForall _ bs t ->
         TForall bs <$> go t
+      IKind _ tn t ->
+        TKind tn <$> go t
 
 freeTVar :: Var -> StateT (Int, Map Var TypeName) (Either (TypeError l a)) TypeName
 freeTVar x = do
@@ -313,6 +318,8 @@ flattenIType ity =
       IList a _ ->
         a
       IForall a _ _ ->
+        a
+      IKind a _ _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
@@ -336,6 +343,8 @@ flattenIType' ity =
       TList (flattenIType' ty)
     IForall _ ps t ->
       TForall ps (flattenIType' t)
+    IKind _ tn t ->
+      TKind tn (flattenIType' t)
 
 -- | Report a unification error.
 unificationError :: IType l a -> IType l a -> TypeError l a
@@ -720,6 +729,9 @@ substituteType subs top ty =
     IForall a bs t ->
       IForall a bs (substituteType subs False t)
 
+    IKind a tn t ->
+      IKind a tn (substituteType subs False t)
+
     IClosedRecord _ _ _ ->
       ty
 
@@ -792,6 +804,11 @@ mguST points t1 t2 =
       [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
 
+    (IKind a tn1 v1, IKind b tn2 v2) -> do
+      unless (tn1 == tn2) (left [unificationError (IVar a tn1) (IVar b tn2)])
+      c <- mguST points v1 v2
+      pure (IKind a tn1 c)
+
     (IList k a, IList _ b) -> do
       c <- mguST points a b
       pure (IList k c)
@@ -847,6 +864,8 @@ occurs a q ity =
         IList _ f ->
           go x f
         IForall _ _ t ->
+          go x t
+        IKind _ _ t ->
           go x t
 {-# INLINE occurs #-}
 
@@ -935,6 +954,8 @@ subst bnds' ty' =
           IList a (go bnds t1)
         IHole a x mty ->
           IHole a x (fmap (go bnds) mty)
+        IKind a tn t ->
+          IKind a tn (go bnds t)
         ILit _ _ ->
           ity
         IDunno _ _ ->
