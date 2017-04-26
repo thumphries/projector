@@ -98,6 +98,8 @@ interpret' e =
         <$> value v
     EApp _ (EForeign _ (Name "blank") _) _ ->
       pure $ Nested []
+    EApp _ (EForeign _ (Name "fold") _) xs ->
+      undefined
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
