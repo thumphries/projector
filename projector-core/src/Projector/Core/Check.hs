@@ -208,10 +208,12 @@ hoistType decls a (Type ty) =
       ILit a l
     TVarF tn ->
       case lookupType tn decls of
-        Just (DVariant ps _cns) ->
-          foldl' (_) (IVar a tn) ps
+        Just (DVariant _ps _cns) ->
+          IVar a tn
+          -- foldl' (\t n -> IApp a t (IVar a n)) (IVar a tn) ps
         Just (DRecord ps fts) ->
-          foldl' (_) (IClosedRecord a tn (hoistFields decls a fts)) ps
+          IClosedRecord a tn (hoistFields decls a fts)
+          --foldl' (\t n -> IApp a t (IVar a n)) (IClosedRecord a tn (hoistFields decls a fts)) ps
         Nothing ->
           -- 'a' or an unknown type.
           -- FIXME should be threading type bindings around so we know can handle bindings properly
@@ -584,6 +586,11 @@ generateConstraints' decls expr =
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
           unless (length ts == length es) (throwError (BadConstructorArity c (length ts) (length es) a))
           es' <- for es (generateConstraints' decls)
+          -- TODO we need to instantiate all the bound type variables in the constructor...
+          --      for each in ps,
+          --        - grab a new ivar
+          --        - subst it into the cns list of types before looping over it
+          --        - result type is a tapp over those ivars
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal (Just a) expected inferred))
           let ty' = IVar a tn -- FIX TAPP and BINDERS here
