@@ -21,15 +21,20 @@ module Projector.Html.Runtime.Library (
   ) where
 
 
-import           Data.Foldable (fold)
+import qualified Data.Foldable as F
 import           Data.Functor (fmap)
 import           Data.Monoid (Monoid (..))
 import qualified Hydrant
 import           Projector.Html.Runtime.Prim
 
+fold :: [[a]] -> [a]
+fold =
+  F.fold
+{-# INLINE fold #-}
+
 foldHtml :: [Hydrant.Html] -> Hydrant.Html
 foldHtml =
-  fold
+  F.fold
 {-# INLINE foldHtml #-}
 
 append :: Text -> Text -> Text
