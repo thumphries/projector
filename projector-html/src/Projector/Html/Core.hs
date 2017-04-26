@@ -13,6 +13,7 @@ module Projector.Html.Core (
   , typeCheckIncremental
   , htmlTypes
   , libraryExprs
+  , primExprs
   -- * Various type aliases
   , HtmlType
   , HtmlDecl
@@ -104,6 +105,10 @@ htmlTypes =
 libraryExprs :: Map PC.Name (HtmlType, Annotation a)
 libraryExprs =
   fmap (fmap (snd . PC.extractAnnotation)) Library.exprs
+
+primExprs :: Map PC.Name (HtmlType, Annotation a)
+primExprs =
+  fmap (fmap (snd . PC.extractAnnotation)) Prim.exprs
 
 extractType :: HtmlExpr (HtmlType, a) -> HtmlType
 extractType =

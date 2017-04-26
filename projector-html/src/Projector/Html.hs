@@ -147,7 +147,7 @@ checkExprIncremental decls known =
     conFunTypes = HC.constructorFunctionTypes (decls <> Library.types <> Prim.types)
     conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
-    allSigs = conFunTypes <> libraryExprs <> M.mapKeys PC.Name known
+    allSigs = conFunTypes <> libraryExprs <> primExprs <> M.mapKeys PC.Name known
 
 defaultName :: Text
 defaultName = "it"
@@ -170,7 +170,7 @@ checkModule decls known (HB.Module typs imps exps) = do
     conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
     allDecls = decls <> typs
-    allSigs = conFunTypes <> libraryExprs <> exprTypes <> known
+    allSigs = conFunTypes <> libraryExprs <> primExprs <> exprTypes <> known
     exprs = fmap HB.meExpr exps
 
 -- | Figure out the dependency order of a set of modules, then
@@ -186,7 +186,7 @@ checkModules decls known exprs =
   where
     deps = dependencyOrder (buildDependencyGraph (buildModuleGraph exprs))
     conFunTypes = HC.constructorFunctionTypes (decls <> Library.types <> Prim.types)
-    initialKnown = conFunTypes <> libraryExprs <> known
+    initialKnown = conFunTypes <> libraryExprs <> primExprs <> known
     --
     conFunExprs = HC.constructorFunctions (decls <> Library.types <> Prim.types)
     toSubstitute = fmap snd (Library.exprs <> Prim.exprs <> conFunExprs)
@@ -343,6 +343,10 @@ runBuildIncremental (Build mnr mdm) (UserDataTypes decls) ucons hms rts = do
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
 libraryExprs =
   M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.libraryExprs
+
+primExprs :: Map PC.Name (HtmlType, SrcAnnotation)
+primExprs =
+  M.mapWithKey (\n (ty,_e) -> (ty, LibraryFunction n)) HC.primExprs
 
 -- | Run a set of backend-specific predicates.
 validateModules :: HB.Backend a e -> Map HB.ModuleName (HB.Module HtmlType PrimT b) -> Either [e] ()

@@ -42,6 +42,7 @@ exprs =
   M.fromList [
       (nStringAppend, (tStringAppend, eStringAppend))
     , (nStringConcat, (tStringConcat, eStringConcat))
+    , (nListFold, (tListFold, eListFold))
     ]
 
 
@@ -97,3 +98,22 @@ eStringConcat =
 aStringConcat :: Annotation a
 aStringConcat =
   LibraryFunction nStringConcat
+
+-- -----------------------------------------------------------------------------
+
+nListFold :: Name
+nListFold =
+  Name "fold"
+
+tListFold :: HtmlType
+tListFold =
+  TForall [TypeName "a"]
+    (TArrow (TList (TList (TVar (TypeName "a")))) (TList (TVar (TypeName "a"))))
+
+eListFold :: HtmlExpr (HtmlType, Annotation a)
+eListFold =
+  EForeign (tListFold, aListFold) nListFold tListFold
+
+aListFold :: Annotation a
+aListFold =
+  LibraryFunction nListFold
