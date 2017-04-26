@@ -190,6 +190,7 @@ data IType l a
   | IOpenRecord a Var (Fields l a)
   | IList a (IType l a)
   | IForall a [TypeName] (IType l a)
+  | IApp a (IType l a) (IType l a)
   deriving (Eq, Ord, Show)
 
 newtype Fields l a = Fields {
@@ -208,10 +209,12 @@ hoistType decls a (Type ty) =
       ILit a l
     TVarF tn ->
       case lookupType tn decls of
-        Just (DVariant _cns) ->
+        Just (DVariant _ps _cns) ->
           IVar a tn
-        Just (DRecord fts) ->
+          -- foldl' (\t n -> IApp a t (IVar a n)) (IVar a tn) ps
+        Just (DRecord ps fts) ->
           IClosedRecord a tn (hoistFields decls a fts)
+          --foldl' (\t n -> IApp a t (IVar a n)) (IClosedRecord a tn (hoistFields decls a fts)) ps
         Nothing ->
           -- 'a' or an unknown type.
           -- FIXME should be threading type bindings around so we know can handle bindings properly
@@ -223,6 +226,8 @@ hoistType decls a (Type ty) =
       IList a (hoistType decls a f)
     TForallF ps t ->
       IForall a ps (hoistType decls a t)
+    TAppF ta tb ->
+      IApp a (hoistType decls a ta) (hoistType decls a tb)
 
 hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l a
 hoistFields decls a =
@@ -262,6 +267,8 @@ lowerIType ity' = do
         TList <$> go f
       IForall _ bs t ->
         TForall bs <$> go t
+      IApp _ ta tb ->
+        TApp <$> go ta <*> go tb
 
 freeTVar :: Var -> StateT (Int, Map Var TypeName) (Either (TypeError l a)) TypeName
 freeTVar x = do
@@ -315,6 +322,8 @@ flattenIType ity =
       IList a _ ->
         a
       IForall a _ _ ->
+        a
+      IApp a _ _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
@@ -338,6 +347,8 @@ flattenIType' ity =
       TList (flattenIType' ty)
     IForall _ ps t ->
       TForall ps (flattenIType' t)
+    IApp _ ta tb ->
+      TApp (flattenIType' ta) (flattenIType' tb)
 
 -- | Report a unification error.
 unificationError :: IType l a -> IType l a -> TypeError l a
@@ -571,19 +582,24 @@ generateConstraints' decls expr =
 
     ECon a c tn es ->
       case lookupType tn decls of
-        Just ty@(DVariant cns) -> do
+        Just ty@(DVariant ps cns) -> do
           -- Look up the constructor, check its arity, and introduce
           -- constraints for each of its subterms, for which we expect certain types.
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
           unless (length ts == length es) (throwError (BadConstructorArity c (length ts) (length es) a))
           es' <- for es (generateConstraints' decls)
+          -- TODO we need to instantiate all the bound type variables in the constructor...
+          --      for each in ps,
+          --        - grab a new ivar
+          --        - subst it into the cns list of types before looping over it
+          --        - result type is a tapp over those ivars
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
             (\(expected, inferred) -> addConstraint (Equal (Just a) expected inferred))
-          let ty' = IVar a tn
+          let ty' = IVar a tn -- FIX TAPP and BINDERS here
           pure (ECon (ty', a) c tn es')
 
         -- Records should be constructed via ERec, not ECon
-        Just ty@(DRecord _) -> do
+        Just ty@(DRecord _ _) -> do
           throwError (BadConstructorName c tn ty a)
 
         Nothing ->
@@ -608,7 +624,7 @@ generateConstraints' decls expr =
 
     ERec a tn fes -> do
       case lookupType tn decls of
-        Just (DRecord fts) -> do
+        Just (DRecord ps fts) -> do
           -- recurse into each field
           fes' <- traverse (traverse (generateConstraints' decls)) fes
           let need = M.fromList (fmap (fmap (hoistType decls a)) fts)
@@ -627,11 +643,12 @@ generateConstraints' decls expr =
             throwError (DuplicateRecordFields tn (fmap fst fes L.\\ fmap fst fts) a)
 
           -- set type as the closed record
+          -- FIX TAPP and BINDERS here
           let ty' = IClosedRecord a tn (hoistFields decls a fts)
           pure (ERec (ty', a) tn fes')
 
         -- Variants should be constructed via ECon, not ERec
-        Just ty@(DVariant _) -> do
+        Just ty@(DVariant _ _) -> do
           throwError (BadConstructorName (Constructor (unTypeName tn)) tn ty a)
 
         Nothing ->
@@ -723,6 +740,9 @@ substituteType subs top ty =
     IForall a bs t ->
       IForall a bs (substituteType subs False t)
 
+    IApp a ta tb ->
+      IApp a (substituteType subs False ta) (substituteType subs False tb)
+
     IClosedRecord _ _ _ ->
       ty
 
@@ -795,6 +815,12 @@ mguST points t1 t2 =
       [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
 
+    (IApp a f1 g1, IApp b f2 g2) -> do
+      -- TODO should we be verifying the kind of f here?
+      f <- mguST points f1 f2
+      g <- mguST points g1 g2
+      pure (IApp a f g)
+
     (IList k a, IList _ b) -> do
       c <- mguST points a b
       pure (IList k c)
@@ -862,6 +888,8 @@ occurs a q ity =
           go x f
         IForall _ _ t ->
           go x t
+        IApp _ f g ->
+          go x f *> go x g
 {-# INLINE occurs #-}
 
 unifyOpenFields ::
@@ -957,6 +985,8 @@ subst bnds' ty' =
           IList a (go bnds t1)
         IHole a x mty ->
           IHole a x (fmap (go bnds) mty)
+        IApp a f g ->
+          IApp a (go bnds f) (go bnds g)
         ILit _ _ ->
           ity
         IDunno _ _ ->

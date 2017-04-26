@@ -134,9 +134,9 @@ checkSet a decls seen =
     (tn, _tys) <- lookupConstructor witness decls
     defn <- lookupType tn decls
     let missing = case defn of
-          DVariant cts ->
+          DVariant _ps cts ->
             S.difference (S.fromList (fmap fst cts)) seen
-          DRecord _ ->
+          DRecord _ps _fts ->
             S.difference (S.singleton (Constructor (unTypeName tn))) seen
     pure $
       if missing == S.empty

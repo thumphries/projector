@@ -17,6 +17,7 @@ module Projector.Core.Type (
   , pattern TArrow
   , pattern TList
   , pattern TForall
+  , pattern TApp
   , mapGroundType
   -- *** Type functor
   , TypeF (..)
@@ -49,6 +50,7 @@ pattern TVar x = Type (TVarF x)
 pattern TArrow a b = Type (TArrowF a b)
 pattern TList a = Type (TListF a)
 pattern TForall a b = Type (TForallF a b)
+pattern TApp n a = Type (TAppF n a)
 
 -- | Type functor.
 data TypeF l a
@@ -57,6 +59,7 @@ data TypeF l a
   | TArrowF a a
   | TListF a
   | TForallF [TypeName] a
+  | TAppF a a
   deriving (Functor, Foldable, Traversable)
 
 deriving instance (Eq l, Eq a) => Eq (TypeF l a)
@@ -82,10 +85,13 @@ mapGroundType tmap (Type ty) =
     TForallF as bs ->
       TForallF as (mapGroundType tmap bs)
 
+    TAppF a b ->
+      TAppF (mapGroundType tmap a) (mapGroundType tmap b)
+
 -- | Declared types.
 data Decl l
-  = DVariant [(Constructor, [Type l])]
-  | DRecord [(FieldName, Type l)]
+  = DVariant [TypeName] [(Constructor, [Type l])]
+  | DRecord [TypeName] [(FieldName, Type l)]
   deriving (Eq, Ord, Show)
 
 -- | The class of user-supplied primitive types.
@@ -128,12 +134,13 @@ subtractTypes (TypeDecls m) (TypeDecls n) =
   TypeDecls (M.difference m n)
 
 -- FIX this really sucks, maintain the map in Decls if need be
+-- FIX this needs to also have the kind scope
 lookupConstructor :: Ground l => Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
 lookupConstructor con (TypeDecls m) =
   M.lookup con . M.fromList . mconcat . with (M.toList m) $ \(tn, dec) ->
     case dec of
-      DVariant cts ->
+      DVariant _ps cts ->
         with cts $ \(c, ts) ->
           (c, (tn, ts))
-      DRecord fts ->
+      DRecord _ps fts ->
         [(Constructor (unTypeName tn), (tn, fmap snd fts))]
