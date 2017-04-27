@@ -18,6 +18,7 @@ module Projector.Html.Runtime.Library (
   , fmap
   , attrValue
   , blank
+  , isEmpty
   ) where
 
 
@@ -64,3 +65,8 @@ blank :: Hydrant.Html
 blank =
   mempty
 {-# INLINE blank #-}
+
+isEmpty :: [a] -> Bool
+isEmpty =
+  F.null
+{-# INLINE isEmpty #-}

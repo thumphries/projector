@@ -21,6 +21,10 @@ module Projector.Html.Core.Prim (
   , nListFold
   , tListFold
   , eListFold
+  -- ** isEmpty
+  , nIsEmpty
+  , tIsEmpty
+  , eIsEmpty
   ) where
 
 import           Data.Map.Strict (Map)
@@ -46,6 +50,7 @@ exprs =
       (nStringAppend, (tStringAppend, eStringAppend))
     , (nStringConcat, (tStringConcat, eStringConcat))
     , (nListFold, (tListFold, eListFold))
+    , (nIsEmpty, (tIsEmpty, eIsEmpty))
     ]
 
 
@@ -120,3 +125,22 @@ eListFold =
 aListFold :: Annotation a
 aListFold =
   LibraryFunction nListFold
+
+-- -----------------------------------------------------------------------------
+
+nIsEmpty :: Name
+nIsEmpty =
+  Name "isEmpty"
+
+tIsEmpty :: HtmlType
+tIsEmpty =
+  TForall [TypeName "a"]
+    (TArrow (TList (TVar (TypeName "a"))) tBool)
+
+eIsEmpty :: HtmlExpr (HtmlType, Annotation a)
+eIsEmpty =
+  EForeign (tIsEmpty, aIsEmpty) nIsEmpty tIsEmpty
+
+aIsEmpty :: Annotation a
+aIsEmpty =
+  LibraryFunction nIsEmpty
