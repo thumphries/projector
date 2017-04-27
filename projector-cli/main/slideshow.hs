@@ -139,8 +139,6 @@ renderReplError re =
       renderHaskellError h
     ReplPurescriptError h ->
       renderPurescriptError h
-    ReplInterpretError e ->
-      T.pack (ppShow e) -- FIX
     ReplUnbound v ->
       "'" <> v <> "' is not bound"
     ReplNotATemplate b ->

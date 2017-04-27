@@ -17,7 +17,10 @@ module Projector.Html.Core.Prim (
   , nStringConcat
   , tStringConcat
   , eStringConcat
-
+  -- ** List fold
+  , nListFold
+  , tListFold
+  , eListFold
   ) where
 
 import           Data.Map.Strict (Map)

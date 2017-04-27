@@ -900,11 +900,14 @@ solveConstraints constraints =
     -- Solve all the constraints independently.
     es <- fmap ET.sequenceEither . for constraints $ \c ->
       case c of
-        Equal ma t1 t2 ->
-          mgu ma t1 t2
+        Equal ma want have -> do
+          inst1 <- instantiate want
+          inst2 <- instantiate have
+          mgu ma inst1 inst2
         ExplicitInstance ma want have -> do
-          inst <- instantiate want
-          mgu ma inst have
+          inst1 <- instantiate want
+          inst2 <- instantiate have
+          mgu ma inst1 inst2
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- lift $ ST.readSTRef points
