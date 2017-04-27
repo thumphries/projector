@@ -136,7 +136,7 @@ eAttr attr =
           , eAttrVal (TQuotedAttrValue a (TIString a []))
           ]]
     TAttributeExpr a expr ->
-      EList (SourceAnnotation a) [eExpr expr]
+      eExpr expr
 
 eAttrKey :: a -> TAttrName -> HtmlExpr (Annotation a)
 eAttrKey a (TAttrName n) =
