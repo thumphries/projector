@@ -45,7 +45,7 @@ append =
 
 concat :: [Text] -> Text
 concat =
-  fold
+  F.fold
 {-# INLINE concat #-}
 
 -- TODO this only exists until we start inlining library functions

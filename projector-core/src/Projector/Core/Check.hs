@@ -546,7 +546,7 @@ generateConstraints' decls expr =
       f' <- generateConstraints' decls f
       g' <- generateConstraints' decls g
       t <- freshTypeVar a
-      addConstraint (Equal (Just a) (IArrow a (extractType g') t) (extractType f'))
+      addConstraint (ExplicitInstance (Just a) (IArrow a (extractType g') t) (extractType f'))
       pure (EApp (t, a) f' g')
 
     EList a es -> do
