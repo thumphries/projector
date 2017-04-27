@@ -75,6 +75,14 @@ rules =
                pure (EForeign a (Name "Projector.Html.Runtime.concat") ty)
              _ ->
                empty)
+    , (\case EForeign a (Name "fold") ty ->
+               pure (EForeign a (Name "Projector.Html.Runtime.fold") ty)
+             _ ->
+               empty)
+    , (\case EForeign a (Name "isEmpty") ty ->
+               pure (EForeign a (Name "Projector.Html.Runtime.isEmpty") ty)
+             _ ->
+               empty)
     , (\case ECon a c tn es ->
                ECon a
                  <$> qualifyConstructor c
@@ -122,6 +130,8 @@ rules =
       -- TODO
       -- adjacent plaintext nodes can be merged
       -- hoist nested foldHtmls up to the top level
+      -- rewrite away redundant isEmpty
+      -- rewrite away redundant fold
     ]
 
 
