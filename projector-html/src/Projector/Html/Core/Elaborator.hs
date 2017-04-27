@@ -118,8 +118,7 @@ eTag (TTag a t) =
 
 eAttrs :: a -> [TAttribute a] -> HtmlExpr (Annotation a)
 eAttrs a =
-  -- FIXME eStringConcat has the wrong type, we need an attribute fold or generalised list concat
-  EApp (SourceAnnotation a) (EHole (TypedHole a)) . EList (SourceAnnotation a) . fmap eAttr
+  EApp (SourceAnnotation a) (fmap snd Prim.eListFold) . EList (SourceAnnotation a) . fmap eAttr
 
 eAttr :: TAttribute a -> HtmlExpr (Annotation a)
 eAttr attr =
@@ -136,8 +135,8 @@ eAttr attr =
             eAttrKey a name
           , eAttrVal (TQuotedAttrValue a (TIString a []))
           ]]
-    TAttributeExpr _ expr ->
-      eExpr expr
+    TAttributeExpr a expr ->
+      EList (SourceAnnotation a) [eExpr expr]
 
 eAttrKey :: a -> TAttrName -> HtmlExpr (Annotation a)
 eAttrKey a (TAttrName n) =

@@ -916,8 +916,9 @@ solveConstraints constraints =
         Equal ma t1 t2 ->
           mgu ma t1 t2
         ExplicitInstance ma want have -> do
-          inst <- instantiate want
-          mgu ma inst have
+          inst1 <- instantiate want
+          inst2 <- instantiate have
+          mgu ma inst1 inst2
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- lift $ ST.readSTRef points
