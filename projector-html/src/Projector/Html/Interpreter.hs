@@ -80,15 +80,15 @@ interpret' e =
            Raw <$> value t
         (Constructor "Comment", [t]) ->
            Comment <$> value t
-        (Constructor "Element", [ECon _ (Constructor "Tag") _ [t], EList _ attrs, body]) -> do
+        (Constructor "Element", [ECon _ (Constructor "Tag") _ [t], ats, body]) -> do
            Element
              <$> value t
-             <*> mapM attr attrs
+             <*> attrs ats
              <*> interpret' body
-        (Constructor "VoidElement", [ECon _ (Constructor "Tag") _ [t], EList _ attrs]) -> do
+        (Constructor "VoidElement", [ECon _ (Constructor "Tag") _ [t], ats]) -> do
            VoidElement
              <$> value t
-             <*> mapM attr attrs
+             <*> attrs ats
         (Constructor "Nested", [EList _ nodes]) ->
           fmap mconcat . mapM interpret' $ nodes
         _ ->
@@ -98,8 +98,6 @@ interpret' e =
         <$> value v
     EApp _ (EForeign _ (Name "blank") _) _ ->
       pure $ Nested []
-    EApp _ (EForeign _ (Name "fold") _) xs ->
-      undefined
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
@@ -133,6 +131,16 @@ value e =
       fmap mconcat . mapM value $ as
     _ ->
       Left $ InterpretInvalidExpression e
+
+attrs :: HtmlExpr a -> Either (InterpretError a) [Attribute]
+attrs expr =
+  case expr of
+    EList _ ats ->
+      traverse attr ats
+    EApp _ (EForeign _ (Name "fold") _) (EList _ xs) ->
+      fmap fold (traverse attrs xs)
+    _ ->
+      Left (InterpretInvalidExpression expr)
 
 attr :: HtmlExpr a -> Either (InterpretError a) Attribute
 attr e =
