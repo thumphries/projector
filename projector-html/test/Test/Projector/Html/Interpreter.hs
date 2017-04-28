@@ -82,6 +82,9 @@ prop_interpreter_unit_bool_con =
 prop_interpreter_unit_bool_con_false =
   regressionFile "bool_con_false"
 
+prop_interpreter_unit_attr_space =
+  regressionFile "attr_space"
+
 -- -----------------------------------------------------------------------------
 
 decls :: HtmlDecls
