@@ -146,6 +146,6 @@ attr :: HtmlExpr a -> Either (InterpretError a) Attribute
 attr e =
   case e of
     ECon _ (Constructor "Attribute") _ [ECon _ (Constructor "AttributeKey") _ [k], ECon _ (Constructor "AttributeValue") _ [v]] ->
-      Attribute <$> value k <$> value v
+      Attribute <$> value k <*> value v
     _ ->
       Left $ InterpretInvalidExpression e
