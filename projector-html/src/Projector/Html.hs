@@ -18,7 +18,7 @@ module Projector.Html (
   , userConstants
   , PlatformConstants (..)
   , platformConstants
-  , TemplateNameMap
+  , TemplateNameMap (..)
   , ModuleNamer (..)
   , CodeGenNamer (..)
   , ModuleGraph (..)
