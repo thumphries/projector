@@ -19,7 +19,6 @@ import qualified Hedgehog.Range as Range
 import           P
 
 import           Projector.Core.Type
-import           Projector.Core.Syntax
 
 import           Test.Projector.Core.Arbitrary.Ground (TestLitT)
 import qualified Test.Projector.Core.Arbitrary.Ground as Ground
@@ -30,6 +29,10 @@ import qualified Test.Projector.Core.Arbitrary.Name as Name
 genTestType :: Monad m => Gen m (Type TestLitT)
 genTestType =
   genType Ground.genTestLitT
+
+genTestTypeFromContext :: Monad m => TypeDecls TestLitT -> Gen m (Type TestLitT)
+genTestTypeFromContext decls =
+  genTypeFromContext decls Ground.genTestLitT
 
 genTestTypeDecls :: Monad m => Gen m (TypeDecls TestLitT)
 genTestTypeDecls =

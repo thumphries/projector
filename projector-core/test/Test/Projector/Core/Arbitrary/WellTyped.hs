@@ -3,6 +3,8 @@
 module Test.Projector.Core.Arbitrary.WellTyped where
 
 
+import           Control.Monad.Trans.Reader (ReaderT, ask, local, runReaderT)
+
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -16,6 +18,7 @@ import           Projector.Core.Type
 import           Test.Projector.Core.Arbitrary.Ground (TestLitT)
 import qualified Test.Projector.Core.Arbitrary.Ground as Ground
 import qualified Test.Projector.Core.Arbitrary.Name as Name
+import qualified Test.Projector.Core.Arbitrary.Types as Types
 
 
 -- -----------------------------------------------------------------------------
@@ -29,14 +32,10 @@ genWellTypedTestExpr decls ty =
   genWellTypedExpr
     decls
     ty
-    undefined
+    (Types.genTestTypeFromContext decls)
     Ground.genWellTypedTestLitValue
 
 -- -----------------------------------------------------------------------------
-
-genTypeDecls :: (Ground l, Monad m) => TypeDecls l -> Gen m l -> Gen m (TypeDecls l)
-genTypeDecls tc gt =
-  undefined
 
 genWellTypedExpr ::
      (Ground l, Ord l, Monad m)
@@ -47,3 +46,21 @@ genWellTypedExpr ::
   -> Gen m (Expr l ())
 genWellTypedExpr decls ty genType genVal =
   undefined
+
+type GenExpr m = Gen (ReaderT Env m)
+
+
+
+
+
+-- -----------------------------------------------------------------------------
+-- Statey primitives
+
+data Env = Env
+  deriving (Eq, Ord, Show)
+
+
+-- TODO
+-- - Come up with a stronger notion of 'path'
+--   - Separate 'simple' paths from complex ones (complex ones are monadic, simple pure)
+--   - Some kind of trie to handle type variables
