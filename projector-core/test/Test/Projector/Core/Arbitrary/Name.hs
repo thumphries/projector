@@ -4,6 +4,7 @@ module Test.Projector.Core.Arbitrary.Name (
     genName
   , genConstructor
   , genTypeName
+  , genFieldName
   , genIdent
   ) where
 
@@ -40,3 +41,7 @@ genConstructor =
 genTypeName :: Monad m => Gen m TypeName
 genTypeName =
   fmap (TypeName . T.toTitle) (genIdent 8)
+
+genFieldName :: Monad m => Gen m FieldName
+genFieldName =
+  fmap FieldName (genIdent 8)

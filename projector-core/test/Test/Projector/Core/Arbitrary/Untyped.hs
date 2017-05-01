@@ -19,6 +19,7 @@ import           Projector.Core.Type
 import           Test.Projector.Core.Arbitrary.Ground (TestLitT)
 import qualified Test.Projector.Core.Arbitrary.Ground as Ground
 import qualified Test.Projector.Core.Arbitrary.Name as Name
+import qualified Test.Projector.Core.Arbitrary.Type as Type
 
 
 -- -----------------------------------------------------------------------------
@@ -29,19 +30,10 @@ genTestExpr =
   genExpr
     Name.genName
     Name.genTypeName
-    (genType Ground.genTestLitT)
+    Type.genTestType
     Ground.genTestLitValue
 
 -- -----------------------------------------------------------------------------
-
-genType :: Monad m => Gen m l -> Gen m (Type l)
-genType g = do
-  Gen.recursive Gen.choice [
-      TLit <$> g
-    ] [
-      Gen.subterm (genType g) TList
-    , Gen.subterm2 (genType g) (genType g) TArrow
-    ]
 
 genExpr ::
      Monad m
