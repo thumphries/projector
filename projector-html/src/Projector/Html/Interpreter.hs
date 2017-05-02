@@ -60,6 +60,19 @@ data InterpretError a =
   InterpretInvalidExpression (HtmlExpr a)
   deriving (Eq, Show)
 
+-- -----------------------------------------------------------------------------
+
+eval ::
+     Map Name (HtmlExpr (HtmlType, SrcAnnotation))
+  -> HtmlExpr (HtmlType, SrcAnnotation)
+  -> HtmlExpr (HtmlType, SrcAnnotation)
+eval bnds expr =
+  undefined
+  where
+    bnds' = fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds
+
+
+
 interpret ::
      HtmlDecls
   -> Map Name (HtmlExpr (HtmlType, SrcAnnotation))

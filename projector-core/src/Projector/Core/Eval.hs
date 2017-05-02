@@ -12,11 +12,15 @@ module Projector.Core.Eval (
   , runEval
   , EvalState (..)
   , whnf'
+  , whnf''
   , nf'
+  , nf''
   , beta
   , eta
   , match
   , subst
+  -- ** X
+  , fixpoint'
   ) where
 
 
@@ -82,30 +86,38 @@ next =
 -- | Apply 'beta' and 'eta' until in weak head normal form, i.e. not outwardly reducible.
 whnf' :: Expr l a -> Eval l a (Expr l a)
 whnf' =
-  U.fixpoint (beta >=> eta)
+  U.once . whnf''
+
+whnf'' :: Expr l a -> FixT (Eval l a) (Expr l a)
+whnf'' =
+  fixpoint' (beta >=> eta)
 
 -- | Apply 'beta' and 'eta' everywhere until they can no longer be applied.
 -- This includes reducing under abstractions.
 nf' :: Expr l a -> Eval l a (Expr l a)
-nf' expr = do
-  expr' <- whnf' expr
+nf' =
+  U.once . nf'' whnf''
+
+nf'' :: (Expr l a -> FixT (Eval l a) (Expr l a)) -> Expr l a -> FixT (Eval l a) (Expr l a)
+nf'' whnf''' expr = do
+  expr' <- whnf''' expr
   case expr' of
     ELam a x ty f ->
-      ELam a x ty <$> nf' f
+      ELam a x ty <$> nf'' whnf''' f
     ECon a c tn es ->
-      ECon a c tn <$> traverse nf' es
+      ECon a c tn <$> traverse (nf'' whnf''') es
     ECase a e pes ->
-      ECase a <$> nf' e <*> traverse (traverse nf') pes
+      ECase a <$> nf'' whnf''' e <*> traverse (traverse (nf'' whnf''')) pes
     ERec a tn fes ->
-      ERec a tn <$> traverse (traverse nf') fes
+      ERec a tn <$> traverse (traverse (nf'' whnf''')) fes
     EPrj a e fn ->
-      EPrj a <$> nf' e <*> pure fn
+      EPrj a <$> nf'' whnf''' e <*> pure fn
     EList a es ->
-      EList a <$> traverse nf' es
+      EList a <$> traverse (nf'' whnf''') es
     EMap a f g ->
-      EMap a <$> nf' f <*> nf' g
+      EMap a <$> nf'' whnf''' f <*> nf'' whnf''' g
     EApp a f g ->
-      EApp a <$> nf' f <*> nf' g
+      EApp a <$> nf'' whnf''' f <*> nf'' whnf''' g
 
     -- uninteresting cases:
     ELit _ _ ->
@@ -339,3 +351,16 @@ fresh n@(Name nn) free =
       do i <- next
          fresh (Name (nn <> renderIntegral i)) free
     else pure n
+
+-- | Like 'U.fixpoint', but stays inside FixT.
+fixpoint' :: Monad m => (a -> FixT m a) -> a -> FixT m a
+fixpoint' f a = do
+  (a', prog) <- lift (U.runFixT $! f a)
+  case prog of
+    U.RunAgain -> do
+      -- the whole expression has progress
+      b' <- lift (U.fixpoint f a')
+      U.progress b'
+    U.NoProgress ->
+      pure a'
+{-# INLINE fixpoint' #-}
