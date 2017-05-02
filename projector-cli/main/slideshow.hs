@@ -90,8 +90,8 @@ readCommand t =
       pure (LoadTemplate foo (T.unpack path))
     (":let" : foo : xs) ->
       pure (LetTemplate foo (T.unwords xs))
-    [":eval", foo] ->
-      pure (EvalTemplate foo)
+    [":html", foo] ->
+      pure (InterpretTemplate foo)
     [":template", foo] ->
       pure (DumpTemplate foo)
     [":core", foo] ->
@@ -116,7 +116,7 @@ readCommand t =
 data ReplCommand
   = LoadTemplate Text FilePath
   | LetTemplate Text Text
-  | EvalTemplate Text
+  | InterpretTemplate Text
   | DumpTemplate Text
   | DumpCore Text
   | DumpType Text
@@ -251,7 +251,7 @@ runReplCommand cmd =
       (ast, ty, core) <- parseTemplate' "<repl>" temp
       bindM name (TBind ast ty core)
       pure (ReplSuccess (name <> " : " <> Core.ppType ty))
-    EvalTemplate temp -> do
+    InterpretTemplate temp -> do
       (_ast, _ty, core) <- parseTemplate' "<repl>" temp
       html <- interpret core
       pure (ReplSuccess (T.pack (ppShow html)))

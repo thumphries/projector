@@ -30,7 +30,6 @@ executable cinema
                      , filepath                        == 1.4.*
                      , Glob                            == 0.7.*
                      , optparse-applicative            == 0.12.*
-                     , pretty-show                     == 1.*
                      , text                            == 1.2.*
                      , transformers
 
@@ -50,5 +49,6 @@ executable slideshow
                      , ambiata-x-eithert
                      , containers
                      , haskeline                       == 0.7.*
+                     , pretty-show                     == 1.*
                      , text
                      , transformers
