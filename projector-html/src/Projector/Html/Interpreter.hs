@@ -8,18 +8,24 @@ module Projector.Html.Interpreter (
   , interpret
   ) where
 
+
 import           Data.Map (Map)
 
 import           P
 
-import           Projector.Core.Eval
+import qualified Projector.Core.Eval as Eval
+import qualified Projector.Core.Rewrite as Rewrite
 import           Projector.Core.Syntax
 import           Projector.Core.Type
+import qualified Projector.Html.Backend.Rewrite as Rewrite
 import           Projector.Html.Core
 import qualified Projector.Html.Core.Library as Lib
 import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
+
+import qualified Umami.Monad.FixT as U
+
 
 data Html =
     Plain !Text
@@ -66,10 +72,13 @@ eval ::
      Map Name (HtmlExpr (HtmlType, SrcAnnotation))
   -> HtmlExpr (HtmlType, SrcAnnotation)
   -> HtmlExpr (HtmlType, SrcAnnotation)
-eval bnds expr =
-  undefined
+eval bnds =
+  fst . nf . Eval.substitute bnds'
   where
     bnds' = fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds
+    nf = fst . Eval.runEval (Eval.EvalState 0) . U.runFixT .
+      Eval.nf'' (Eval.fixpoint' (Eval.beta >=> Eval.eta >=> rewrite))
+    rewrite = Rewrite.rewriteT Rewrite.globalRules
 
 
 
@@ -80,7 +89,7 @@ interpret ::
   -> Either (InterpretError (HtmlType, SrcAnnotation)) Html
 interpret decls bnds =
   let confuns = constructorFunctionExprs decls in
-  interpret' . nf (confuns <> fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds)
+  interpret' . eval (confuns <> bnds)
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
 interpret' e =
