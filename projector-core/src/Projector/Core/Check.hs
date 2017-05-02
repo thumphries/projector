@@ -117,6 +117,7 @@ typeCheckAll' decls known exprs = do
       -- constraints we figured out in generateConstraints
       localConstraints = sConstraints sstate
       -- constraints provided by the user in type signatures
+      -- FIXME these should be ImplicitInstance constraints
       userConstraints = D.fromList . M.elems $
         M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
       -- assumptions we made about free variables
