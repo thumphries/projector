@@ -147,6 +147,9 @@ genType ty =
     Type (TListF t)->
       WL.parens (text "Array" <+> genType t)
 
+    Type (TForallF ts t1) ->
+      WL.parens (text "forall" <+> text (T.unwords $ fmap unTypeName ts) WL.<> text "." <+> genType t1)
+
 genTypeSig :: Name -> HtmlType -> Doc a
 genTypeSig (Name n) ty =
   WL.hang 2 (text n <+> "::" <+> genType ty)

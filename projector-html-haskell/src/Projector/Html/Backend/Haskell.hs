@@ -220,6 +220,10 @@ genType (Type ty) =
     TListF t ->
       listT_ (genType t)
 
+    TForallF _ts t1 ->
+      -- Abuse implicit foralls
+      genType t1
+
 -- -----------------------------------------------------------------------------
 
 -- | Expression declarations.
