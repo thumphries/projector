@@ -118,7 +118,7 @@ typeCheckAll' decls known exprs = do
       localConstraints = sConstraints sstate
       -- constraints provided by the user in type signatures
       userConstraints = D.fromList . M.elems $
-        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (ExplicitInstance Nothing))) known exprTypes
+        M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
       -- assumptions we made about free variables
       Assumptions assums = sAssumptions sstate
       -- types biased towards 'known' over 'inferred', since they may be user constraints
@@ -214,6 +214,7 @@ hoistType decls a (Type ty) =
         Nothing ->
           -- 'a' or an unknown type.
           -- FIXME should be threading type bindings around so we know can handle bindings properly
+          --       in practice not a big deal unless you're doing Forall [TypeName "List"] or something
           IVar a tn
     TArrowF f g ->
       IArrow a (hoistType decls a f) (hoistType decls a g)
@@ -797,6 +798,17 @@ mguST points t1 t2 =
       c <- mguST points a b
       pure (IList k c)
 
+    (IForall a ts1 ot1, IForall b ts2 ot2) ->
+      -- TODO normalise, check param list is equal, then unify result type
+      case (normalise a ts1 ot1, normalise b ts2 ot2) of
+        (IForall _ ps1 tt1, IForall _ ps2 tt2) -> do
+          unless (ps1 == ps2) (left [unificationError t1 t2])
+          c <- mguST points tt1 tt2
+          pure (IForall a ps1 c)
+
+        (tt1, tt2) ->
+          left [unificationError tt1 tt2]
+
     (_, _) ->
       left [unificationError t1 t2]
 
@@ -914,20 +926,27 @@ solveConstraints constraints =
 instantiate :: (Monad m) => IType l a -> StateT NameSupply m (IType l a)
 instantiate ty =
   case ty of
-    IForall _a vars ity -> do
-      bnds <- traverse (const nextSVar) (M.fromList (fmap (\v -> (v, ())) vars))
+    IForall a vars ity -> do
+      bnds <- traverse (fmap (IDunno a) . const nextSVar) (M.fromList (fmap (\v -> (v, ())) vars))
       pure (subst bnds ity)
     _ ->
       pure ty
 
-subst :: Map TypeName Var -> IType l a -> IType l a
+normalise :: a -> [TypeName] -> IType l a -> IType l a
+normalise a ps t =
+  let
+    vars = with [0..length ps] (dunnoTypeVar' "")
+    bnds = M.fromList $ with (L.zip ps vars) (\(n, x) -> (n, IVar a x))
+  in IForall a vars (subst bnds t)
+
+subst :: Map TypeName (IType l a) -> IType l a -> IType l a
 subst bnds' ty' =
   go bnds' ty'
   where
     go bnds ity =
       case ity of
-        IVar a tn ->
-          maybe ity (IDunno a) (M.lookup tn bnds)
+        IVar _a tn ->
+          fromMaybe ity (M.lookup tn bnds)
         IForall a bs t ->
           IForall a bs (go (foldl' (flip M.delete) bnds bs) t)
         IArrow a t1 t2 ->

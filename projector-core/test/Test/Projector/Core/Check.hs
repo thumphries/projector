@@ -5,6 +5,9 @@
 module Test.Projector.Core.Check where
 
 
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+
 import           Disorder.Core
 import           Disorder.Jack
 
@@ -154,6 +157,129 @@ prop_record_unit_prj_extra =
             , (FieldName "baz", lit (VInt 43))
             ])
           (FieldName "quux"))
+
+-- 'id' typechecks on its own
+prop_forall_unit_id =
+  once $
+    typeCheck mempty expr
+    ===
+    Right
+      (Type
+         (TForallF
+            [ TypeName { unTypeName = "a" } ]
+            (Type
+               (TArrowF
+                  (Type (TVarF TypeName { unTypeName = "a" }))
+                  (Type (TVarF TypeName { unTypeName = "a" }))))))
+  where
+    expr :: Expr TestLitT ()
+    expr =
+      ELam () (Name "x") Nothing (EVar () (Name "x"))
+
+-- 'id' is usable below
+prop_forall_unit_id_app =
+  once $
+    typeCheckIncremental mempty known exprs
+    ===
+    Right
+      (M.fromList
+         [ ( Name { unName = "id_bool" }
+           , EApp
+               ( Type (TLitF TBool) , () )
+               (EVar
+                  ( Type (TArrowF (Type (TLitF TBool)) (Type (TLitF TBool))) , () )
+                  Name { unName = "id" })
+               (ELit ( Type (TLitF TBool) , () ) (VBool True))
+           )
+         , ( Name { unName = "id_int" }
+           , EApp
+               ( Type (TLitF TInt) , () )
+               (EVar
+                  ( Type (TArrowF (Type (TLitF TInt)) (Type (TLitF TInt))) , () )
+                  Name { unName = "id" })
+               (ELit ( Type (TLitF TInt) , () ) (VInt 44))
+           )
+         ])
+  where
+    known =
+      M.fromList [
+          (Name "id", (TForall [TypeName "b"] (TArrow (TVar (TypeName "b")) (TVar (TypeName "b"))), ()))
+        ]
+    exprs =
+      M.fromList [
+          (Name "id_bool", EApp () (var_ "id") (lit (VBool True)))
+        , (Name "id_int", EApp () (var_ "id") (lit (VInt 44)))
+        ]
+
+-- 'id' gets monomorphised within its own declaration scope in absence of explicit constraint
+prop_forall_unit_id_app_mono =
+  once $
+    typeCheckAll mempty exprs
+    ===
+    Left [
+        UnificationError (Type (TLitF TInt), ()) (Type (TLitF TBool), ())
+      ]
+  where
+    exprs :: Map Name (Expr TestLitT ())
+    exprs =
+      M.fromList [
+          (Name "id", ELam () (Name "x") Nothing (EVar () (Name "x")))
+        , (Name "id_bool", EApp () (var_ "id") (lit (VBool True)))
+        , (Name "id_int", EApp () (var_ "id") (lit (VInt 44)))
+        ]
+
+-- 'id' with explicit user-provided type annotation
+-- FIXME missing some code to handle this case - want to generalize
+{-
+--prop_forall_unit_id_explicit =
+  once $
+    typeCheckIncremental mempty known exprs
+    ===
+    Left []
+  where
+    known =
+      M.fromList [
+          (Name "id", (TForall [TypeName "b"] (TArrow (TVar (TypeName "b")) (TVar (TypeName "b"))), ()))
+        ]
+    exprs =
+      M.fromList [
+          (Name "id", ELam () (Name "x") Nothing (EVar () (Name "x")))
+        , (Name "id_bool", EApp () (var_ "id") (lit (VBool True)))
+        , (Name "id_int", EApp () (var_ "id") (lit (VInt 44)))
+        ]
+-}
+
+-- 'id' with explicit user-provided type annotation that is too general
+prop_forall_unit_id_explicit_neg =
+  once $
+    typeCheckIncremental mempty known exprs
+    ===
+    Left
+      [ UnificationError
+          ( Type
+              (TForallF
+                 [ TypeName { unTypeName = "b" } ]
+                 (Type
+                    (TArrowF
+                       (Type (TVarF TypeName { unTypeName = "b" }))
+                       (Type (TVarF TypeName { unTypeName = "b" })))))
+          , ()
+          )
+          ( Type
+              (TArrowF
+                 (Type (TLitF TBool)) (Type (TVarF TypeName { unTypeName = "a" })))
+          , ()
+          )
+      ]
+  where
+    known =
+      M.fromList [
+          (Name "id", (TForall [TypeName "b"] (TArrow (TVar (TypeName "b")) (TVar (TypeName "b"))), ()))
+        ]
+    exprs =
+      M.fromList [
+          (Name "id", ELam () (Name "x") (Just (TLit TBool)) (EVar () (Name "x")))
+        ]
 
 
 
