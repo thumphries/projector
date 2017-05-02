@@ -49,5 +49,6 @@ executable slideshow
                      , ambiata-x-eithert
                      , containers
                      , haskeline                       == 0.7.*
+                     , pretty-show                     == 1.*
                      , text
                      , transformers

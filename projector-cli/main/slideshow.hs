@@ -23,10 +23,13 @@ import           Projector.Html.Data.Annotation
 import qualified Projector.Html.Backend as Backend
 import           Projector.Html.Backend.Haskell
 import           Projector.Html.Backend.Purescript
+import qualified Projector.Html.Interpreter as Interpreter
 import qualified Projector.Html.Pretty as HP
 
 import           System.Console.Haskeline as HL
 import           System.IO  (IO, FilePath)
+
+import           Text.Show.Pretty (ppShow)
 
 import           X.Control.Monad.Trans.Either
 
@@ -87,6 +90,8 @@ readCommand t =
       pure (LoadTemplate foo (T.unpack path))
     (":let" : foo : xs) ->
       pure (LetTemplate foo (T.unwords xs))
+    [":html", foo] ->
+      pure (InterpretTemplate foo)
     [":template", foo] ->
       pure (DumpTemplate foo)
     [":core", foo] ->
@@ -111,6 +116,7 @@ readCommand t =
 data ReplCommand
   = LoadTemplate Text FilePath
   | LetTemplate Text Text
+  | InterpretTemplate Text
   | DumpTemplate Text
   | DumpCore Text
   | DumpType Text
@@ -125,6 +131,7 @@ data ReplError
   = ReplError HtmlError
   | ReplHaskellError HaskellError
   | ReplPurescriptError PurescriptError
+  | ReplInterpretError (Interpreter.InterpretError (HtmlType, SrcAnnotation))
   | ReplUnbound Text
   | ReplNotATemplate Text
   | ReplBadCommand
@@ -139,6 +146,8 @@ renderReplError re =
       renderHaskellError h
     ReplPurescriptError h ->
       renderPurescriptError h
+    ReplInterpretError e ->
+      T.pack (show e) -- FIX
     ReplUnbound v ->
       "'" <> v <> "' is not bound"
     ReplNotATemplate b ->
@@ -218,6 +227,12 @@ boundTemplate b =
     EBind _ _ ->
       Nothing
 
+interpret :: HtmlExpr (HtmlType, SrcAnnotation) -> Repl (Interpreter.Html)
+interpret expr = do
+  bnds <- Repl $ gets (M.mapKeys Core.Name . fmap boundCore . unBindings . replBindings)
+  let e = first ReplInterpretError (Interpreter.interpret mempty bnds expr)
+  Repl . lift $ hoistEither e
+
 newtype Repl a = Repl { unRepl :: StateT ReplState (EitherT ReplError IO) a }
   deriving (Functor, Applicative, Monad, MonadIO)
 
@@ -236,6 +251,10 @@ runReplCommand cmd =
       (ast, ty, core) <- parseTemplate' "<repl>" temp
       bindM name (TBind ast ty core)
       pure (ReplSuccess (name <> " : " <> Core.ppType ty))
+    InterpretTemplate temp -> do
+      (_ast, _ty, core) <- parseTemplate' "<repl>" temp
+      html <- interpret core
+      pure (ReplSuccess (T.pack (ppShow html)))
     DumpTemplate name -> do
       let dump t = pure (ReplSuccess (HP.uglyPrintTemplate t))
       withBind name $ maybe (err (ReplNotATemplate name)) dump . boundTemplate
