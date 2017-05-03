@@ -68,6 +68,15 @@ data InterpretError a =
 
 -- -----------------------------------------------------------------------------
 
+interpret ::
+     HtmlDecls
+  -> Map Name (HtmlExpr (HtmlType, SrcAnnotation))
+  -> HtmlExpr (HtmlType, SrcAnnotation)
+  -> Either (InterpretError (HtmlType, SrcAnnotation)) Html
+interpret decls bnds =
+  let confuns = constructorFunctionExprs decls in
+  interpret' . eval (confuns <> bnds)
+
 eval ::
      Map Name (HtmlExpr (HtmlType, SrcAnnotation))
   -> HtmlExpr (HtmlType, SrcAnnotation)
@@ -79,17 +88,6 @@ eval bnds =
     nf = fst . Eval.runEval (Eval.EvalState 0) . U.runFixT .
       Eval.nf'' (Eval.fixpoint' (Eval.beta >=> Eval.eta >=> rewrite))
     rewrite = Rewrite.rewriteT Rewrite.globalRules
-
-
-
-interpret ::
-     HtmlDecls
-  -> Map Name (HtmlExpr (HtmlType, SrcAnnotation))
-  -> HtmlExpr (HtmlType, SrcAnnotation)
-  -> Either (InterpretError (HtmlType, SrcAnnotation)) Html
-interpret decls bnds =
-  let confuns = constructorFunctionExprs decls in
-  interpret' . eval (confuns <> bnds)
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
 interpret' e =
@@ -115,11 +113,6 @@ interpret' e =
           fmap mconcat . mapM interpret' $ nodes
         _ ->
           Left $ InterpretInvalidExpression e
-    EApp _ (EForeign _ (Name "text") _) v ->
-      Plain
-        <$> value v
-    EApp _ (EForeign _ (Name "blank") _) _ ->
-      pure $ Nested []
     EApp _ _ _ ->
       Left $ InterpretInvalidExpression e
     ELam _ _ _ _ ->
@@ -149,8 +142,6 @@ value e =
   case e of
     ELit _ (VString v) ->
       pure v
-    EApp _ (EForeign _ (Name "concat") _) (EList _ as) ->
-      fmap mconcat . mapM value $ as
     _ ->
       Left $ InterpretInvalidExpression e
 
