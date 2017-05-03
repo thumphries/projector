@@ -8,6 +8,8 @@ module Projector.Core.Rewrite (
   , rewriteFix
   -- Fine-grained control
   , rewriteT
+  , applyRules
+  , applyRule
   ) where
 
 
