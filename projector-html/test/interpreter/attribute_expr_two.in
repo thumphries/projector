@@ -1,0 +1,1 @@
+<a { [(Attribute (AttributeKey "marquee") (AttributeValue "true")), (Attribute (AttributeKey "foo") (AttributeValue "bar"))] }/>

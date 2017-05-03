@@ -88,6 +88,12 @@ prop_interpreter_unit_attribute_concat =
 prop_interpreter_unit_attribute_concat_empty =
   regressionFile "attribute_concat_empty"
 
+prop_interpreter_unit_attribute_expr_empty =
+  regressionFile "attribute_expr_empty"
+
+prop_interpreter_unit_attribute_expr_singleton =
+  regressionFile "attribute_expr_singleton"
+
 prop_interpreter_unit_is_empty_true =
   regressionFile "is_empty_true"
 
