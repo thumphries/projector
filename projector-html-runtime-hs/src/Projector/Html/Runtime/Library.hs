@@ -19,6 +19,7 @@ module Projector.Html.Runtime.Library (
   , attrValue
   , blank
   , isEmpty
+  , fold
   ) where
 
 
