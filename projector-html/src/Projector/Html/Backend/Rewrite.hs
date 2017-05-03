@@ -52,11 +52,22 @@ globalRules =
                    pure (EApp a fun (EList b nodes'))
              _ ->
                empty)
+      -- rules for isEmpty
+    , (\case EApp a IsEmpty (EList _ nodes) ->
+               case nodes of
+                 [] ->
+                   pure (BTrue a)
+                 _x ->
+                   pure (BFalse a)
+             _ ->
+               empty)
     ]
 
 pattern Concat <- (EForeign _ (Name "concat") _)
 pattern Fold <- (EForeign _ (Name "fold") _)
-
+pattern IsEmpty <- (EForeign _ (Name "isEmpty") _)
+pattern BTrue a = (ECon a (Constructor "True") (TypeName "Bool") [])
+pattern BFalse a = (ECon a (Constructor "False") (TypeName "Bool") [])
 
 -- Fold together raw text nodes
 pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "Html") [ELit b (VString t)]
