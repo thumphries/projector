@@ -18,6 +18,7 @@ library
                      , ambiata-machinator-core
                      , ambiata-x-eithert
                      , ambiata-x-templatehaskell
+                     , ambiata-umami
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , Earley                          == 0.11.*
