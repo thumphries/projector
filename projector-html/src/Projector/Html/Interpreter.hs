@@ -6,6 +6,7 @@ module Projector.Html.Interpreter (
   ---
   , InterpretError (..)
   , interpret
+  , eval
   ) where
 
 
