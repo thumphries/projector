@@ -180,6 +180,12 @@ attrTokens attr =
         ]
     TEmptyAttribute _ (TAttrName an) ->
       [AttName an]
+    TAttributeExpr _ expr ->
+      mconcat [
+          [ExprStart]
+        , exprTokens expr
+        , [ExprEnd]
+        ]
 
 attrValueTokens :: TAttrValue a -> DList (Token)
 attrValueTokens aval =
