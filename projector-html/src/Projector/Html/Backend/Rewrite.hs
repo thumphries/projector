@@ -38,7 +38,7 @@ globalRules =
                empty)
 
       -- rule for append
-    , (\case EApp a (EApp b fun@Append (String c s1)) (String d s2) ->
+    , (\case EApp a (EApp _ Append (String _ s1)) (String _ s2) ->
                pure (String a (s1 <> s2))
              _ ->
                empty)
