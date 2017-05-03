@@ -42,7 +42,7 @@ renderParseError pe =
     Unexpected loc expect got ->
       T.unlines [
           renderRange loc <> ": Parse error:"
-        , "  " <> "Unexpected " <> T.pack (show got)
+        , "  " <> "Unexpected '" <> renderToken got <> "' (" <> T.pack (show got) <> ")"
         , "  " <> renderExpected expect
         ]
     AmbiguousParse x _ts ->
@@ -255,6 +255,7 @@ htmlAttribute :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
 htmlAttribute expr' =
       htmlAttributeKV expr'
   <|> htmlAttributeEmpty
+  <|> htmlAttributeExpr expr'
   <?> "attribute"
 
 htmlAttributeKV :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
@@ -269,6 +270,13 @@ htmlAttributeValue expr' =
       htmlAttributeValueQuoted expr'
   <|> htmlAttributeValueExpr expr'
   <?> "attribute value"
+
+htmlAttributeExpr :: Rule r (TExpr Range) -> Rule r (TAttribute Range)
+htmlAttributeExpr expr' =
+  (\a e b -> TAttributeExpr (a <> b) e)
+    <$> token ExprStart
+    <*> expr'
+    <*> token ExprEnd
 
 htmlAttributeValueQuoted :: Rule r (TExpr Range) -> Rule r (TAttrValue Range)
 htmlAttributeValueQuoted expr' =

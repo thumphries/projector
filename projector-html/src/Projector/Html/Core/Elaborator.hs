@@ -118,21 +118,25 @@ eTag (TTag a t) =
 
 eAttrs :: a -> [TAttribute a] -> HtmlExpr (Annotation a)
 eAttrs a =
-  EList (SourceAnnotation a) . fmap eAttr
+  EApp (SourceAnnotation a) (fmap snd Prim.eListFold) . EList (SourceAnnotation a) . fmap eAttr
 
 eAttr :: TAttribute a -> HtmlExpr (Annotation a)
 eAttr attr =
   case attr of
     TAttribute a name aval ->
-      ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
-          eAttrKey a name
-        , eAttrVal aval
-        ]
+      EList (SourceAnnotation a)
+        [ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
+            eAttrKey a name
+          , eAttrVal aval
+          ]]
     TEmptyAttribute a name ->
-      ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
-          eAttrKey a name
-        , eAttrVal (TQuotedAttrValue a (TIString a []))
-        ]
+      EList (SourceAnnotation a)
+        [ECon (AttributeExpression a) (Constructor "Attribute") Lib.nAttribute [
+            eAttrKey a name
+          , eAttrVal (TQuotedAttrValue a (TIString a []))
+          ]]
+    TAttributeExpr _a expr ->
+      eExpr expr
 
 eAttrKey :: a -> TAttrName -> HtmlExpr (Annotation a)
 eAttrKey a (TAttrName n) =
@@ -172,7 +176,6 @@ eExpr expr =
       EPrj (RecordProjection a (FieldName fn)) (eExpr e) (FieldName fn)
     TEHole a ->
       EHole (TypedHole a)
-
 
 eStr :: TIString a -> HtmlExpr (Annotation a)
 eStr (TIString a chunks) =

@@ -546,7 +546,7 @@ generateConstraints' decls expr =
       f' <- generateConstraints' decls f
       g' <- generateConstraints' decls g
       t <- freshTypeVar a
-      addConstraint (Equal (Just a) (IArrow a (extractType g') t) (extractType f'))
+      addConstraint (ExplicitInstance (Just a) (IArrow a (extractType g') t) (extractType f'))
       pure (EApp (t, a) f' g')
 
     EList a es -> do
@@ -916,8 +916,9 @@ solveConstraints constraints =
         Equal ma t1 t2 ->
           mgu ma t1 t2
         ExplicitInstance ma want have -> do
-          inst <- instantiate want
-          mgu ma inst have
+          inst1 <- instantiate want
+          inst2 <- instantiate have
+          mgu ma inst1 inst2
 
     -- Retrieve the remaining points and produce a substitution map
     solvedPoints <- lift $ ST.readSTRef points

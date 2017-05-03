@@ -24,30 +24,59 @@ globalRules =
              _ ->
                empty)
 
-      -- concat of an empty list - empty string
-    , (\case EApp a Concat (EList _ []) ->
-               pure (ELit a (VString ""))
+      -- rules for concat
+    , (\case EApp a fun@Concat (EList b nodes) ->
+               case nodes of
+                 [] ->
+                   pure (EmptyString a)
+                 [x] ->
+                   pure x
+                 _x -> do
+                   nodes' <- foldStrings nodes
+                   pure (EApp a fun (EList b nodes'))
              _ ->
                empty)
-      -- concat of a singleton - id
-    , (\case EApp _ Concat (EList _ [x]) ->
-               pure x
+
+      -- rule for append
+    , (\case EApp a (EApp _ Append (String _ s1)) (String _ s2) ->
+               pure (String a (s1 <> s2))
              _ ->
                empty)
-      -- adjacent strings in a concat - fold together
-    , (\case EApp a fun@Concat (EList b nodes) -> do
-               nodes' <- foldStrings nodes
-               pure (EApp a fun (EList b nodes'))
+
+      -- rules for list fold
+    , (\case EApp a fun@Fold el@(EList b nodes) ->
+               case nodes of
+                 [] ->
+                   pure el
+                 [x] ->
+                   pure x
+                 xs -> do
+                   nodes' <- foldLists xs
+                   pure (EApp a fun (EList b nodes'))
+             _ ->
+               empty)
+      -- rules for isEmpty
+    , (\case EApp a IsEmpty (EList _ nodes) ->
+               case nodes of
+                 [] ->
+                   pure (BTrue a)
+                 _x ->
+                   pure (BFalse a)
              _ ->
                empty)
     ]
 
+pattern Append <- (EForeign _ (Name "append") _)
 pattern Concat <- (EForeign _ (Name "concat") _)
-
-
--- Fold together raw text nodes
+pattern Fold <- (EForeign _ (Name "fold") _)
+pattern IsEmpty <- (EForeign _ (Name "isEmpty") _)
+pattern BTrue a = (ECon a (Constructor "True") (TypeName "Bool") [])
+pattern BFalse a = (ECon a (Constructor "False") (TypeName "Bool") [])
+pattern EmptyString a = (ELit a (VString ""))
+pattern String a t = ELit a (VString t)
 pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "Html") [ELit b (VString t)]
 
+-- Fold together raw text nodes
 foldRaw :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldRaw exprs =
   if length (go exprs) == length exprs then empty else pure (go exprs)
@@ -62,8 +91,6 @@ foldRaw exprs =
           x : go xs
 
 -- concat strings together
-pattern String a t = ELit a (VString t)
-
 foldStrings :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldStrings exprs =
   if length (go exprs) == length exprs then empty else pure (go exprs)
@@ -74,5 +101,19 @@ foldStrings exprs =
           []
         (String a t1 : String _ t2 : xs) ->
           go (String a (t1 <> t2) : xs)
+        (x:xs) ->
+          x : go xs
+
+-- fold lists together
+foldLists :: [HtmlExpr a] -> Maybe [HtmlExpr a]
+foldLists exprs =
+  if length (go exprs) == length exprs then empty else pure (go exprs)
+  where
+    go es =
+      case es of
+        [] ->
+          []
+        (EList a l1 : EList _ l2 : xs) ->
+          go (EList a (l1 <> l2) : xs)
         (x:xs) ->
           x : go xs

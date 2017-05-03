@@ -1,0 +1,3 @@
+case isEmpty ["a"] of
+  True -> text "foo"
+  False-> text "bar"
