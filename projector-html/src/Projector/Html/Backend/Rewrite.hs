@@ -40,9 +40,22 @@ globalRules =
                pure (EApp a fun (EList b nodes'))
              _ ->
                empty)
+      -- rules for list fold
+    , (\case EApp a fun@Fold el@(EList b nodes) ->
+               case nodes of
+                 [] ->
+                   pure el
+                 [x] ->
+                   pure x
+                 xs -> do
+                   nodes' <- foldLists xs
+                   pure (EApp a fun (EList b nodes'))
+             _ ->
+               empty)
     ]
 
 pattern Concat <- (EForeign _ (Name "concat") _)
+pattern Fold <- (EForeign _ (Name "fold") _)
 
 
 -- Fold together raw text nodes
@@ -74,5 +87,18 @@ foldStrings exprs =
           []
         (String a t1 : String _ t2 : xs) ->
           go (String a (t1 <> t2) : xs)
+        (x:xs) ->
+          x : go xs
+
+foldLists :: [HtmlExpr a] -> Maybe [HtmlExpr a]
+foldLists exprs =
+  if length (go exprs) == length exprs then empty else pure (go exprs)
+  where
+    go es =
+      case es of
+        [] ->
+          []
+        (EList a l1 : EList _ l2 : xs) ->
+          go (EList a (l1 <> l2) : xs)
         (x:xs) ->
           x : go xs
