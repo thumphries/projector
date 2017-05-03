@@ -82,11 +82,11 @@ eval ::
   -> HtmlExpr (HtmlType, SrcAnnotation)
   -> HtmlExpr (HtmlType, SrcAnnotation)
 eval bnds =
-  fst . nf . Eval.substitute bnds'
+  nf . Eval.substitute bnds'
   where
     bnds' = fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds
-    nf = fst . Eval.runEval (Eval.EvalState 0) . U.runFixT .
-      Eval.nf'' (Eval.fixpoint' (Eval.beta >=> Eval.eta >=> rewrite))
+    nf = fst . Eval.runEval (Eval.EvalState 0) . U.fixpoint
+      (Eval.nf'' (Eval.fixpoint' (rewrite >=> Eval.beta >=> Eval.eta)))
     rewrite = Rewrite.rewriteT Rewrite.globalRules
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
