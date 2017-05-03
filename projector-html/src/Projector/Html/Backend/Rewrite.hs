@@ -37,6 +37,12 @@ globalRules =
              _ ->
                empty)
 
+      -- rule for append
+    , (\case EApp a (EApp b fun@Append (String c s1)) (String d s2) ->
+               pure (String a (s1 <> s2))
+             _ ->
+               empty)
+
       -- rules for list fold
     , (\case EApp a fun@Fold el@(EList b nodes) ->
                case nodes of
@@ -60,16 +66,17 @@ globalRules =
                empty)
     ]
 
+pattern Append <- (EForeign _ (Name "append") _)
 pattern Concat <- (EForeign _ (Name "concat") _)
 pattern Fold <- (EForeign _ (Name "fold") _)
 pattern IsEmpty <- (EForeign _ (Name "isEmpty") _)
 pattern BTrue a = (ECon a (Constructor "True") (TypeName "Bool") [])
 pattern BFalse a = (ECon a (Constructor "False") (TypeName "Bool") [])
 pattern EmptyString a = (ELit a (VString ""))
-
--- Fold together raw text nodes
+pattern String a t = ELit a (VString t)
 pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "Html") [ELit b (VString t)]
 
+-- Fold together raw text nodes
 foldRaw :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldRaw exprs =
   if length (go exprs) == length exprs then empty else pure (go exprs)
@@ -84,8 +91,6 @@ foldRaw exprs =
           x : go xs
 
 -- concat strings together
-pattern String a t = ELit a (VString t)
-
 foldStrings :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldStrings exprs =
   if length (go exprs) == length exprs then empty else pure (go exprs)
@@ -99,6 +104,7 @@ foldStrings exprs =
         (x:xs) ->
           x : go xs
 
+-- fold lists together
 foldLists :: [HtmlExpr a] -> Maybe [HtmlExpr a]
 foldLists exprs =
   if length (go exprs) == length exprs then empty else pure (go exprs)
