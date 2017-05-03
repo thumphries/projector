@@ -88,7 +88,7 @@ eval bnds =
     bnds' = fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds
     nf = fst . Eval.runEval (Eval.EvalState 0) . U.fixpoint
       (Eval.nf'' (Eval.fixpoint' (rewrite >=> Eval.beta >=> Eval.eta)))
-    rewrite = Rewrite.rewriteT Rewrite.globalRules
+    rewrite = flip Rewrite.applyRules Rewrite.globalRules
 
 interpret' :: HtmlExpr a -> Either (InterpretError a) Html
 interpret' e =
