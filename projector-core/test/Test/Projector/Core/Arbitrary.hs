@@ -283,6 +283,10 @@ pinsert ctx (Context ns p) n t =
     Type (TVarF x) ->
       maybe p (declPaths n t p) (lookupType x ctx)
 
+    Type (TForallF _x _t) ->
+      -- TODO could do better
+      p
+
 -- figure out all the types we can reach via this type declaration
 declPaths :: Ord l => Name -> Type l -> Paths l -> Decl l -> Paths l
 declPaths n t p ty =
@@ -355,6 +359,10 @@ genWellTypedExpr' n ty ctx names genty genval =
           k <- chooseInt (1, n+1)
           list <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
 
+        Type (TForallF _xs _t1) ->
+          fail "can't generate foralls"
+          -- TODO case on t1, we can probably generate certain types of forall
+
   -- try to look something appropriate up from the context
   in case plookup names ty of
        Nothing -> gen
@@ -402,6 +410,13 @@ genWellTypedPath ctx names more want x have =
       Type (TListF _) ->
         -- impossible
         pure (var x)
+
+      Type (TForallF _xs _t1) ->
+        -- TODO
+        -- case on t1,
+        --   - if it's a lam we can apply it until it looks how we want
+        --   - if its a constant we might be able to look one up
+        fail "can't generate foralls"
 
       Type (TVarF n) ->
         -- look up in ctx, run with that
