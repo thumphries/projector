@@ -5,8 +5,11 @@
 {-# LANGUAGE TypeFamilies #-}
 module Projector.Html.Core.Prim (
     types
+  -- * Primitives types
+  -- ** Bool
   , tBool
   , dBool
+  , nBool
   -- * Primitive functions
   , exprs
   -- ** String append

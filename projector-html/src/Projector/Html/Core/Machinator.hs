@@ -12,6 +12,7 @@ import qualified Machinator.Core.Data.Definition as MC
 import           P
 
 import           Projector.Core
+import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Prim
 
 
@@ -52,3 +53,5 @@ fromMachinatorGT g =
   case g of
     MC.StringT ->
       TLit TString
+    MC.BoolT ->
+      TVar Prim.nBool
