@@ -287,6 +287,9 @@ ppPattern p =
     PCon _ (Constructor c) ps ->
       c <> " " <> T.unwords (fmap (parenMay . ppPattern) ps)
 
+    PWildcard _ ->
+      "_"
+
 hasSpace :: Text -> Bool
 hasSpace =
   isJust . T.find (== ' ')

@@ -333,6 +333,7 @@ instance Comonad TAlt where
 data TPattern a
   = TPVar a TId
   | TPCon a TConstructor [TPattern a]
+  | TPWildcard a
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)
 
 instance Comonad TPattern where
@@ -342,12 +343,16 @@ instance Comonad TPattern where
         a
       TPCon a _ _ ->
         a
+      TPWildcard a ->
+        a
   extend f pat =
     case pat of
       (TPVar _ a) ->
         TPVar (f pat) a
       TPCon _ a b ->
         TPCon (f pat) a (fmap (extend f) b)
+      TPWildcard _ ->
+        TPWildcard (f pat)
 
 setTPatAnnotation :: a -> TPattern a -> TPattern a
 setTPatAnnotation a pat =
@@ -356,6 +361,8 @@ setTPatAnnotation a pat =
       TPVar a b
     TPCon _ b c ->
       TPCon a b c
+    TPWildcard _ ->
+      TPWildcard a
 
 data TTag a = TTag a Text
   deriving (Eq, Ord, Show, Data, Typeable, Generic, Functor, Foldable, Traversable)

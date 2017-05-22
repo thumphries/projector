@@ -56,6 +56,9 @@ addToMatchTree mt@(MatchTree m) pat =
       MatchTree (m <> [(Var n, [])])
     PCon _ c ps ->
       mt <> MatchTree [(Con c, fmap (buildMatchTree . pure) ps)]
+    PWildcard _ ->
+      -- FIX Should probably add another constructor to `Pat`
+      MatchTree (m <> [(Var (Name "_"), [])])
 
 {-
 testPats :: [Pattern ()]

@@ -5,3 +5,5 @@ case foo of
     "jkl"
   Mno ->
     "pqr"
+  _ ->
+    "stu"

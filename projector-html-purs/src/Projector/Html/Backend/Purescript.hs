@@ -242,6 +242,8 @@ genPat p =
       WL.annotate a (text n)
     PCon a (Constructor n) ps ->
       WL.annotate a (WL.parens (text n <+> WL.hsep (fmap genPat ps)))
+    PWildcard a ->
+      WL.annotate a (text "_")
 
 genLit :: Value PrimT -> Doc a
 genLit v =

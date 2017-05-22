@@ -156,6 +156,7 @@ newtype Name = Name { unName :: Text }
 data Pattern a
   = PVar a Name
   | PCon a Constructor [Pattern a]
+  | PWildcard a
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 extractPatternAnnotation :: Pattern a -> a
@@ -164,6 +165,8 @@ extractPatternAnnotation p =
     PVar a _ ->
       a
     PCon a _ _ ->
+      a
+    PWildcard a ->
       a
 {-# INLINE extractPatternAnnotation #-}
 
@@ -329,6 +332,8 @@ foldFree f acc expr =
                     S.insert x $! bnd
                   PCon _ _ pats ->
                     foldl' patBinds bnd pats
+                  PWildcard _ ->
+                    bnd
           in foldl' (\a (p, ee) -> go f' ee (patBinds bound p) a) (go f' e bound acc') $! pes
 
         ERec _ _ fes ->
@@ -362,6 +367,8 @@ patternBinds pat =
       S.singleton x
     PCon _ _ pats ->
       foldl' (<>) mempty (fmap patternBinds pats)
+    PWildcard _ ->
+      mempty
 
 -- | Migrate to a different set of ground types.
 mapGround ::
@@ -470,6 +477,9 @@ foldrPatternM fp acc p =
       acc' <- foldrM (flip (foldrPatternM fp)) acc ps
       fp p acc'
 
+    PWildcard _ ->
+      fp p acc
+
 -- | Bottom-up strict fold.
 foldrExpr :: (Expr l a -> b -> b) -> (Pattern a -> b -> b) -> b -> Expr l a -> b
 foldrExpr fx fp acc expr =
@@ -540,6 +550,9 @@ foldlPatternM fp acc p =
     PCon _ _ ps -> do
       acc' <- fp acc p
       foldlM (foldlPatternM fp) acc' ps
+
+    PWildcard _ ->
+      fp acc p
 
 -- | Top-down strict fold.
 foldlExpr :: (b -> Expr l a -> b) -> (b -> Pattern a -> b) -> b -> Expr l a -> b

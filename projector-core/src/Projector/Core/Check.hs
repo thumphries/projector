@@ -679,6 +679,9 @@ patternConstraints decls ty pat =
         Nothing ->
           throwError (BadPatternConstructor c a)
 
+    PWildcard a ->
+      pure (PWildcard (ty, a))
+
 extractType :: Expr l (c, a) -> c
 extractType =
   fst . extractAnnotation

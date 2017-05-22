@@ -301,3 +301,5 @@ patTokens pat =
         , mconcat (fmap patTokens pats)
         , [PatRParen]
         ]
+    TPWildcard _ ->
+      [PatId "_"]

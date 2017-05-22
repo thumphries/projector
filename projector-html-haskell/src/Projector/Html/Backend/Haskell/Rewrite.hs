@@ -101,6 +101,8 @@ rules =
                          -- Keep track of any time we need to qualify and return the full Just ECase later
                          <$> (maybe (pure c) (\c' -> State.put True >> pure c') . qualifyConstructor) c
                          <*> mapM go ps'
+                     PWildcard pa ->
+                       pure $ PWildcard pa
                  (ec, updated) =
                    flip State.runState False $
                      ECase a e <$> mapM (\(p, e') -> fmap (flip (,) e') . go $ p) ps
