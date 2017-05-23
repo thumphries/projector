@@ -288,6 +288,7 @@ genTemplatePattern k =
   let j = k `div` 2
       nonrec = [
           TPVar () <$> (TId <$> elements waters)
+        , pure (TPWildcard ())
         ]
       recc = [
           TPCon () <$> ((TConstructor . T.toTitle) <$> elements muppets)

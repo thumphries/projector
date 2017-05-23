@@ -210,6 +210,8 @@ ePat pat =
       PVar (PatternVar (Name x) a) (Name x)
     TPCon a (TConstructor x) pats ->
       PCon (PatternCon (Name x) a) (Constructor x) (fmap ePat pats)
+    TPWildcard a ->
+      PWildcard (PatternVar (Name "_") a)
 
 stringLit :: a -> Text -> HtmlExpr (Annotation a)
 stringLit a =

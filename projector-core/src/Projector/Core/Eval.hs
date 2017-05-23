@@ -257,6 +257,8 @@ matchesExpr expr pat =
         else empty
     (PCon _ _ _, _) ->
       empty
+    (PWildcard _, _) ->
+      pure ()
 
 -- | Eta reduction. Eliminate redundant lambda abstractions. Runs only one step.
 eta :: Expr l a -> FixT (Eval l a) (Expr l a)
@@ -343,6 +345,8 @@ patFresh free patt =
     PCon a c pats -> do
       pats' <- traverse (patFresh free) pats
       pure (PCon a c (fmap fst pats'), foldMap snd pats')
+    PWildcard a ->
+      pure (PWildcard a, mempty)
 
 fresh :: Name -> Set Name -> Eval l a Name
 fresh n@(Name nn) free =

@@ -16,4 +16,8 @@ Template
             ()
             (TPCon () TConstructor { unTConstructor = "Mno" } [])
             (TEString () (TIString () [ TStringChunk () "pqr" ]))
+        , TAlt
+            ()
+            (TPWildcard ())
+            (TEString () (TIString () [ TStringChunk () "stu" ]))
         ]))

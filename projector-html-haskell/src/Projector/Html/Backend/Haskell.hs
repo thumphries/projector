@@ -308,6 +308,9 @@ genPat p = case p of
   PCon _ (Constructor n) ps ->
     conP (mkName_ n) (fmap genPat ps)
 
+  PWildcard _ ->
+    varP (mkName_ "_")
+
 -- | Literals.
 genLit :: Value HaskellPrimT -> TH.Lit
 genLit v =

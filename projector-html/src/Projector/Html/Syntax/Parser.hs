@@ -486,6 +486,8 @@ patVar =
   E.terminal $ \case
     ExprVarId t :@ a ->
       pure (TPVar a (TId t))
+    ExprHole :@ a ->
+      pure (TPWildcard a)
     _ ->
       empty
 
