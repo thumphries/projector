@@ -29,15 +29,19 @@ import           Data.Monoid (Monoid (..))
 import qualified Hydrant
 import           Projector.Html.Runtime.Prim
 
+-- FIX Unfortunately inlining this function results in _inevitable_ GHC 7.10.2 panics.
+-- Upgrading to more recent versions of GHC may help, but for now we can live with
+-- the negligible runtime cost.
 fold :: [[a]] -> [a]
 fold =
   F.fold
-{-# INLINE fold #-}
 
+-- FIX Unfortunately inlining this function results in _inevitable_ GHC 7.10.2 panics.
+-- Upgrading to more recent versions of GHC may help, but for now we can live with
+-- the negligible runtime cost.
 foldHtml :: [Hydrant.Html] -> Hydrant.Html
 foldHtml =
   F.fold
-{-# INLINE foldHtml #-}
 
 append :: Text -> Text -> Text
 append =
