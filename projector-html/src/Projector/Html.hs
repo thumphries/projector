@@ -213,16 +213,17 @@ codeGen ::
   -> PlatformConstants
   -> BuildArtefacts
   -> Either [e] [(FilePath, Text)]
-codeGen backend cgn pcons (BuildArtefacts nmap checked) = do
+codeGen backend cgn pcons (BuildArtefacts decls nmap checked) = do
   -- Run the backend's validation predicates
   validateModules backend checked
   -- Apply the CodeGenNamer and substitute any platform constants
   let renamed = with checked (substPlatformConstants pcons . codeGenRename nmap cgn)
   -- Generate code.
-  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend) renamed)
+  fmap M.elems $ first pure (M.traverseWithKey (codeGenModule backend decls) renamed)
 
 codeGenModule ::
      HB.Backend a e
+  -> HtmlDecls
   -> HB.ModuleName
   -> HB.Module HtmlType PrimT (HtmlType, a)
   -> Either e (FilePath, Text)
@@ -268,7 +269,8 @@ newtype RawTemplates = RawTemplates {
   } deriving (Eq, Ord, Show)
 
 data BuildArtefacts = BuildArtefacts {
-    buildArtefactsNameMap :: TemplateNameMap
+    buildArtefactsDecls :: HtmlDecls
+  , buildArtefactsNameMap :: TemplateNameMap
   , buildArtefactsHtmlModules :: HtmlModules
   } deriving (Eq, Show)
 
@@ -337,7 +339,7 @@ runBuildIncremental (Build mnr mdm) (UserDataTypes decls) ucons hms rts = do
   let known = HB.extractModuleBindings hms <> userConstants ucons
   -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  BuildArtefacts nmap <$> first pure (checkModules decls known mmap)
+  BuildArtefacts decls nmap <$> first pure (checkModules decls known mmap)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)

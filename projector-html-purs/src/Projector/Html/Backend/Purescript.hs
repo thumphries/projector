@@ -12,6 +12,7 @@ module Projector.Html.Backend.Purescript (
 
 
 import           Data.Functor.Identity  (Identity, runIdentity)
+import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
@@ -60,27 +61,31 @@ predicates = [
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either PurescriptError (FilePath, Text)
-renderModule mn@(ModuleName n) m = do
+renderModule ::
+     HtmlDecls
+  -> ModuleName
+  -> Module HtmlType PrimT (HtmlType, a)
+  -> Either PurescriptError (FilePath, Text)
+renderModule decls mn@(ModuleName n) m = do
   let modName = T.unwords ["module", n, "where"]
       imports = (htmlRuntime, OpenImport) : (M.toList (moduleImports m))
       importText = fmap (uncurry genImport) imports
-  decls <- fmap (fmap prettyUndecorated) (genModule m)
+  decs <- fmap (fmap prettyUndecorated) (genModule decls m)
   pure (genFileName mn, T.unlines $ mconcat [
       [modName]
     , importText
-    , decls
+    , decs
     ])
 
-renderExpr :: Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError Text
-renderExpr n =
-  fmap prettyUndecorated . genExpDec n
+renderExpr :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError Text
+renderExpr decls n =
+  fmap prettyUndecorated . genExpDec decls n
 
-genModule :: Module HtmlType PrimT (HtmlType, a) -> Either PurescriptError [Doc (HtmlType, a)]
-genModule (Module ts _ es) = do
+genModule :: HtmlDecls -> Module HtmlType PrimT (HtmlType, a) -> Either PurescriptError [Doc (HtmlType, a)]
+genModule decls (Module ts _ es) = do
   let tdecs = genTypeDecs ts
   decs <- for (M.toList es) $ \(n, ModuleExpr ty e) -> do
-    d <- genExpDec n e
+    d <- genExpDec decls n e
     pure [genTypeSig n ty, d]
   pure (tdecs <> fold decs)
 
@@ -154,13 +159,13 @@ genTypeSig :: Name -> HtmlType -> Doc a
 genTypeSig (Name n) ty =
   WL.hang 2 (text n <+> "::" <+> genType ty)
 
-genExpDec :: Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
-genExpDec (Name n) expr = do
-  e <- genExp expr
+genExpDec :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
+genExpDec decls (Name n) expr = do
+  e <- genExp decls expr
   pure (WL.hang 2 (text n <+> text "=" WL.<$$> e))
 
-genExp :: HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
-genExp expr =
+genExp :: HtmlDecls -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
+genExp decls expr =
   case expr of
     ELit a v ->
       pure (WL.annotate a (genLit v))
@@ -169,43 +174,43 @@ genExp expr =
       pure (WL.annotate a (text x))
 
     ELam a (Name n) _ body -> do
-      body' <- genExp body
+      body' <- genExp decls body
       pure (WL.annotate a (WL.hang 2 (WL.parens (text ("\\" <> n <> " -> ") WL.<$$> body'))))
 
     EApp a fun arg -> do
-      fun' <- genExp fun
-      arg' <- genExp arg
+      fun' <- genExp decls fun
+      arg' <- genExp decls arg
       pure (WL.annotate a (WL.hang 2 (WL.parens (fun' </> arg'))))
 
     ECon a (Constructor c) _ es -> do
-      es' <- traverse genExp es
+      es' <- traverse (genExp decls) es
       pure (WL.annotate a (WL.nest 2 (WL.parens (text c <+> WL.fillSep es'))))
 
     ECase a f bs -> do
-      f' <- genExp f
+      f' <- genExp decls f
       fmap
         (WL.annotate a . WL.hang 2 . WL.parens . (text "case" <+> f' <+> text "of" WL.<$$>))
         (foldrM
           (\(p, g) doc -> do
-            mat <- genMatch p g
+            mat <- genMatch decls p g
             pure (WL.hang 2 mat WL.<$$> doc))
           WL.empty
           bs)
 
     ERec a (TypeName tn) fes -> do
-      fes' <- traverse (uncurry fieldInst) fes
+      fes' <- traverse (uncurry (fieldInst decls)) fes
       pure (WL.annotate a . WL.hang 2 . WL.parens $
         text tn <+> WL.encloseSep WL.lbrace WL.rbrace WL.comma fes')
 
     EPrj a e fn ->
-      WL.annotate a <$> genRecordPrj e fn
+      WL.annotate a <$> genRecordPrj decls e fn
 
     EList a es -> do
-      es' <- traverse genExp es
+      es' <- traverse (genExp decls) es
       pure (WL.annotate a (WL.hang 2 (WL.list es')))
 
     EMap a f g ->
-      genExp (EApp a (EApp a (EVar a (Name "map")) f) g)
+      genExp decls (EApp a (EApp a (EVar a (Name "map")) f) g)
 
     EForeign a (Name n) _ ->
       pure (WL.annotate a (text n))
@@ -213,35 +218,64 @@ genExp expr =
     EHole _ ->
       Left TypeHolePresent
 
-fieldInst :: FieldName -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
-fieldInst (FieldName fn) expr = do
-  expr' <- genExp expr
+fieldInst :: HtmlDecls -> FieldName -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
+fieldInst decls (FieldName fn) expr = do
+  expr' <- genExp decls expr
   pure (text (fn <> ":") <+> expr')
 
--- This is the only type-directed part of purescript codegen.
+-- Due to our boxed representation of records,
+-- we need the type name to figure out the constructor to match on.
 -- Could potentially get rid of this with purescript-newtype unwrap.
-genRecordPrj :: HtmlExpr (HtmlType, a) -> FieldName -> Either PurescriptError (Doc (HtmlType, a))
-genRecordPrj e (FieldName fn) =
+-- Could also rely on the 'unFoo' function we generate, same diff.
+genRecordPrj :: HtmlDecls -> HtmlExpr (HtmlType, a) -> FieldName -> Either PurescriptError (Doc (HtmlType, a))
+genRecordPrj decls e (FieldName fn) =
   case extractAnnotation e of
     (TVar (TypeName recName), _) -> do
-      e' <- genExp e
+      e' <- genExp decls e
       pure (WL.parens (text "case" <+> e' <+> text "of" <+> text recName <+> text "x -> x")
         WL.<> (text ("." <> fn)))
     (_, _) ->
       Left RecordTypeInvariant
 
-genMatch :: Pattern (HtmlType, a) -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
-genMatch p e = do
-  e' <- genExp e
-  pure (WL.hang 2 ((genPat p WL.<> text " ->") WL.<$$> e'))
+genMatch ::
+     HtmlDecls
+  -> Pattern (HtmlType, a)
+  -> HtmlExpr (HtmlType, a)
+  -> Either PurescriptError (Doc (HtmlType, a))
+genMatch decls p e = do
+  e' <- genExp decls e
+  pure (WL.hang 2 ((genPat decls p WL.<> text " ->") WL.<$$> e'))
 
-genPat :: Pattern a -> Doc a
-genPat p =
+genPat :: HtmlDecls -> Pattern (HtmlType, a) -> Doc (HtmlType, a)
+genPat decls p =
   case p of
     PVar a (Name n) ->
       WL.annotate a (text n)
+
     PCon a (Constructor n) ps ->
-      WL.annotate a (WL.parens (text n <+> WL.hsep (fmap genPat ps)))
+      -- Need to use type information here too.
+      -- Purescript requires explicit record field matching, because fields are unordered.
+      -- We should probably have built that into Projector, but instead we chose Haskell-style.
+      -- Luckily the field order is encoded in the HtmlDecls, so we just look it up and build an
+      -- explicit record pattern with it.
+      let plainPat = WL.annotate a (WL.parens (text n <+> WL.hsep (fmap (genPat decls) ps)))
+          recPat (FieldName fn) pat = text fn WL.<> ":" <+> genPat decls pat
+      in case a of
+        (TVar tn@(TypeName tname), _) ->
+          case lookupType tn decls of
+            Just (DRecord fts) ->
+              WL.annotate a $
+                WL.parens $
+                  (text tname <+>
+                    (WL.parens $
+                          text "{"
+                      <+> WL.hcat (L.intersperse (text ", ") (fmap (\((fn,_), pat) -> recPat fn pat) (L.zip fts ps)))
+                      <+> text "}"))
+            _ ->
+              plainPat
+        _ ->
+          plainPat
+
     PWildcard a ->
       WL.annotate a (text "_")
 

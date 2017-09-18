@@ -26,16 +26,16 @@ import           System.IO (FilePath)
 -- platform source code, with a validation pass derived from a set of
 -- predicates.
 data Backend a e = Backend {
-    renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either e (FilePath, Text)
-  , renderExpr :: Name -> HtmlExpr (HtmlType, a) -> Either e Text
+    renderModule :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either e (FilePath, Text)
+  , renderExpr :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either e Text
   , predicates :: [Predicate e]
   }
 
 instance Functor (Backend a) where
   fmap f (Backend m e p) =
     Backend {
-        renderModule = fmap (fmap (first f)) m
-      , renderExpr = fmap (fmap (first f)) e
+        renderModule = fmap (fmap (fmap (first f))) m
+      , renderExpr = fmap (fmap (fmap (first f))) e
       , predicates = fmap (fmap f) p
       }
 

@@ -31,11 +31,11 @@ import           Test.Projector.Html.Arbitrary
 -- -----------------------------------------------------------------------------
 
 prop_empty_module =
-  once (moduleProp (ModuleName "Test.Purescript.Module") mempty)
+  once (moduleProp baseDecls (ModuleName "Test.Purescript.Module") mempty)
 
 prop_library_module =
-  once . modulePropCheck (ModuleName "Test.Purescript.Library") $ Module {
-      moduleTypes = Lib.types <> Prim.types
+  once . modulePropCheck baseDecls (ModuleName "Test.Purescript.Library") $ Module {
+      moduleTypes = baseDecls
     , moduleImports = mempty
     , moduleExprs = M.fromList [
           helloWorld
@@ -47,7 +47,7 @@ prop_welltyped =
   gamble genHtmlTypeDecls $ \decls ->
     gamble (chooseInt (0,  100)) $ \k ->
       gamble (genWellTypedHtmlModule k decls) $ \modl ->
-        moduleProp (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
+        moduleProp decls (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
             -- TODO once the backend actually does something, remove this setter
             moduleTypes = decls
           , moduleExprs = moduleExprs modl
@@ -55,15 +55,19 @@ prop_welltyped =
 
 -- -----------------------------------------------------------------------------
 
-moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Property
-moduleProp mn =
-  uncurry pscProp . either (fail . show) id . Html.codeGenModule purescriptBackend mn
+baseDecls :: HtmlDecls
+baseDecls =
+  Lib.types <> Prim.types
 
-modulePropCheck :: ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
-modulePropCheck mn modl@(Module tys _ _) =
+moduleProp :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Property
+moduleProp decls mn =
+  uncurry pscProp . either (fail . show) id . Html.codeGenModule purescriptBackend decls mn
+
+modulePropCheck :: HtmlDecls -> ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
+modulePropCheck decls mn modl@(Module tys _ _) =
   uncurry pscProp . either (fail . T.unpack) id $ do
     modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
-    first renderPurescriptError (Html.codeGenModule purescriptBackend mn modl')
+    first renderPurescriptError (Html.codeGenModule purescriptBackend decls mn modl')
 
 pscProp mname modl =
   fileProp mname modl
