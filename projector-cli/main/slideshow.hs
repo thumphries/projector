@@ -305,7 +305,7 @@ renderExpr' :: (e -> ReplError) -> Backend.Backend SrcAnnotation e -> Core.Name 
 renderExpr' e b n expr =
   Repl $ do
     lift (hoistEither (bimap e ReplSuccess
-      (Backend.renderExpr b n expr)))
+      (Backend.renderExpr b mempty n expr)))
 
 
 err :: ReplError -> Repl a

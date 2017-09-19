@@ -18,6 +18,8 @@ import qualified Projector.Html as Html
 import           Projector.Html.Backend (checkModule)
 import           Projector.Html.Backend.Haskell
 import           Projector.Html.Core
+import qualified Projector.Html.Core.Library as Lib
+import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Backend ()
 import           Projector.Html.Data.Module
@@ -30,10 +32,10 @@ import           Test.Projector.Html.Arbitrary
 
 
 prop_empty_module =
-  once (moduleProp (ModuleName "Test.Haskell.Module") mempty)
+  once (moduleProp baseDecls (ModuleName "Test.Haskell.Module") mempty)
 
 prop_library_runtime =
-  once . modulePropCheck (ModuleName "Test.Haskell.Runtime") $ Module {
+  once . modulePropCheck baseDecls (ModuleName "Test.Haskell.Runtime") $ Module {
       moduleTypes = mempty
     , moduleImports = mempty
     , moduleExprs = M.fromList [
@@ -58,28 +60,32 @@ prop_hello_world =
                   ]
               }
         modl' <- first Html.renderHtmlError (Html.checkModule mempty mempty modl)
-        first renderHaskellError (Html.codeGenModule haskellBackend (ModuleName "Main") modl')
+        first renderHaskellError (Html.codeGenModule haskellBackend baseDecls (ModuleName "Main") modl')
 
 prop_welltyped :: Property
 prop_welltyped =
   gamble (genHtmlTypeDecls) $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
       gamble (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule haskellBackend)) $ \modl ->
-        moduleProp (ModuleName "Test.Haskell.Arbitrary.WellTyped") modl
+        moduleProp decls (ModuleName "Test.Haskell.Arbitrary.WellTyped") modl
 
 -- -----------------------------------------------------------------------------
 
-modulePropCheck :: ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
-modulePropCheck mn modl@(Module tys _ _) =
+baseDecls :: HtmlDecls
+baseDecls =
+  Lib.types <> Prim.types
+
+modulePropCheck :: HtmlDecls -> ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> Property
+modulePropCheck decls mn modl@(Module tys _ _) =
   uncurry ghcProp . either (fail . T.unpack) id $ do
     modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
-    first renderHaskellError (Html.codeGenModule haskellBackend mn modl')
+    first renderHaskellError (Html.codeGenModule haskellBackend decls mn modl')
 
-moduleProp :: ModuleName -> Module HtmlType PrimT (HtmlType, SrcAnnotation) -> Property
-moduleProp mn =
+moduleProp :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, SrcAnnotation) -> Property
+moduleProp decls mn =
   uncurry ghcProp .
   either (fail . T.unpack) id .
-  first renderHaskellError . Html.codeGenModule haskellBackend mn
+  first renderHaskellError . Html.codeGenModule haskellBackend decls mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
 ghcProp mname modl =

@@ -110,8 +110,8 @@ htmlConstructors =
 
 -- -----------------------------------------------------------------------------
 
-renderModule :: ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either HaskellError (FilePath, Text)
-renderModule mn@(ModuleName n) m = do
+renderModule :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, a) -> Either HaskellError (FilePath, Text)
+renderModule _decls mn@(ModuleName n) m = do
   let pragmas = [
           "{-# LANGUAGE NoImplicitPrelude #-}"
         , "{-# LANGUAGE OverloadedStrings #-}"
@@ -134,8 +134,8 @@ renderModule mn@(ModuleName n) m = do
      , decls
      ])
 
-renderExpr :: Name -> HtmlExpr (HtmlType, a) -> Either HaskellError Text
-renderExpr n =
+renderExpr :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either HaskellError Text
+renderExpr _decls n =
   fmap (T.pack . TH.pprint) . genExpDec n . toHaskellExpr . rewriteExpr
 
 genImport :: ModuleName -> Imports -> Text
