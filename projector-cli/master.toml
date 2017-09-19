@@ -4,6 +4,7 @@
   sha1 = "09aa2a97367596116e8d12112bf68464919d4815"
 [global]
   PUBLISH_EXECUTABLES = "cinema slideshow"
+  CACHE = "true"
 [build.dist]
   GHC_VERSION="7.10.2"
   CABAL_VERSION = "1.22.4.0"
