@@ -36,5 +36,5 @@
 
 [build.haskell]
   [build.haskell.master]
-    runner = "s3://ambiata-dispensary-v2/dist/master/master-haskell/linux/x86_64/20160609072923-58d5481/master-haskell-20160609072923-58d5481"
-    sha1 = "f827e1ff43bcaa325d128662391d95a8b4d65525"
+    runner = "s3://ambiata-dispensary-v2/dist/master/master-haskell/linux/x86_64/20170724213527-c4b2de4/master-haskell-20170724213527-c4b2de4"
+    sha1 = "09aa2a97367596116e8d12112bf68464919d4815"
