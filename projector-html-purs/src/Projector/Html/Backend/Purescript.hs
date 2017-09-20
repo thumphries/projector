@@ -1,5 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 module Projector.Html.Backend.Purescript (
     purescriptBackend
   ---
@@ -13,14 +16,19 @@ module Projector.Html.Backend.Purescript (
 
 import           Data.Functor.Identity  (Identity, runIdentity)
 import qualified Data.List as L
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import           P
 
 import           Projector.Core
 
+import qualified Projector.Html.Backend.Purescript.Rewrite as Rewrite
 import           Projector.Html.Core
+import           Projector.Html.Core.Library
 import           Projector.Html.Data.Backend hiding (Backend (..))
 import qualified Projector.Html.Data.Backend as BE
 import           Projector.Html.Data.Module
@@ -45,6 +53,7 @@ purescriptBackend =
 data PurescriptError
   = RecordTypeInvariant
   | TypeHolePresent
+  | HtmlCase
   deriving (Eq, Ord, Show)
 
 renderPurescriptError :: PurescriptError -> Text
@@ -54,10 +63,38 @@ renderPurescriptError e =
       "BUG: Invariant failure - expected a record type, but found something else."
     TypeHolePresent ->
       "BUG: Type hole was present for code generation. Should have been a type error."
+    HtmlCase ->
+      "Don't case on Html, pal!"
+
 
 predicates :: [Predicate PurescriptError]
 predicates = [
+    PatPredicate $ \case
+      PCon _ c _ ->
+        if S.member c htmlConstructors
+          then PredError HtmlCase
+          else PredOk
+      _ ->
+        PredOk
   ]
+
+-- | The set of constructors used for the Html library type.
+htmlConstructors :: Set Constructor
+htmlConstructors =
+  fold [
+      sumCons dHtml
+    , sumCons dTag
+    , sumCons dAttribute
+    , sumCons dAttributeKey
+    , sumCons dAttributeValue
+    ]
+  where
+  sumCons x =
+    case x of
+      DVariant cts ->
+        S.fromList (fmap fst cts)
+      DRecord _ ->
+        mempty
 
 -- -----------------------------------------------------------------------------
 
@@ -67,10 +104,15 @@ renderModule ::
   -> Module HtmlType PrimT (HtmlType, a)
   -> Either PurescriptError (FilePath, Text)
 renderModule decls mn@(ModuleName n) m = do
-  let modName = T.unwords ["module", n, "where"]
-      imports = (htmlRuntime, OpenImport) : (M.toList (moduleImports m))
+  let (_mn', m') = Rewrite.rewriteModule mn m
+      modName = T.unwords ["module", n, "where"]
+      imports = (htmlRuntime, OpenImport)
+              : (htmlRuntime, ImportQualified)
+              : (htmlRuntimePux, ImportQualified)
+              : (puxHtmlElements, ImportQualifiedAs (ModuleName "Pux"))
+              : hackImports (M.toList (moduleImports m'))
       importText = fmap (uncurry genImport) imports
-  decs <- fmap (fmap prettyUndecorated) (genModule decls m)
+  decs <- fmap (fmap prettyUndecorated) (genModule decls m')
   pure (genFileName mn, T.unlines $ mconcat [
       [modName]
     , importText
@@ -79,14 +121,16 @@ renderModule decls mn@(ModuleName n) m = do
 
 renderExpr :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError Text
 renderExpr decls n =
-  fmap prettyUndecorated . genExpDec decls n
+  fmap prettyUndecorated . genExpDec decls n . Rewrite.rewriteExpr Nothing
 
 genModule :: HtmlDecls -> Module HtmlType PrimT (HtmlType, a) -> Either PurescriptError [Doc (HtmlType, a)]
 genModule decls (Module ts _ es) = do
-  let tdecs = genTypeDecs ts
+  let
+    kps = gatherTypeParams decls
+    tdecs = genTypeDecs ts
   decs <- for (M.toList es) $ \(n, ModuleExpr ty e) -> do
     d <- genExpDec decls n e
-    pure [genTypeSig n ty, d]
+    pure [genTypeSig n ty kps, d]
   pure (tdecs <> fold decs)
 
 genImport :: ModuleName -> Imports -> Text
@@ -97,7 +141,15 @@ genImport (ModuleName n) imports =
     OnlyImport funs ->
       "import " <> n <> " (" <> T.intercalate ", " (fmap unName funs) <> ")"
     ImportQualified ->
-      "import qualified " <> n
+      "import " <> n <> " as " <> n
+    ImportQualifiedAs (ModuleName mn) ->
+      "import " <> n <> " as " <> mn
+
+-- This is pretty bad - import twice
+hackImports :: [(ModuleName, Imports)] -> [(ModuleName, Imports)]
+hackImports [] = []
+hackImports (a@(ModuleName mn, _):ms) =
+  a : (ModuleName mn, ImportQualified) : hackImports ms
 
 genFileName :: ModuleName -> FilePath
 genFileName (ModuleName n) =
@@ -107,57 +159,148 @@ htmlRuntime :: ModuleName
 htmlRuntime =
   ModuleName "Projector.Html.Runtime"
 
+htmlRuntimePux :: ModuleName
+htmlRuntimePux =
+  ModuleName "Projector.Html.Runtime.Pux"
+
+puxHtmlElements :: ModuleName
+puxHtmlElements =
+  ModuleName "Pux.Html.Elements"
 
 -- -----------------------------------------------------------------------------
 
 genTypeDecs :: HtmlDecls -> [Doc a]
-genTypeDecs =
-  fmap (uncurry genTypeDec) . M.toList . unTypeDecls
+genTypeDecs decls =
+  let kps = gatherTypeParams decls
+  in fmap (\(tn, (sn, td)) -> genTypeDec tn sn td kps) (M.toList kps)
 
-genTypeDec :: TypeName -> HtmlDecl -> Doc a
-genTypeDec (TypeName n) ty =
+type KnownParams = Map TypeName (Set TypeName, HtmlDecl)
+
+-- | Figure out which declarations should have type parameters.
+--
+-- This is extremely naive and relies on the fact that we usually only
+-- have a single type parameter, 'ev'. No freshening of type variables.
+--
+-- If you extended the language with real polymorphism, this code would collapse.
+gatherTypeParams :: HtmlDecls -> KnownParams
+gatherTypeParams (TypeDecls dmap) =
+  fix $ \result ->
+    flip M.mapWithKey dmap $ \tn td ->
+      go tn td result
+  where
+    go :: TypeName -> HtmlDecl -> Map TypeName (Set TypeName, HtmlDecl) -> (Set TypeName, HtmlDecl)
+    go tn td result =
+      case td of
+        DVariant cts ->
+          (,td) (foldMap (foldMap (flip (gather (Just tn)) result) . snd) cts)
+        DRecord fts ->
+          (,td) (foldMap (flip (gather (Just tn)) result . snd) fts)
+
+-- | The set of built-in types parameterised by some event.
+builtInEventedTypes :: Set TypeName
+builtInEventedTypes =
+  S.fromList [
+      TypeName "Html"
+    , TypeName "Attribute"
+    ]
+
+gather :: Maybe TypeName -> HtmlType -> Map TypeName (Set TypeName, HtmlDecl) -> Set TypeName
+gather self ty result =
+  case ty of
+    Type (TLitF _) ->
+      S.empty
+    Type (TVarF (TypeName "Html")) ->
+      S.singleton (TypeName "ev")
+    Type (TVarF tn) ->
+      if | S.member tn builtInEventedTypes -> S.singleton (TypeName "ev")
+         | self == Just tn -> S.empty
+         | otherwise ->
+             case M.lookup tn result of
+               Just (ps, _d) ->
+                 ps
+               Nothing ->
+                 S.empty
+    Type (TArrowF a b) ->
+      gather self a result <> gather self b result
+    Type (TListF a) ->
+      gather self a result
+    Type (TForallF ps b) ->
+      S.fromList ps <> gather self b result
+
+genTypeDec :: TypeName -> Set TypeName -> HtmlDecl -> KnownParams -> Doc a
+genTypeDec (TypeName n) ps ty kps =
   case ty of
     DVariant cts ->
       WL.hang 2
-        (text "data" <+> text n WL.<$$> text "="
+        (text "data" <+> text n <+> typeParams ps WL.<$$> text "="
           WL.<> (foldl'
                   (<+>)
                   WL.empty
-                  (WL.punctuate (WL.linebreak WL.<> text "|") (fmap (uncurry genCon) cts))))
+                  (WL.punctuate (WL.linebreak WL.<> text "|") (fmap (\(c, ts) -> genCon c ts kps) cts))))
     DRecord fts ->
       WL.vcat [
         -- newtype
           WL.hang 2
-            (text "newtype" <+> text n <+> text "=" <+> text n <+> WL.lbrace
-              WL.<$$> WL.vcat (WL.punctuate WL.comma (with fts $ \(FieldName fn, ft) -> text fn <+> text "::" <+> genType ft))
+            (text "newtype" <+> text n <+> typeParams ps <+> text "=" <+> text n <+> WL.lbrace
+              WL.<$$> WL.vcat (WL.punctuate WL.comma (with fts $ \(FieldName fn, ft) -> text fn <+> text "::" <+> genType ft kps))
               WL.<$$> WL.rbrace)
         ]
 
-genCon :: Constructor -> [HtmlType] -> Doc a
-genCon (Constructor c) ts =
-  WL.hang 2 (text c WL.<> foldl' (<+>) WL.empty (fmap genType ts))
+typeParams :: Set TypeName -> Doc a
+typeParams ps =
+  WL.hsep (fmap (text . unTypeName) (S.toList ps))
 
-genType :: HtmlType -> Doc a
-genType ty =
+genCon :: Constructor -> [HtmlType] -> KnownParams -> Doc a
+genCon (Constructor c) ts kps =
+  WL.hang 2 (text c WL.<> foldl' (<+>) WL.empty (fmap (flip genType kps) ts))
+
+genType :: HtmlType -> KnownParams -> Doc a
+genType ty kps =
   case ty of
-    Type (TLitF l) ->
-      text (ppGroundType l)
+    Type (TLitF TString) ->
+      text "String"
 
-    Type (TVarF (TypeName n)) ->
-      text n
+    -- Library types
+    Type (TVarF (TypeName "Html")) ->
+      text "(Array (Pux.Html ev))"
+    Type (TVarF (TypeName "Attribute")) ->
+      text "(Pux.Attribute ev)"
+    Type (TVarF (TypeName "AttributeKey")) ->
+      text "String"
+    Type (TVarF (TypeName "AttributeValue")) ->
+      text "String"
+    Type (TVarF (TypeName "Tag")) ->
+      text "String"
+    Type (TVarF (TypeName "Bool")) ->
+      text "Boolean"
+
+    Type (TVarF tn@(TypeName n)) ->
+      if | S.member tn builtInEventedTypes -> WL.parens (text n <+> text "ev")
+         | otherwise ->
+             -- Look up known params
+             case M.lookup tn kps of
+               Just (ps, _decl) ->
+                 if null ps then text n else WL.parens (text n <+> typeParams ps)
+               Nothing ->
+                 text n
 
     Type (TArrowF t1 t2) ->
-      WL.parens (genType t1 <+> text "->" <+> genType t2)
+      WL.parens (genType t1 kps <+> text "->" <+> genType t2 kps)
 
     Type (TListF t)->
-      WL.parens (text "Array" <+> genType t)
+      WL.parens (text "Array" <+> genType t kps)
 
     Type (TForallF ts t1) ->
-      WL.parens (text "forall" <+> text (T.unwords $ fmap unTypeName ts) WL.<> text "." <+> genType t1)
+      WL.parens (text "forall" <+> text (T.unwords $ fmap unTypeName ts) WL.<> text "." <+> genType t1 kps)
 
-genTypeSig :: Name -> HtmlType -> Doc a
-genTypeSig (Name n) ty =
-  WL.hang 2 (text n <+> "::" <+> genType ty)
+genTypeSig :: Name -> HtmlType -> KnownParams -> Doc a
+genTypeSig (Name n) ty kps =
+  let
+    ps = gather Nothing ty kps
+    ty' = if null ps then ty else (Type (TForallF (toList ps) ty))
+  in
+    WL.hang 2 $
+      text n <+> "::" <+> genType ty' kps
 
 genExpDec :: HtmlDecls -> Name -> HtmlExpr (HtmlType, a) -> Either PurescriptError (Doc (HtmlType, a))
 genExpDec decls (Name n) expr = do
@@ -283,7 +426,7 @@ genLit :: Value PrimT -> Doc a
 genLit v =
   case v of
     VString x ->
-      WL.dquotes (text x)
+      WL.string (show x)
 
 -- -----------------------------------------------------------------------------
 

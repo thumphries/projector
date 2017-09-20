@@ -7,7 +7,6 @@
     "output"
   ],
   "dependencies": {
-    "purescript-p": "git@github.com:ambiata/p.purs#0179678a83d5289863bdb04a81d032e7858640f7",
     "purescript-arrays": "^1.0.0",
     "purescript-control": "^1.0.0",
     "purescript-enums": "^1.1.0",
@@ -24,7 +23,8 @@
     "purescript-strings": "^1.0.0",
     "purescript-tailrec": "^1.0.0",
     "purescript-tuples": "^1.0.0",
-    "purescript-unfoldable": "^1.0.0"
+    "purescript-unfoldable": "^1.0.0",
+    "purescript-pux": "^6.0.1"
   },
   "devDependencies": {
     "purescript-psci-support": "^1.0.0"

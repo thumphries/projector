@@ -15,6 +15,7 @@ import           Disorder.Jack
 import           P
 
 import qualified Projector.Html as Html
+import           Projector.Html.Backend (checkModule)
 import           Projector.Html.Backend.Purescript
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Module
@@ -35,7 +36,7 @@ prop_empty_module =
 
 prop_library_module =
   once . modulePropCheck baseDecls (ModuleName "Test.Purescript.Library") $ Module {
-      moduleTypes = baseDecls
+      moduleTypes = mempty
     , moduleImports = mempty
     , moduleExprs = M.fromList [
           helloWorld
@@ -46,11 +47,9 @@ prop_welltyped :: Property
 prop_welltyped =
   gamble genHtmlTypeDecls $ \decls ->
     gamble (chooseInt (0,  100)) $ \k ->
-      gamble (genWellTypedHtmlModule k decls) $ \modl ->
+      gamble (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule purescriptBackend)) $ \modl ->
         moduleProp decls (ModuleName "Test.Purescript.Arbitrary.WellTyped") $ modl {
-            -- TODO once the backend actually does something, remove this setter
-            moduleTypes = decls
-          , moduleExprs = moduleExprs modl
+            moduleExprs = moduleExprs modl
           }
 
 -- -----------------------------------------------------------------------------

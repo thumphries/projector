@@ -147,6 +147,8 @@ genImport (ModuleName n) imports =
       "import " <> n <> " (" <> T.intercalate ", " (fmap unName funs) <> ")"
     ImportQualified ->
       "import qualified " <> n
+    ImportQualifiedAs (ModuleName mn) ->
+      "import qualified " <> n <> " as " <> mn
 
 genModule :: HaskellModule (HtmlType, a) -> Either HaskellError [TH.Dec]
 genModule (Module ts _ es) = do

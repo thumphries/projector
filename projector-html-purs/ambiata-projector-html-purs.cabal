@@ -19,6 +19,7 @@ library
                      , annotated-wl-pprint             == 0.7.*
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
+                     , transformers                    >= 0.4        && < 0.7
 
   ghc-options:
                        -Wall
@@ -30,7 +31,7 @@ library
                        Paths_ambiata_projector_html_purs
 
                        Projector.Html.Backend.Purescript
-
+                       Projector.Html.Backend.Purescript.Rewrite
 
 test-suite test-io
   type:                exitcode-stdio-1.0

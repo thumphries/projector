@@ -78,4 +78,5 @@ data Imports
   = OpenImport
   | OnlyImport [Name]
   | ImportQualified
+  | ImportQualifiedAs ModuleName
   deriving (Eq, Ord, Show)

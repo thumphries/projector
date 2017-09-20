@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
-module Projector.Html.Backend.Haskell.Rewrite (
+module Projector.Html.Backend.Purescript.Rewrite (
     rewriteModule
   , rewriteExpr
   , rules
@@ -11,10 +11,13 @@ module Projector.Html.Backend.Haskell.Rewrite (
 
 import qualified Control.Monad.Trans.State as State
 
+import qualified Data.Text as T
+
 import           P
 
 import           Projector.Core
-import           Projector.Html.Backend.Rewrite (globalRules)
+import qualified Projector.Core as Core
+import qualified Projector.Html.Backend.Rewrite as Rewrite
 import qualified Projector.Html.Core.Library as CL
 import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
@@ -22,24 +25,19 @@ import           Projector.Html.Data.Prim
 
 rewriteModule :: ModuleName -> Module HtmlType PrimT a -> (ModuleName, Module HtmlType PrimT a)
 rewriteModule mn (Module tys imports exprs) =
-  let exprs' = fmap (\(ModuleExpr ty e) -> ModuleExpr ty (rewriteFix (globalRules <> rules) e)) exprs
+  let exprs' = fmap (\(ModuleExpr ty e) -> ModuleExpr ty (rewriteExpr (Just mn) e)) exprs
   in (mn, Module tys imports exprs')
 
-rewriteExpr :: Expr PrimT a -> Expr PrimT a
-rewriteExpr =
-  rewrite (globalRules <> rules)
+rewriteExpr :: Maybe ModuleName -> Expr PrimT a -> Expr PrimT a
+rewriteExpr mn =
+  Core.rewriteFix (rules mn) . Core.rewriteFix Rewrite.globalRules
 
--- TODO these rules can operate on the fully typed AST if we need it
--- TODO oh god, this all goes to hell if people shadow the runtime names
---      (we better make this hard or illegal)
-
--- * Erase all evidence of the Html type, which doesn't exist at runtime.
---   Each gets converted to Projector.Html.Runtime's Html type.
--- * Projector's HTML type becomes a monoidal fold of Projector.Html.Runtime's Html type.
-rules :: [RewriteRule PrimT a]
-rules =
+-- * Drop all comments, they don't make sense in virtual-dom world
+-- * Replace constructors with DOMLike typeclass methods
+rules :: Maybe ModuleName -> [RewriteRule PrimT a]
+rules mmn =
   fmap Rewrite [
-      -- Replace HTML model with Projector.Html.Runtime functions.
+      -- Replace HTML model with DOMLike functions.
       -- These rules are important for correctness - won't work without these.
       (\case ECon a (Constructor "Plain") _ [x] ->
                pure (apply (textNode a) [x])
@@ -50,19 +48,51 @@ rules =
              _ ->
                empty)
     , (\case ECon a (Constructor "Element") _ [tag, attrs, body] ->
-               pure (apply (parentNode a) [tag, attrs, body])
+               pure (apply (parentNode a) [tag, attrs, EList a [body]])
              _ ->
                empty)
     , (\case ECon a (Constructor "VoidElement") _ [tag, attrs] ->
                pure (apply (voidNode a) [tag, attrs])
              _ ->
                empty)
+
+    -- FIXME this is a bad bad hack, probably need to filter out comments.
     , (\case ECon a (Constructor "Comment") _ [str] ->
-               pure (apply (comment a) [str])
+               pure (apply (textNode a) [str])
              _ ->
                empty)
+
     , (\case ECon a (Constructor "Nested") _ [nodes] ->
                pure (apply (foldHtml a) [nodes])
+             _ ->
+               empty)
+
+    -- Strip constructors, these become text nodes.
+    , (\case ECon _ (Constructor "Tag") _ [t] ->
+               pure t
+             _ ->
+               empty)
+    , (\case ECon _ (Constructor "AttributeKey") _ [k] ->
+               pure k
+             _ ->
+               empty)
+    , (\case ECon _ (Constructor "AttributeValue") _ [v] ->
+               pure v
+             _ ->
+               empty)
+    -- Replace with runtime function.
+    , (\case ECon a (Constructor "Attribute") _ [k, v] ->
+               pure (apply (attr a) [k, v])
+             _ ->
+               empty)
+
+    -- Bool constructors
+    , (\case ECon a (Constructor "True") b k ->
+               pure (ECon a (Constructor "true") b k)
+             _ ->
+               empty)
+    , (\case ECon a (Constructor "False") b k ->
+               pure (ECon a (Constructor "false") b k)
              _ ->
                empty)
 
@@ -83,13 +113,16 @@ rules =
                pure (EForeign a (Name "Projector.Html.Runtime.isEmpty") ty)
              _ ->
                empty)
-    , (\case ECon a c tn es ->
-               ECon a
-                 <$> qualifyConstructor c
-                 <*> pure tn
-                 <*> pure es
+
+    -- Confusingly, for Purescript, we must de-qualify local definitions.
+    , (\case EVar a n -> do
+               mn <- mmn
+               nn <- disqualify mn n
+               pure (EVar a nn)
              _ ->
                empty)
+
+    -- Mutate all the constructors in pattern matches.
     , (\case ECase a e ps ->
                let
                  go p =
@@ -112,8 +145,8 @@ rules =
                empty)
 
       -- These rules are just optimisations.
-      -- foldHtml of a singleton: id
-    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList _ [x]) ->
+      -- fold of a singleton: id
+    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.Pux.fold") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
@@ -123,70 +156,69 @@ rules =
              _ ->
                empty)
       -- adjacent raw plaintext nodes can be merged
-    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList b nodes) -> do
+    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.Pux.fold") _) (EList b nodes) -> do
                nodes' <- foldRaw nodes
                pure (EApp a fh (EList b nodes'))
              _ ->
                empty)
 
-      -- TODO
-      -- adjacent plaintext nodes can be merged
-      -- hoist nested foldHtmls up to the top level
-      -- rewrite away redundant isEmpty
-      -- rewrite away redundant fold
     ]
-
 
 qualifyConstructor :: Constructor -> Maybe Constructor
 qualifyConstructor c =
   case c of
-    Constructor "Tag" ->
-      pure $ Constructor "Projector.Html.Runtime.Tag"
-    Constructor "Attribute" ->
-      pure $ Constructor "Projector.Html.Runtime.Attribute"
-    Constructor "AttributeKey" ->
-      pure $ Constructor "Projector.Html.Runtime.AttributeKey"
-    Constructor "AttributeValue" ->
-      pure $ Constructor "Projector.Html.Runtime.AttributeValue"
     Constructor "True" ->
-      pure $ Constructor "Projector.Html.Runtime.True"
+      pure $ Constructor "true"
     Constructor "False" ->
-      pure $ Constructor "Projector.Html.Runtime.False"
+      pure $ Constructor "false"
     _ ->
       empty
 
-textNode :: a -> Expr PrimT a
-textNode a =
-  EForeign a (Name "Projector.Html.Runtime.textNode") (TArrow (TLit TString) CL.tHtml)
-
-rawTextNode :: a -> Expr PrimT a
-rawTextNode a =
-  EForeign a (Name "Projector.Html.Runtime.textNodeUnescaped") (TArrow (TLit TString) CL.tHtml)
-
-parentNode :: a -> Expr PrimT a
-parentNode a =
-  EForeign a (Name "Projector.Html.Runtime.parentNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
-
-voidNode :: a -> Expr PrimT a
-voidNode a =
-  EForeign a (Name "Projector.Html.Runtime.voidNode") (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
-
-comment :: a -> Expr PrimT a
-comment a =
-  EForeign a (Name "Projector.Html.Runtime.comment") (TArrow (TLit TString) CL.tHtml)
-
-foldHtml :: a -> Expr PrimT a
-foldHtml a =
-  EForeign a (Name "Projector.Html.Runtime.foldHtml") (TArrow (TList CL.tHtml) CL.tHtml)
+disqualify :: ModuleName -> Name -> Maybe Name
+disqualify (ModuleName mn) (Name n) = do
+  let (modl, varr) = T.breakOnEnd "." n
+  guard (modl == (mn <> "."))
+  pure (Name varr)
 
 -- build an application chain
 apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
 apply f =
   foldl' (EApp (extractAnnotation f)) f
 
+textNode :: a -> Expr PrimT a
+textNode a =
+  EForeign a (Name "Projector.Html.Runtime.Pux.text") (TArrow (TLit TString) CL.tHtml)
+
+rawTextNode :: a -> Expr PrimT a
+rawTextNode a =
+  EForeign a (Name "Projector.Html.Runtime.Pux.textUnescaped") (TArrow (TLit TString) CL.tHtml)
+
+parentNode :: a -> Expr PrimT a
+parentNode a =
+  EForeign a
+    (Name "Projector.Html.Runtime.Pux.parent")
+    (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
+
+voidNode :: a -> Expr PrimT a
+voidNode a =
+  EForeign a
+    (Name "Projector.Html.Runtime.Pux.void")
+    (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
+
+attr :: a -> Expr PrimT a
+attr a =
+  EForeign a
+    (Name "Projector.Html.Runtime.Pux.attr")
+    (TArrow CL.tAttributeKey (TArrow CL.tAttributeValue CL.tAttribute))
+
+foldHtml :: a -> Expr PrimT a
+foldHtml a =
+  EForeign a (Name "Projector.Html.Runtime.Pux.fold") (TArrow (TList CL.tHtml) CL.tHtml)
+
+pattern RawTextNode :: a -> a -> a -> Text -> HtmlExpr a
 pattern RawTextNode a b c t =
   EApp a
-    (EForeign b (Name "Projector.Html.Runtime.textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
+    (EForeign b (Name "Projector.Html.Runtime.Pux.textUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
     (ELit c (VString t))
 
 -- Combine adjacent raw text nodes.
