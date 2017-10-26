@@ -555,7 +555,6 @@ generateConstraints' decls expr =
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
       ta <- maybe (freshTypeVar a) (pure . hoistType decls a) mta
-      -- FIXME verify this is the right thing to do with assumptions
       for_ (fmap snd as) (addConstraint . Equal (Just a) ta)
       let ty = IArrow a ta (extractType e')
       pure (ELam (ty, a) n mta e')
@@ -684,7 +683,6 @@ patternConstraints decls ty pat =
   case pat of
     PVar a x -> do
       as <- lookupAssumptions x
-      -- FIXME verify this is the right thing to do with assumptions
       for_ (fmap snd as) (addConstraint . Equal (Just a) ty)
       pure (PVar (ty, a) x)
 
