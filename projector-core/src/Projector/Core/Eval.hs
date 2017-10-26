@@ -288,7 +288,7 @@ subst' :: Map Name (Expr l a) -> Set Name -> Expr l a -> FixT (Eval l a) (Expr l
 subst' subs free expr =
   case expr of
     EVar a z ->
-      mcase (M.lookup z subs) (pure expr) (U.progress . setAnnotation a)
+      mcase (M.lookup z subs) (pure (setAnnotation a expr)) (U.progress . setAnnotation a)
 
     ELam a z ty f ->
       if S.member z free
