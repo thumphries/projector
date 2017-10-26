@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 module Projector.Core.Check (
@@ -103,7 +104,8 @@ typeCheckAll decls exprs =
   typeCheckAll' decls mempty exprs
 
 typeCheckAll' ::
-     Ground l
+     forall l a
+   . Ground l
   => TypeDecls l
   -> Map Name (IType l a)
   -> Map Name (Expr l a)
@@ -113,33 +115,51 @@ typeCheckAll' decls known exprs = do
   (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
   -- build up new global set of constraints from the assumptions
   let -- the inferred types (thus far) for our exprs
+      exprTypes :: Map Name (IType l a)
       exprTypes = fmap extractType annotated
+
       -- constraints we figured out in generateConstraints
+      localConstraints :: DList (Constraint l a)
       localConstraints = sConstraints sstate
+
       -- constraints provided by the user in type signatures
       -- FIXME these should be ImplicitInstance constraints
+      userConstraints :: DList (Constraint l a)
       userConstraints = D.fromList . M.elems $
         M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
+
       -- assumptions we made about free variables
+      assums :: Map Name [IType l a]
       Assumptions assums = sAssumptions sstate
+
       -- types biased towards 'known' over 'inferred', since they may be user constraints
+      types :: Map Name (IType l a)
       types = known <> exprTypes
+
       -- constraints for free variables we know stuff about
+      globalConstraints :: DList (Constraint l a)
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
         maybe mempty (with itys . (ExplicitInstance Nothing)) (M.lookup n types)
+
       -- all the constraints mashed together in a dlist
+      constraints :: [Constraint l a]
       constraints = D.toList (localConstraints <> userConstraints <> globalConstraints)
+
       -- all variables let-bound
+      bound :: S.Set Name
       bound = S.fromList (M.keys known <> M.keys exprs)
       -- all variables we have lingering assumptions about
+      used :: S.Set Name
       used = S.fromList (M.keys (M.filter (not . null) assums))
       -- all mystery free variables
+      free :: S.Set Name
       free = used `S.difference` bound
       -- annotating mystery free variables with location info
+      freeAt :: [(Name, a)]
       freeAt = foldMap (\n -> maybe [] (fmap ((n,) . snd . flattenIType)) (M.lookup n assums)) (toList free)
+
   -- throw errors for any undefined variables
   if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
-
   -- solve all our constraints at once
   subs <- solveConstraints constraints
   -- substitute solved types, all at once
