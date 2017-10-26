@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 module Projector.Core.Check (
@@ -103,7 +104,8 @@ typeCheckAll decls exprs =
   typeCheckAll' decls mempty exprs
 
 typeCheckAll' ::
-     Ground l
+     forall l a
+   . Ground l
   => TypeDecls l
   -> Map Name (IType l a)
   -> Map Name (Expr l a)
@@ -113,33 +115,51 @@ typeCheckAll' decls known exprs = do
   (annotated, sstate) <- runCheck (sequenceCheck (fmap (generateConstraints' decls) exprs))
   -- build up new global set of constraints from the assumptions
   let -- the inferred types (thus far) for our exprs
+      exprTypes :: Map Name (IType l a)
       exprTypes = fmap extractType annotated
+
       -- constraints we figured out in generateConstraints
+      localConstraints :: DList (Constraint l a)
       localConstraints = sConstraints sstate
+
       -- constraints provided by the user in type signatures
-      -- FIXME these should be ImplicitInstance constraints
+      -- FIXME these should be ImplicitInstance constraints (so 'a' matches 'Int', etc)
+      userConstraints :: DList (Constraint l a)
       userConstraints = D.fromList . M.elems $
         M.merge M.dropMissing M.dropMissing (M.zipWithMatched (const (Equal Nothing))) known exprTypes
+
       -- assumptions we made about free variables
+      assums :: Map Name [(a, IType l a)]
       Assumptions assums = sAssumptions sstate
+
       -- types biased towards 'known' over 'inferred', since they may be user constraints
+      types :: Map Name (IType l a)
       types = known <> exprTypes
+
       -- constraints for free variables we know stuff about
+      globalConstraints :: DList (Constraint l a)
       globalConstraints = D.fromList . fold . M.elems . flip M.mapWithKey assums $ \n itys ->
-        maybe mempty (with itys . (ExplicitInstance Nothing)) (M.lookup n types)
+        maybe mempty (with itys . (\global (a, ty) -> ExplicitInstance (Just a) global ty)) (M.lookup n types)
+
       -- all the constraints mashed together in a dlist
+      constraints :: [Constraint l a]
       constraints = D.toList (localConstraints <> userConstraints <> globalConstraints)
+
       -- all variables let-bound
+      bound :: S.Set Name
       bound = S.fromList (M.keys known <> M.keys exprs)
       -- all variables we have lingering assumptions about
+      used :: S.Set Name
       used = S.fromList (M.keys (M.filter (not . null) assums))
       -- all mystery free variables
+      free :: S.Set Name
       free = used `S.difference` bound
       -- annotating mystery free variables with location info
-      freeAt = foldMap (\n -> maybe [] (fmap ((n,) . snd . flattenIType)) (M.lookup n assums)) (toList free)
+      freeAt :: [(Name, a)]
+      freeAt = foldMap (\n -> maybe [] (fmap ((n,) . fst)) (M.lookup n assums)) (toList free)
+
   -- throw errors for any undefined variables
   if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
-
   -- solve all our constraints at once
   subs <- solveConstraints constraints
   -- substitute solved types, all at once
@@ -161,7 +181,7 @@ typeTree decls expr = do
   -- Any unresolved assumptions are from free variables
   if M.keys (M.filter (not . null) assums) == mempty
     then pure ()
-    else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . snd . flattenIType) itys) (M.toList assums))
+    else Left (foldMap (\(n, itys) -> fmap (FreeVariable n . fst) itys) (M.toList assums))
   subs <- solveConstraints constraints
   let subbed = substitute subs expr'
   first D.toList (lowerExpr subbed)
@@ -390,7 +410,7 @@ initialSolverState =
     }
 
 newtype Assumptions l a = Assumptions {
-    unAssumptions :: Map Name [IType l a]
+    unAssumptions :: Map Name [(a, IType l a)]
   } deriving (Eq, Ord, Show, Monoid)
 
 throwError :: TypeError l a -> Check l a b
@@ -451,15 +471,15 @@ addConstraint c =
 -- Assumptions
 
 -- | Add an assumed type for some variable we've encountered.
-addAssumption :: Ground l => Name -> IType l a -> Check l a ()
-addAssumption n ty =
+addAssumption :: Ground l => Name -> a -> IType l a -> Check l a ()
+addAssumption n a ty =
   Check . lift $
     modify' (\s -> s {
-        sAssumptions = Assumptions (M.insertWith (<>) n [ty] (unAssumptions (sAssumptions s)))
+        sAssumptions = Assumptions (M.insertWith (<>) n [(a, ty)] (unAssumptions (sAssumptions s)))
       })
 
 -- | Clobber the assumption set for some variable.
-setAssumptions :: Ground l => Name -> [IType l a] -> Check l a ()
+setAssumptions :: Ground l => Name -> [(a, IType l a)] -> Check l a ()
 setAssumptions n assums =
   Check . lift $
     modify' (\s -> s {
@@ -477,14 +497,14 @@ deleteAssumptions n =
       })
 
 -- | Look up all assumptions for a given name. Returns the empty set if there are none.
-lookupAssumptions :: Ground l => Name -> Check l a [IType l a]
+lookupAssumptions :: Ground l => Name -> Check l a [(a, IType l a)]
 lookupAssumptions n =
   Check . lift $
     fmap (fromMaybe mempty) (gets (M.lookup n . unAssumptions . sAssumptions))
 
 -- | Run some continuation with lexically-scoped assumptions.
 -- This is sorta like 'local', but we need to keep changes to other keys in the map.
-withBindings :: Ground l => Traversable f => f Name -> Check l a b -> Check l a (Map Name [IType l a], b)
+withBindings :: Ground l => Traversable f => f Name -> Check l a b -> Check l a (Map Name [(a, IType l a)], b)
 withBindings xs k = do
   old <- fmap (M.fromList . toList) . for xs $ \n -> do
     as <- lookupAssumptions n
@@ -497,7 +517,7 @@ withBindings xs k = do
     pure (n, as)
   pure (new, res)
 
-withBinding :: Ground l => Name -> Check l a b -> Check l a ([IType l a], b)
+withBinding :: Ground l => Name -> Check l a b -> Check l a ([(a, IType l a)], b)
 withBinding x k = do
   (as, b) <- withBindings [x] k
   pure (fromMaybe mempty (M.lookup x as), b)
@@ -526,7 +546,7 @@ generateConstraints' decls expr =
       -- We introduce a new type variable representing the type of this expression.
       -- Add it to the assumption set.
       t <- freshTypeVar a
-      addAssumption v t
+      addAssumption v a t
       pure (EVar (t, a) v)
 
     ELam a n mta e -> do
@@ -535,7 +555,7 @@ generateConstraints' decls expr =
       -- This expression's type is an arrow from the known type to the inferred type of 'e'.
       (as, e') <- withBinding n (generateConstraints' decls e)
       ta <- maybe (freshTypeVar a) (pure . hoistType decls a) mta
-      for_ as (addConstraint . Equal (Just a) ta)
+      for_ (fmap snd as) (addConstraint . Equal (Just a) ta)
       let ty = IArrow a ta (extractType e')
       pure (ELam (ty, a) n mta e')
 
@@ -663,7 +683,7 @@ patternConstraints decls ty pat =
   case pat of
     PVar a x -> do
       as <- lookupAssumptions x
-      for_ as (addConstraint . Equal (Just a) ty)
+      for_ (fmap snd as) (addConstraint . Equal (Just a) ty)
       pure (PVar (ty, a) x)
 
     PCon a c pats ->

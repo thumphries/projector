@@ -217,7 +217,8 @@ prop_forall_unit_id_app_mono =
     typeCheckAll mempty exprs
     ===
     Left [
-        UnificationError (Type (TLitF TInt), ()) (Type (TLitF TBool), ())
+        Annotated ()
+          (UnificationError (Type (TLitF TInt), ()) (Type (TLitF TBool), ()))
       ]
   where
     exprs :: Map Name (Expr TestLitT ())
