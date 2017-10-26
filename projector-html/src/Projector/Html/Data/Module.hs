@@ -43,7 +43,7 @@ data Module b l a = Module {
   , moduleExprs :: Map Name (ModuleExpr b l a)
   } deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
-instance Ground l => Monoid (Module b l a) where
+instance Monoid (Module b l a) where
   mempty = Module mempty mempty mempty
   mappend (Module a b c) (Module d e f) = Module {
       moduleTypes = a <> d
