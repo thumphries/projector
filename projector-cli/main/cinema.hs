@@ -125,7 +125,7 @@ cinemaBuild :: Build -> Maybe BackendT -> Maybe StripPrefix -> Glob -> Maybe Glo
 cinemaBuild b mb msp tg mdg o = do
   -- Load all our datatypes from disk
   dfs <- maybe (pure []) globSafe mdg
-  udts <- parseDataFiles dfs
+  udts <- parseDataFiles msp dfs
   -- Load all our template files from disk
   tfs <- globSafe tg
   rts <- liftIO . fmap RawTemplates . for tfs $ \f -> do
@@ -143,12 +143,13 @@ cinemaBuild b mb msp tg mdg o = do
     T.writeFile ofile body
 
 -- | Parse machinator files, discard version info.
-parseDataFiles :: [FilePath] -> EitherT CinemaError IO UserDataTypes
-parseDataFiles fps = do
+parseDataFiles :: Maybe StripPrefix -> [FilePath] -> EitherT CinemaError IO UserDataTypes
+parseDataFiles msp fps = do
   defs <- for fps $ \f -> do
     m <- liftIO (T.readFile f)
     MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
-    pure (f, PC.unTypeDecls (HMC.machinatorDecls defs))
+    let stripPrefix = maybe f (\sp -> makeRelative (unStripPrefix sp) f) msp
+    pure (stripPrefix, PC.unTypeDecls (HMC.machinatorDecls defs))
   pure (UserDataTypes defs)
 
 getBackend :: BackendT -> Backend a BackendError
