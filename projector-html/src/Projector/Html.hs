@@ -253,8 +253,10 @@ platformConstants (PlatformConstants pcons) =
 -- -----------------------------------------------------------------------------
 -- Build interface, i.e. things an end user should use
 
+-- FIXME just remove this type
 data Build = Build {
     buildModuleNamer :: ModuleNamer -- ^ A customisable way to name modules
+    -- FIXME datamodules shouldn't be there anymore
   , buildDataModules :: [DataModuleName] -- ^ The modules containing user datatypes.
   }
 
@@ -281,11 +283,12 @@ newtype DataModuleName = DataModuleName {
   } deriving (Eq, Ord, Show)
 
 newtype UserDataTypes = UserDataTypes {
-    unUserDataTypes :: HtmlDecls
+    unUserDataTypes :: [(FilePath, Map PC.TypeName HtmlDecl)]
   } deriving (Eq, Ord, Show, Monoid)
 
 data ModuleNamer = ModuleNamer {
     pathToModuleName :: FilePath -> HB.ModuleName
+  , pathToDataModuleName :: FilePath -> HB.ModuleName
   , filePathToExprName  :: FilePath -> PC.Name
   }
 
@@ -321,25 +324,47 @@ runBuild ::
   -> UserConstants
   -> RawTemplates
   -> Either [HtmlError] BuildArtefacts
-runBuild b udt ucons rts =
-  runBuildIncremental b udt ucons mempty rts
+runBuild b udt ucons =
+  runBuildIncremental b udt ucons mempty mempty
 
 runBuildIncremental ::
      Build
   -> UserDataTypes
   -> UserConstants
+  -> HtmlDecls
   -> HtmlModules
   -> RawTemplates
   -> Either [HtmlError] BuildArtefacts
-runBuildIncremental (Build mnr mdm) (UserDataTypes decls) ucons hms rts = do
+runBuildIncremental (Build mnr umdm) u@(UserDataTypes udts) ucons types hms rts = do
+  -- Build modules out of the user datatypes
+  let datas = buildDataTypes mnr umdm u
+      mdm = umdm <> (fmap DataModuleName (M.keys datas))
   -- Build the module map
   (mg, nmap, mmap) <- smush mdm mnr hms rts
   -- Check it for import cycles
   (_ :: ()) <- first (pure . HtmlModuleGraphError) (detectCycles mg)
   let known = HB.extractModuleBindings hms <> userConstants ucons
+      decls = types <> (PC.TypeDecls $ foldMap snd udts)
   -- Check all modules (this could be a lazy stream)
   -- TODO the Map forces all of this at once, remove
-  BuildArtefacts decls nmap <$> first pure (checkModules decls known mmap)
+  terms <- first pure (checkModules decls known mmap)
+  pure $ BuildArtefacts decls nmap (terms <> datas)
+
+buildDataTypes ::
+     ModuleNamer
+  -> [DataModuleName]
+  -> UserDataTypes
+  -> HtmlModules
+buildDataTypes mnr dmns (UserDataTypes udts) =
+  let someModules :: Map HB.ModuleName HB.Imports
+      someModules = M.fromList (fmap ((,HB.OpenImport) . unDataModuleName) dmns)
+      allModules :: Map HB.ModuleName HB.Imports
+      allModules = someModules <> M.fromList (fmap ((,HB.OpenImport) . pathToDataModuleName mnr) (fmap fst udts))
+  in M.fromListWith (<>) . with udts $ \(fn, typs) ->
+    let mn = pathToDataModuleName mnr fn
+        decls = PC.TypeDecls typs :: HtmlDecls
+        imports = M.delete mn allModules
+    in (mn, HB.Module decls imports mempty)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)
@@ -408,7 +433,10 @@ smush mdm mnr hms (RawTemplates templates) = do
 -- | Provide a default naming scheme for modules and function names
 moduleNamerSimple :: Maybe HB.ModuleName -> ModuleNamer
 moduleNamerSimple prefix =
-  ModuleNamer (filePathToModuleNameSimple prefix) filePathToExprNameSimple
+  ModuleNamer
+    (filePathToModuleNameSimple prefix)
+    ((`HB.moduleNameAppend` (HB.ModuleName "Data")) . filePathToModuleNameSimple prefix)
+    filePathToExprNameSimple
 
 -- | Derive a module name from the relative 'FilePath'.
 --

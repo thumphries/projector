@@ -18,6 +18,7 @@ import qualified Machinator.Core as MC
 
 import           P
 
+import qualified Projector.Core as PC
 import           Projector.Html
 import           Projector.Html.Backend
 import           Projector.Html.Backend.Haskell
@@ -147,8 +148,8 @@ parseDataFiles fps = do
   defs <- for fps $ \f -> do
     m <- liftIO (T.readFile f)
     MC.Versioned _ (MC.DefinitionFile _ defs) <- hoistEither (first (DataError . T.pack . show) (MC.parseDefinitionFile f m))
-    pure defs
-  pure (UserDataTypes (HMC.machinatorDecls (fold defs)))
+    pure (f, PC.unTypeDecls (HMC.machinatorDecls defs))
+  pure (UserDataTypes defs)
 
 getBackend :: BackendT -> Backend a BackendError
 getBackend b =
