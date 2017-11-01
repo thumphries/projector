@@ -108,8 +108,6 @@ renderModule decls mn@(ModuleName n) m = do
       modName = T.unwords ["module", n, "where"]
       imports = (htmlRuntime, OpenImport)
               : (htmlRuntime, ImportQualified)
-              : (htmlRuntimePux, ImportQualified)
-              : (puxHtmlElements, ImportQualifiedAs (ModuleName "Pux"))
               : hackImports (M.toList (moduleImports m'))
       importText = fmap (uncurry genImport) imports
   decs <- fmap (fmap prettyUndecorated) (genModule decls m')
@@ -158,14 +156,6 @@ genFileName (ModuleName n) =
 htmlRuntime :: ModuleName
 htmlRuntime =
   ModuleName "Projector.Html.Runtime"
-
-htmlRuntimePux :: ModuleName
-htmlRuntimePux =
-  ModuleName "Projector.Html.Runtime.Pux"
-
-puxHtmlElements :: ModuleName
-puxHtmlElements =
-  ModuleName "Pux.Html.Elements"
 
 -- -----------------------------------------------------------------------------
 
@@ -262,9 +252,9 @@ genType ty kps =
 
     -- Library types
     Type (TVarF (TypeName "Html")) ->
-      text "(Array (Pux.Html ev))"
+      text "(Html ev)"
     Type (TVarF (TypeName "Attribute")) ->
-      text "(Pux.Attribute ev)"
+      text "(Attribute ev)"
     Type (TVarF (TypeName "AttributeKey")) ->
       text "String"
     Type (TVarF (TypeName "AttributeValue")) ->

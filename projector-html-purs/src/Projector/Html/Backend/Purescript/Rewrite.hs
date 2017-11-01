@@ -146,17 +146,30 @@ rules mmn =
 
       -- These rules are just optimisations.
       -- fold of a singleton: id
-    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.Pux.fold") _) (EList _ [x]) ->
+    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.fold") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
+      -- fold of a singleton: id
+    , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList _ [x]) ->
+               pure x
+             _ ->
+               empty)
+
       -- concat of a singleton: id
     , (\case EApp _ (EForeign _ (Name "Projector.Html.Runtime.concat") _) (EList _ [x]) ->
                pure x
              _ ->
                empty)
       -- adjacent raw plaintext nodes can be merged
-    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.Pux.fold") _) (EList b nodes) -> do
+    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.fold") _) (EList b nodes) -> do
+               nodes' <- foldRaw nodes
+               pure (EApp a fh (EList b nodes'))
+             _ ->
+               empty)
+
+      -- adjacent raw plaintext nodes can be merged
+    , (\case EApp a fh@(EForeign _ (Name "Projector.Html.Runtime.foldHtml") _) (EList b nodes) -> do
                nodes' <- foldRaw nodes
                pure (EApp a fh (EList b nodes'))
              _ ->
@@ -187,42 +200,42 @@ apply f =
 
 blank :: a -> Expr PrimT a
 blank a =
-  EForeign a (Name "Projector.Html.Runtime.Pux.blank") CL.tHtml
+  EForeign a (Name "Projector.Html.Runtime.blank") CL.tHtml
 
 textNode :: a -> Expr PrimT a
 textNode a =
-  EForeign a (Name "Projector.Html.Runtime.Pux.text") (TArrow (TLit TString) CL.tHtml)
+  EForeign a (Name "Projector.Html.Runtime.text") (TArrow (TLit TString) CL.tHtml)
 
 rawTextNode :: a -> Expr PrimT a
 rawTextNode a =
-  EForeign a (Name "Projector.Html.Runtime.Pux.textUnescaped") (TArrow (TLit TString) CL.tHtml)
+  EForeign a (Name "Projector.Html.Runtime.textUnescaped") (TArrow (TLit TString) CL.tHtml)
 
 parentNode :: a -> Expr PrimT a
 parentNode a =
   EForeign a
-    (Name "Projector.Html.Runtime.Pux.parent")
+    (Name "Projector.Html.Runtime.parent")
     (TArrow CL.tTag (TArrow (TList CL.tAttribute) (TArrow CL.tHtml CL.tHtml)))
 
 voidNode :: a -> Expr PrimT a
 voidNode a =
   EForeign a
-    (Name "Projector.Html.Runtime.Pux.void")
+    (Name "Projector.Html.Runtime.void")
     (TArrow CL.tTag (TArrow (TList CL.tAttribute) CL.tHtml))
 
 attr :: a -> Expr PrimT a
 attr a =
   EForeign a
-    (Name "Projector.Html.Runtime.Pux.attr")
+    (Name "Projector.Html.Runtime.attr")
     (TArrow CL.tAttributeKey (TArrow CL.tAttributeValue CL.tAttribute))
 
 foldHtml :: a -> Expr PrimT a
 foldHtml a =
-  EForeign a (Name "Projector.Html.Runtime.Pux.fold") (TArrow (TList CL.tHtml) CL.tHtml)
+  EForeign a (Name "Projector.Html.Runtime.foldHtml") (TArrow (TList CL.tHtml) CL.tHtml)
 
 pattern RawTextNode :: a -> a -> a -> Text -> HtmlExpr a
 pattern RawTextNode a b c t =
   EApp a
-    (EForeign b (Name "Projector.Html.Runtime.Pux.textUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
+    (EForeign b (Name "Projector.Html.Runtime.textUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))
     (ELit c (VString t))
 
 -- Combine adjacent raw text nodes.

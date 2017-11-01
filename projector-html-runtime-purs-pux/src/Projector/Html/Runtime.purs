@@ -1,8 +1,7 @@
 module Projector.Html.Runtime (
-  -- * Basic HTML model
-    Html (..)
-  , Attribute (..)
-  , Event (..)
+  -- * Pux HTML model
+    Html
+  , Attribute
   , text
   , textUnescaped
   , parent
@@ -20,56 +19,52 @@ module Projector.Html.Runtime (
 
 import Control.Monad as Monad
 import Data.Array as Array
+import Data.Function.Uncurried (runFn3)
 import Data.Functor as Functor
 import Data.String as String
-import Prelude ((<>))
+import Prelude
+import Pux.Html.Attributes (attr) as Pux
+import Pux.Html.Elements (Html, Attribute, element, text) as Pux
 
--- -----------------------------------------------------------------------------
--- Inefficient native HTML model
+type Html ev = Array (Pux.Html ev)
+type Attribute ev = Pux.Attribute ev
 
-data Html ev =
-    Element String (Array (Attribute ev)) (Array (Html ev))
-  | VoidElement String (Array (Attribute ev))
-  | Text String
-  | Nested (Array (Html ev))
 
-foldHtml :: forall ev. Array (Html ev) -> Html ev
-foldHtml =
-  Nested
-
-data Attribute ev =
-    Attribute String String
-  | AttrEvent String (Event -> ev)
-
--- This is just a placeholder - if you're using this, consider reimplementing
--- the datatypes in Pux.Html.Events!
-data Event =
-    Event
+-- Pux 6 Html doesn't have a valid fold/concat, so we resort to this
+-- awful hack: Everything must be an array.
+--
+-- The nested array concatenation here will lead to remarkably poor
+-- performance. We just have to live with this until we can upgrade
+-- to the newer version of Pux, or something else based on Smolder.
+-- It may also be straightforward to use rewrite rules to install an array builder.
 
 text :: forall ev. String -> Html ev
 text =
-  Text
+  Array.singleton <<< Pux.text
 
--- once again, this doesn't make much sense on the frontend
 textUnescaped :: forall ev. String -> Html ev
 textUnescaped =
-  Text
+  Array.singleton <<< Pux.text
 
 parent :: forall ev. String -> Array (Attribute ev) -> Array (Html ev) -> Html ev
-parent =
-  Element
+parent name attrs =
+  Array.singleton <<< runFn3 Pux.element name attrs <<< Array.concat
 
 void :: forall ev. String -> Array (Attribute ev) -> Html ev
-void =
-  VoidElement
+void name attrs =
+  Array.singleton (runFn3 Pux.element name attrs [])
 
 blank :: forall ev. Html ev
 blank =
-  Nested []
+  []
 
 attr :: forall ev. String -> String -> Attribute ev
 attr =
-  Attribute
+  Pux.attr
+
+foldHtml :: forall ev. Array (Html ev) -> Html ev
+foldHtml =
+  Array.concat
 
 -- -----------------------------------------------------------------------------
 
