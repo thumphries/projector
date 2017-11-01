@@ -56,9 +56,9 @@ rules mmn =
              _ ->
                empty)
 
-    -- FIXME this is a bad bad hack, probably need to filter out comments.
-    , (\case ECon a (Constructor "Comment") _ [str] ->
-               pure (apply (textNode a) [str])
+    -- Erase HTML comments, they have no meaning at runtime
+    , (\case ECon a (Constructor "Comment") _ _ ->
+               pure (blank a)
              _ ->
                empty)
 
@@ -184,6 +184,10 @@ disqualify (ModuleName mn) (Name n) = do
 apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
 apply f =
   foldl' (EApp (extractAnnotation f)) f
+
+blank :: a -> Expr PrimT a
+blank a =
+  EForeign a (Name "Projector.Html.Runtime.Pux.blank") CL.tHtml
 
 textNode :: a -> Expr PrimT a
 textNode a =
