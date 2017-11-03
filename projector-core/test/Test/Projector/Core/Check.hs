@@ -327,5 +327,47 @@ maybeDecls =
        ])
    ]
 
+-- -----------------------------------------------------------------------------
+
+prop_either_unit_right =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TForall [TypeName "a"] (TApp (TApp (TVar (TypeName "Either")) (TVar (TypeName "a"))) (TLit TString)))
+  where
+    expr =
+      ECon () (Constructor "Right") (TypeName "Either") [ELit () (VString "foobar")]
+
+prop_either_unit_left =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TForall [TypeName "a"] (TApp (TApp (TVar (TypeName "Either")) (TLit TBool)) (TVar (TypeName "a"))))
+  where
+    expr =
+      ECon () (Constructor "Left") (TypeName "Either") [ELit () (VBool True)]
+
+prop_either_unit_case =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TLit TBool)
+  where
+    expr =
+      ECase ()
+        (ECon () (Constructor "Right") (TypeName "Either") [ELit () (VBool True)])
+        [
+          (PCon () (Constructor "Left") [PVar () (Name "x")], EVar () (Name "x"))
+        , (PCon () (Constructor "Right") [PVar () (Name "x")], ELit () (VBool False))
+        ]
+
+eitherDecls =
+  TypeDecls $ M.fromList [
+      (TypeName "Either", DVariant [TypeName "a", TypeName "b"] [
+            (Constructor "Left", [TVar (TypeName "a")])
+          , (Constructor "Right", [TVar (TypeName "b")])
+          ])
+    ]
+
 return []
 tests = $disorderCheckEnvAll TestRunNormal
