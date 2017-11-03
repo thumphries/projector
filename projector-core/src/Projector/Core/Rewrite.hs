@@ -37,13 +37,13 @@ rewriteFix rules =
   runIdentity . U.fixpoint (rewriteT rules)
 
 -- | Apply a single rewrite rule to a single expr, nonrecursively.
-applyRule :: (Ground l, Monad m) => Expr l a -> RewriteRule l a -> FixT m (Expr l a)
+applyRule :: Monad m => Expr l a -> RewriteRule l a -> FixT m (Expr l a)
 applyRule g (Rewrite f) =
   maybe (pure g) U.progress (f g)
 {-# INLINE applyRule #-}
 
 -- | Apply a set of rewrite rules to a single expr, nonrecursively.
-applyRules :: (Ground l, Monad m) => Expr l a -> [RewriteRule l a] -> FixT m (Expr l a)
+applyRules :: Monad m => Expr l a -> [RewriteRule l a] -> FixT m (Expr l a)
 applyRules =
   foldM applyRule
 {-# INLINE applyRules #-}

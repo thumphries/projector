@@ -17,6 +17,7 @@ module Projector.Core.Type (
   , pattern TArrow
   , pattern TList
   , pattern TForall
+  , pattern TApp
   , mapGroundType
   -- *** Type functor
   , TypeF (..)
@@ -59,6 +60,9 @@ pattern TList a = Type (TListF a)
 pattern TForall :: [TypeName] -> Type l -> Type l
 pattern TForall a b = Type (TForallF a b)
 
+pattern TApp :: Type l -> Type l -> Type l
+pattern TApp a b = Type (TAppF a b)
+
 -- | Type functor.
 data TypeF l a
   = TLitF l
@@ -66,6 +70,7 @@ data TypeF l a
   | TArrowF a a
   | TListF a
   | TForallF [TypeName] a
+  | TAppF a a
   deriving (Functor, Foldable, Traversable)
 
 deriving instance (Eq l, Eq a) => Eq (TypeF l a)
@@ -91,10 +96,13 @@ mapGroundType tmap (Type ty) =
     TForallF as bs ->
       TForallF as (mapGroundType tmap bs)
 
+    TAppF a b ->
+      TAppF (mapGroundType tmap a) (mapGroundType tmap b)
+
 -- | Declared types.
 data Decl l
-  = DVariant [(Constructor, [Type l])]
-  | DRecord [(FieldName, Type l)]
+  = DVariant [TypeName] [(Constructor, [Type l])]
+  | DRecord [TypeName] [(FieldName, Type l)]
   deriving (Eq, Ord, Show)
 
 -- | The class of user-supplied primitive types.
@@ -141,8 +149,8 @@ lookupConstructor :: Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
 lookupConstructor con (TypeDecls m) =
   M.lookup con . M.fromList . mconcat . with (M.toList m) $ \(tn, dec) ->
     case dec of
-      DVariant cts ->
+      DVariant _ps cts ->
         with cts $ \(c, ts) ->
           (c, (tn, ts))
-      DRecord fts ->
+      DRecord _ps fts ->
         [(Constructor (unTypeName tn), (tn, fmap snd fts))]

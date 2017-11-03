@@ -210,6 +210,7 @@ data IType l a
   | IOpenRecord a Var (Fields l a)
   | IList a (IType l a)
   | IForall a [TypeName] (IType l a)
+  | IApp a (IType l a) (IType l a)
   deriving (Eq, Ord, Show)
 
 newtype Fields l a = Fields {
@@ -228,9 +229,10 @@ hoistType decls a (Type ty) =
       ILit a l
     TVarF tn ->
       case lookupType tn decls of
-        Just (DVariant _cns) ->
+        Just (DVariant _ps _cns) ->
           IVar a tn
-        Just (DRecord fts) ->
+        Just (DRecord _ps fts) ->
+          -- FIXME hmmmm what should happen here
           IClosedRecord a tn (hoistFields decls a fts)
         Nothing ->
           -- 'a' or an unknown type.
@@ -243,6 +245,8 @@ hoistType decls a (Type ty) =
       IList a (hoistType decls a f)
     TForallF ps t ->
       IForall a ps (hoistType decls a t)
+    TAppF f g ->
+      IApp a (hoistType decls a f) (hoistType decls a g)
 
 hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l a
 hoistFields decls a =
@@ -282,6 +286,8 @@ lowerIType ity' = do
         TList <$> go f
       IForall _ bs t ->
         TForall bs <$> go t
+      IApp _ f g ->
+        TApp <$> go f <*> go g
 
 freeTVar :: Var -> StateT (Int, Map Var TypeName) (Either (TypeError l a)) TypeName
 freeTVar x = do
@@ -335,6 +341,8 @@ flattenIType ity =
       IList a _ ->
         a
       IForall a _ _ ->
+        a
+      IApp a _ _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
@@ -358,6 +366,8 @@ flattenIType' ity =
       TList (flattenIType' ty)
     IForall _ ps t ->
       TForall ps (flattenIType' t)
+    IApp _ f g ->
+      TApp (flattenIType' f) (flattenIType' g)
 
 -- | Report a unification error.
 unificationError :: IType l a -> IType l a -> TypeError l a
@@ -591,7 +601,7 @@ generateConstraints' decls expr =
 
     ECon a c tn es ->
       case lookupType tn decls of
-        Just ty@(DVariant cns) -> do
+        Just ty@(DVariant ps cns) -> do
           -- Look up the constructor, check its arity, and introduce
           -- constraints for each of its subterms, for which we expect certain types.
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
@@ -603,7 +613,7 @@ generateConstraints' decls expr =
           pure (ECon (ty', a) c tn es')
 
         -- Records should be constructed via ERec, not ECon
-        Just ty@(DRecord _) -> do
+        Just ty@(DRecord _ _) -> do
           throwError (BadConstructorName c tn ty a)
 
         Nothing ->
@@ -628,7 +638,7 @@ generateConstraints' decls expr =
 
     ERec a tn fes -> do
       case lookupType tn decls of
-        Just (DRecord fts) -> do
+        Just (DRecord ps fts) -> do
           -- recurse into each field
           fes' <- traverse (traverse (generateConstraints' decls)) fes
           let need = M.fromList (fmap (fmap (hoistType decls a)) fts)
@@ -651,7 +661,7 @@ generateConstraints' decls expr =
           pure (ERec (ty', a) tn fes')
 
         -- Variants should be constructed via ECon, not ERec
-        Just ty@(DVariant _) -> do
+        Just ty@(DVariant _ _) -> do
           throwError (BadConstructorName (Constructor (unTypeName tn)) tn ty a)
 
         Nothing ->
@@ -736,6 +746,9 @@ substituteType subs top ty =
 
     IArrow a t1 t2 ->
       IArrow a (substituteType subs False t1) (substituteType subs False t2)
+
+    IApp a t1 t2 ->
+      IApp a (substituteType subs False t1) (substituteType subs False t2)
 
     IList a t ->
       IList a (substituteType subs False t)
@@ -875,6 +888,8 @@ occurs a q ity =
           pure ()
         IArrow _ f g ->
           go x f *> go x g
+        IApp _ f g ->
+          go x f *> go x g
         IClosedRecord _ _ (Fields fs) ->
           traverse_ (go x) fs
         IOpenRecord _ y (Fields fs) ->
@@ -976,6 +991,8 @@ subst bnds' ty' =
           IForall a bs (go (foldl' (flip M.delete) bnds bs) t)
         IArrow a t1 t2 ->
           IArrow a (go bnds t1) (go bnds t2)
+        IApp a t1 t2 ->
+          IApp a (go bnds t1) (go bnds t2)
         IList a t1 ->
           IList a (go bnds t1)
         IHole a x mty ->
