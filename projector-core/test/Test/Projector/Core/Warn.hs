@@ -83,7 +83,7 @@ buildCaseInex n =
 
 tcasey :: Decl TestLitT
 tcasey =
-  DVariant [
+  DVariant [] [
       (Constructor "Casey", [TLit TBool])
     , (Constructor "Foo", [TVar (TypeName "Casey")])
     ]

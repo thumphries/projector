@@ -10,21 +10,20 @@ module Projector.Html.Runtime (
   , attr
   , foldHtml
   -- * Primitives
-  , Maybe (..)
-  , Either (..)
   , append
   , concat
   , fold
   , isEmpty
   , map
+  , module Exports
   ) where
 
 import Control.Monad as Monad
 import Data.Array as Array
 import Data.Function.Uncurried (runFn3)
 import Data.Functor as Functor
-import Data.Either (Either (..))
-import Data.Maybe (Maybe (..))
+import Data.Either (Either (..)) as Exports
+import Data.Maybe (Maybe (..)) as Exports
 import Data.String as String
 import Prelude
 import Pux.Html.Attributes (attr) as Pux

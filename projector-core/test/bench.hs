@@ -34,7 +34,7 @@ buildCase n = case n of
 
 tcasey :: Decl TestLitT
 tcasey =
-  DVariant [(Constructor "Casey", [TLit TBool])]
+  DVariant [] [(Constructor "Casey", [TLit TBool])]
 
 caseyCtx :: TypeDecls TestLitT
 caseyCtx =
@@ -49,7 +49,7 @@ buildIntList n = case n of
 
 dintlist :: Decl TestLitT
 dintlist =
-  DVariant [
+  DVariant [] [
       (Constructor "Nil", [])
     , (Constructor "Cons", [TLit TInt, TVar (TypeName "IntList")])
     ]

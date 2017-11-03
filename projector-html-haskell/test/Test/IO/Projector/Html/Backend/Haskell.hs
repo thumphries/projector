@@ -66,7 +66,7 @@ prop_welltyped :: Property
 prop_welltyped =
   gamble (genHtmlTypeDecls) $ \decls ->
     gamble (chooseInt (0, 100)) $ \k ->
-      gamble (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule haskellBackend)) $ \modl ->
+      gamble (noShrink (genWellTypedHtmlModule k decls `suchThat` (isRight . checkModule haskellBackend))) $ \modl ->
         moduleProp decls (ModuleName "Test.Haskell.Arbitrary.WellTyped") modl
 
 -- -----------------------------------------------------------------------------

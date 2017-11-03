@@ -107,7 +107,7 @@ prop_interpreter_unit_append =
 
 decls :: HtmlDecls
 decls =
-    declareType (TypeName "Fizz") (DRecord [(FieldName "name", TLit TString)])
+    declareType (TypeName "Fizz") (DRecord [] [(FieldName "name", TLit TString)])
   $ mempty
 
 bnds :: Map Name (HtmlExpr (HtmlType, SrcAnnotation))

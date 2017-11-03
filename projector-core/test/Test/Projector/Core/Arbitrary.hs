@@ -225,13 +225,25 @@ genTypeFromContext tc@(TypeDecls m) g =
                <*> genTypeFromContext tc g
            ]
     else oneOfRec [
-             TVar <$> elements (M.keys m)
+             TVar <$> elements (simpleTypes tc)
            , TLit <$> g
            ] [
              TArrow
                <$> genTypeFromContext tc g
                <*> genTypeFromContext tc g
            ]
+
+-- Cheat a bit and only generate simple types
+simpleTypes :: TypeDecls l -> [TypeName]
+simpleTypes (TypeDecls m) =
+  M.keys . flip M.filter m $ \decl ->
+    case decl of
+      DVariant [] _ ->
+        True
+      DRecord [] _ ->
+        True
+      _ ->
+        False
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
@@ -276,6 +288,9 @@ pinsert ctx (Context ns p) n t =
 
     Type (TArrowF _ to) ->
       mcons to (n, t) p
+
+    Type (TAppF _ _) ->
+      p
 
     Type (TListF _) ->
       p
@@ -355,6 +370,9 @@ genWellTypedExpr' n ty ctx names genty genval =
         Type (TArrowF t1 t2) ->
           genWellTypedLam (max 1 (n `div` 2)) t1 t2 ctx names genty genval
 
+        Type (TAppF _ _) ->
+          fail "can't generate quantified types"
+
         Type (TListF lty) -> do
           k <- chooseInt (1, n+1)
           list <$> replicateM k (genWellTypedExpr' (n `div` (max 1 (n - k))) lty ctx names genty genval)
@@ -402,6 +420,10 @@ genWellTypedPath ctx names more want x have =
       Type (TArrowF from _) -> do
         arg <- more names from
         pure (app (var x) arg)
+
+      Type (TAppF _ _) ->
+        -- impossible
+        pure (var x)
 
       Type (TLitF _) ->
         -- impossible

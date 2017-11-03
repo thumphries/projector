@@ -47,6 +47,11 @@ fromMachinatorT mt =
       fromMachinatorGT g
     MC.ListT t ->
       TList (fromMachinatorT t)
+{-- When Machinator syntax gets proper TApp, proceed as follows:
+    MC.AppT f g ->
+      TApp (fromMachinatorT f) (fromMachinatorT g)
+--}
+
 
 fromMachinatorGT :: MC.Ground -> HtmlType
 fromMachinatorGT g =
