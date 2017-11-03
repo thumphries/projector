@@ -369,5 +369,39 @@ eitherDecls =
           ])
     ]
 
+-- -----------------------------------------------------------------------------
+-- quantified record
+
+prop_blob_unit_rec =
+  once $
+    typeCheck blobDecls expr
+    ===
+    Right (TApp (TVar (TypeName "Blob")) (TLit TBool))
+  where
+    expr =
+      ERec () (TypeName "Blob") [
+          (FieldName "value", ELit () (VBool False))
+        ]
+
+prop_blob_unit_prj =
+  once $
+    typeCheck blobDecls expr
+    ===
+    Right (TLit TBool)
+  where
+    expr =
+      EPrj ()
+        (ERec () (TypeName "Blob") [
+            (FieldName "value", ELit () (VBool False))
+          ])
+        (FieldName "value")
+
+blobDecls =
+  TypeDecls $ M.fromList [
+      (TypeName "Blob", DRecord [TypeName "a"] [
+          (FieldName "value", TVar (TypeName "a"))
+        ])
+    ]
+
 return []
 tests = $disorderCheckEnvAll TestRunNormal

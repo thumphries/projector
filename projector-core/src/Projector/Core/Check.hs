@@ -252,6 +252,10 @@ hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l
 hoistFields decls a =
   Fields . M.fromList . fmap (fmap (hoistType decls a))
 
+substFields :: Map TypeName (IType l a) -> Fields l a -> Fields l a
+substFields subs (Fields m) =
+  Fields (fmap (subst subs) m)
+
 -- | Convert our internal type representation back to the concrete.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
 lowerIType ity' = do
@@ -650,6 +654,11 @@ generateConstraints' decls expr =
     ERec a tn fes -> do
       case lookupType tn decls of
         Just (DRecord ps fts) -> do
+          -- Generate fresh type variables for each type parameter
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          -- Put them in a map so we can substitute
+          let typeParams = M.fromList ps'
+
           -- recurse into each field
           fes' <- traverse (traverse (generateConstraints' decls)) fes
           let need = M.fromList (fmap (fmap (hoistType decls a)) fts)
@@ -660,7 +669,7 @@ generateConstraints' decls expr =
             -- When an extraneous field is present
             (M.traverseMissing (\fn ty -> throwError (ExtraRecordField tn fn (flattenIType ty) a)))
             -- When present in both, add a constraint
-            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal (Just a) twant thave)))
+            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal (Just a) (subst typeParams twant) thave)))
             need
             have
           -- catch duplicate fields too
@@ -668,7 +677,7 @@ generateConstraints' decls expr =
             throwError (DuplicateRecordFields tn (fmap fst fes L.\\ fmap fst fts) a)
 
           -- set type as the closed record
-          let ty' = IClosedRecord a tn (hoistFields decls a fts)
+          let ty' = foldl' (IApp a) (IClosedRecord a tn (substFields typeParams (hoistFields decls a fts))) (fmap snd ps')
           pure (ERec (ty', a) tn fes')
 
         -- Variants should be constructed via ECon, not ERec
@@ -821,6 +830,10 @@ mguST points t1 t2 =
       unifyVar points a x (IOpenRecord b y hs)
 
     (IOpenRecord a x fs, IClosedRecord _ tn gs) -> do
+      _hs <- unifyClosedFields points fs tn gs
+      unifyVar points a x t2
+
+    (IOpenRecord a x fs, IApp _ (IClosedRecord _ tn gs) _) -> do
       _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t2
 
