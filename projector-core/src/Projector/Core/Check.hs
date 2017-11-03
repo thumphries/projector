@@ -606,10 +606,27 @@ generateConstraints' decls expr =
           -- constraints for each of its subterms, for which we expect certain types.
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
           unless (length ts == length es) (throwError (BadConstructorArity c (length ts) (length es) a))
+
+          -- Generate fresh type variables for each type parameter
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          -- Put them in a map so we can substitute
+          let typeParams = M.fromList ps'
+
+          -- Add an ExplicitInstance constraint for the whole expression
+          let
+            scheme = IForall a ps (foldl' (IApp a) (IVar a tn) (fmap (IVar a) ps))
+            ty' = foldl' (IApp a) (IVar a tn) (fmap snd ps')
+          addConstraint (ExplicitInstance (Just a) scheme ty')
+
+          -- Generate constraints for each subexpression
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
-            (\(expected, inferred) -> addConstraint (Equal (Just a) expected inferred))
-          let ty' = IVar a tn
+          -- Add constraints linking subexpression inferred types to the type definition
+          -- (Substitute the type parameters for instantiated versions first)
+            (\(expected, inferred) ->
+               addConstraint (Equal (Just a) (subst typeParams expected) inferred))
+
+
           pure (ECon (ty', a) c tn es')
 
         -- Records should be constructed via ERec, not ECon

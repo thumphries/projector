@@ -73,7 +73,7 @@ nRecord =
 
 tRecord :: Decl TestLitT
 tRecord =
-  DRecord [
+  DRecord [] [
       (FieldName "foo", TLit TBool)
     , (FieldName "bar", TLit TString)
     , (FieldName "baz", TLit TInt)
@@ -282,7 +282,35 @@ prop_forall_unit_id_explicit_neg =
           (Name "id", ELam () (Name "x") (Just (TLit TBool)) (EVar () (Name "x")))
         ]
 
+-- -----------------------------------------------------------------------------
+-- maybe
 
+prop_maybe_unit_just =
+  once $
+    typeTree maybeDecls expr
+    ===
+    Left [ ]
+  where
+    expr =
+      ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)]
+
+prop_maybe_unit_nothing =
+  once $
+    typeTree maybeDecls expr
+    ===
+    Left [ ]
+  where
+    expr :: Expr TestLitT ()
+    expr =
+      ECon () (Constructor "Nothing") (TypeName "Maybe") []
+
+maybeDecls =
+  TypeDecls $ M.fromList [
+     (TypeName "Maybe", DVariant [TypeName "a"] [
+         (Constructor "Just", [TVar (TypeName "a")])
+       , (Constructor "Nothing", [])
+       ])
+   ]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal
