@@ -175,11 +175,11 @@ genTypeDecls' g tts@(t:ts) (c:cs) tc =
   oneOf [
       do
        (vars, cs') <- genVariantsFromContext' g c cs tc
-       let ty = DVariant vars
+       let ty = DVariant [] vars
        genTypeDecls' g ts cs' (declareType t ty tc)
     , do
        fts <- genRecordFromContext' g tc
-       let ty = DRecord fts
+       let ty = DRecord [] fts
            tn = TypeName (unConstructor c)
        genTypeDecls' g tts cs (declareType tn ty tc)
     ]

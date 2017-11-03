@@ -854,7 +854,6 @@ mguST points t1 t2 =
       pure (IList k c)
 
     (IForall a ts1 ot1, IForall b ts2 ot2) ->
-      -- TODO normalise, check param list is equal, then unify result type
       case (normalise a ts1 ot1, normalise b ts2 ot2) of
         (IForall _ ps1 tt1, IForall _ ps2 tt2) -> do
           unless (ps1 == ps2) (left [unificationError t1 t2])

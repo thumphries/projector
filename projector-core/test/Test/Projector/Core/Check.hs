@@ -287,18 +287,18 @@ prop_forall_unit_id_explicit_neg =
 
 prop_maybe_unit_just =
   once $
-    typeTree maybeDecls expr
+    typeCheck maybeDecls expr
     ===
-    Left [ ]
+    Right (TApp (TVar (TypeName "Maybe")) (TLit TBool))
   where
     expr =
       ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)]
 
 prop_maybe_unit_nothing =
   once $
-    typeTree maybeDecls expr
+    typeCheck maybeDecls expr
     ===
-    Left [ ]
+    Right (TForall [TypeName "a"] (TApp (TVar (TypeName "Maybe")) (TVar (TypeName "a"))))
   where
     expr :: Expr TestLitT ()
     expr =
@@ -306,14 +306,11 @@ prop_maybe_unit_nothing =
 
 prop_maybe_unit_case =
   once $
-    typeTree maybeDecls expr
+    typeCheck maybeDecls expr
     ===
-    Left [ ]
+    Right (TLit TBool)
   where
-    expr = mexpr
-
-mexpr :: Expr TestLitT ()
-mexpr =
+    expr =
       ECase ()
         (ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)])
         [
