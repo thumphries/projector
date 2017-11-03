@@ -64,7 +64,7 @@ genAcyclicSet =
     names <- vectorOfUnique k genName
     pure (genAcycle names, names)
 
-vectorOfUnique :: (Eq a, Ord a) => Int -> Jack a -> Jack [a]
+vectorOfUnique :: Ord a => Int -> Jack a -> Jack [a]
 vectorOfUnique k gen =
   go k gen mempty
   where

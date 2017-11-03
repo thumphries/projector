@@ -66,14 +66,31 @@ globalRules =
                empty)
     ]
 
+pattern Append :: Expr l a
 pattern Append <- (EForeign _ (Name "append") _)
+
+pattern Concat :: Expr l a
 pattern Concat <- (EForeign _ (Name "concat") _)
+
+pattern Fold :: Expr l a
 pattern Fold <- (EForeign _ (Name "fold") _)
+
+pattern IsEmpty :: Expr l a
 pattern IsEmpty <- (EForeign _ (Name "isEmpty") _)
+
+pattern BTrue :: a -> Expr l a
 pattern BTrue a = (ECon a (Constructor "True") (TypeName "Bool") [])
+
+pattern BFalse :: a -> Expr l a
 pattern BFalse a = (ECon a (Constructor "False") (TypeName "Bool") [])
+
+pattern EmptyString :: a -> HtmlExpr a
 pattern EmptyString a = (ELit a (VString ""))
+
+pattern String :: a -> Text -> HtmlExpr a
 pattern String a t = ELit a (VString t)
+
+pattern RawString :: a -> a -> Text -> HtmlExpr a
 pattern RawString a b t = ECon a (Constructor "Raw") (TypeName "Html") [ELit b (VString t)]
 
 -- Fold together raw text nodes

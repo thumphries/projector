@@ -461,7 +461,7 @@ data Constraint l a
   deriving (Eq, Ord, Show)
 
 -- | Record a new constraint.
-addConstraint :: Ground l => Constraint l a -> Check l a ()
+addConstraint :: Constraint l a -> Check l a ()
 addConstraint c =
   Check . lift $
     modify' (\s -> s { sConstraints = D.cons c (sConstraints s) })
@@ -471,7 +471,7 @@ addConstraint c =
 -- Assumptions
 
 -- | Add an assumed type for some variable we've encountered.
-addAssumption :: Ground l => Name -> a -> IType l a -> Check l a ()
+addAssumption :: Name -> a -> IType l a -> Check l a ()
 addAssumption n a ty =
   Check . lift $
     modify' (\s -> s {
@@ -479,7 +479,7 @@ addAssumption n a ty =
       })
 
 -- | Clobber the assumption set for some variable.
-setAssumptions :: Ground l => Name -> [(a, IType l a)] -> Check l a ()
+setAssumptions :: Name -> [(a, IType l a)] -> Check l a ()
 setAssumptions n assums =
   Check . lift $
     modify' (\s -> s {
@@ -489,7 +489,7 @@ setAssumptions n assums =
 -- | Delete all assumptions for some variable.
 --
 -- This is called when leaving the lexical scope in which the variable was bound.
-deleteAssumptions :: Ground l => Name -> Check l a ()
+deleteAssumptions :: Name -> Check l a ()
 deleteAssumptions n =
   Check . lift $
     modify' (\s -> s {
@@ -497,14 +497,14 @@ deleteAssumptions n =
       })
 
 -- | Look up all assumptions for a given name. Returns the empty set if there are none.
-lookupAssumptions :: Ground l => Name -> Check l a [(a, IType l a)]
+lookupAssumptions :: Name -> Check l a [(a, IType l a)]
 lookupAssumptions n =
   Check . lift $
     fmap (fromMaybe mempty) (gets (M.lookup n . unAssumptions . sAssumptions))
 
 -- | Run some continuation with lexically-scoped assumptions.
 -- This is sorta like 'local', but we need to keep changes to other keys in the map.
-withBindings :: Ground l => Traversable f => f Name -> Check l a b -> Check l a (Map Name [(a, IType l a)], b)
+withBindings :: Traversable f => f Name -> Check l a b -> Check l a (Map Name [(a, IType l a)], b)
 withBindings xs k = do
   old <- fmap (M.fromList . toList) . for xs $ \n -> do
     as <- lookupAssumptions n
@@ -517,7 +517,7 @@ withBindings xs k = do
     pure (n, as)
   pure (new, res)
 
-withBinding :: Ground l => Name -> Check l a b -> Check l a ([(a, IType l a)], b)
+withBinding :: Name -> Check l a b -> Check l a ([(a, IType l a)], b)
 withBinding x k = do
   (as, b) <- withBindings [x] k
   pure (fromMaybe mempty (M.lookup x as), b)

@@ -44,10 +44,19 @@ import           P
 newtype Type l = Type (TypeF l (Type l))
   deriving (Eq, Ord, Show)
 
+pattern TLit :: l -> Type l
 pattern TLit l = Type (TLitF l)
+
+pattern TVar :: TypeName -> Type l
 pattern TVar x = Type (TVarF x)
+
+pattern TArrow :: Type l -> Type l -> Type l
 pattern TArrow a b = Type (TArrowF a b)
+
+pattern TList :: Type l -> Type l
 pattern TList a = Type (TListF a)
+
+pattern TForall :: [TypeName] -> Type l -> Type l
 pattern TForall a b = Type (TForallF a b)
 
 -- | Type functor.
@@ -111,24 +120,24 @@ newtype FieldName = FieldName { unFieldName :: Text }
 newtype TypeDecls l = TypeDecls { unTypeDecls :: Map TypeName (Decl l) }
   deriving (Eq, Ord, Show)
 
-instance Ord l => Monoid (TypeDecls l) where
+instance Monoid (TypeDecls l) where
   mempty = TypeDecls mempty
   mappend x = TypeDecls . (mappend `on` unTypeDecls) x
 
-declareType :: Ground l => TypeName -> Decl l -> TypeDecls l -> TypeDecls l
+declareType :: TypeName -> Decl l -> TypeDecls l -> TypeDecls l
 declareType n t =
   TypeDecls . M.insert n t . unTypeDecls
 
-lookupType :: Ground l => TypeName -> TypeDecls l -> Maybe (Decl l)
+lookupType :: TypeName -> TypeDecls l -> Maybe (Decl l)
 lookupType n =
   M.lookup n . unTypeDecls
 
-subtractTypes :: Ground l => TypeDecls l -> TypeDecls l -> TypeDecls l
+subtractTypes :: TypeDecls l -> TypeDecls l -> TypeDecls l
 subtractTypes (TypeDecls m) (TypeDecls n) =
   TypeDecls (M.difference m n)
 
 -- FIX this really sucks, maintain the map in Decls if need be
-lookupConstructor :: Ground l => Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
+lookupConstructor :: Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
 lookupConstructor con (TypeDecls m) =
   M.lookup con . M.fromList . mconcat . with (M.toList m) $ \(tn, dec) ->
     case dec of
