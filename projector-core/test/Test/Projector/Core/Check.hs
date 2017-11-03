@@ -304,6 +304,24 @@ prop_maybe_unit_nothing =
     expr =
       ECon () (Constructor "Nothing") (TypeName "Maybe") []
 
+prop_maybe_unit_case =
+  once $
+    typeTree maybeDecls expr
+    ===
+    Left [ ]
+  where
+    expr = mexpr
+
+mexpr :: Expr TestLitT ()
+mexpr =
+      ECase ()
+        (ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)])
+        [
+          (PCon () (Constructor "Just") [PVar () (Name "x")], EVar () (Name "x"))
+        , (PCon () (Constructor "Nothing") [], ELit () (VBool False))
+        ]
+
+
 maybeDecls =
   TypeDecls $ M.fromList [
      (TypeName "Maybe", DVariant [TypeName "a"] [

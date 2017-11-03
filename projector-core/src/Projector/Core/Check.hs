@@ -612,12 +612,6 @@ generateConstraints' decls expr =
           -- Put them in a map so we can substitute
           let typeParams = M.fromList ps'
 
-          -- Add an ExplicitInstance constraint for the whole expression
-          let
-            scheme = IForall a ps (foldl' (IApp a) (IVar a tn) (fmap (IVar a) ps))
-            ty' = foldl' (IApp a) (IVar a tn) (fmap snd ps')
-          addConstraint (ExplicitInstance (Just a) scheme ty')
-
           -- Generate constraints for each subexpression
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
@@ -626,7 +620,7 @@ generateConstraints' decls expr =
             (\(expected, inferred) ->
                addConstraint (Equal (Just a) (subst typeParams expected) inferred))
 
-
+          let ty' = foldl' (IApp a) (IVar a tn) (fmap snd ps')
           pure (ECon (ty', a) c tn es')
 
         -- Records should be constructed via ERec, not ECon
@@ -715,12 +709,15 @@ patternConstraints decls ty pat =
 
     PCon a c pats ->
       case lookupConstructor c decls of
-        Just (tn, ts) -> do
+        Just (tn, ps, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
-          let ty' = hoistType decls a (TVar tn)
-          addConstraint (Equal (Just a) ty' ty)
-          pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) (uncurry (patternConstraints decls))
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          let ty' = foldl' (IApp a) (hoistType decls a (TVar tn)) (fmap snd ps')
+              typeParams = M.fromList ps'
+          pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) $ \(ty2, pat2) ->
+            patternConstraints decls (subst typeParams ty2) pat2
+          addConstraint (Equal (Just a) ty' (subst typeParams ty))
           pure (PCon (ty', a) c pats')
 
         Nothing ->
@@ -847,6 +844,10 @@ mguST points t1 t2 =
       -- Would be nice to have an applicative newtype for this...
       [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
+
+    (IApp a f g, IApp _ h i) -> do
+      [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
+      pure (IApp a j k)
 
     (IList k a, IList _ b) -> do
       c <- mguST points a b
@@ -997,8 +998,9 @@ normalise a ps t =
   in IForall a vars (subst bnds t)
 
 subst :: Map TypeName (IType l a) -> IType l a -> IType l a
-subst bnds' ty' =
-  go bnds' ty'
+subst bnds' ty'
+  | null bnds' = ty'
+  | otherwise = go bnds' ty'
   where
     go bnds ity =
       case ity of

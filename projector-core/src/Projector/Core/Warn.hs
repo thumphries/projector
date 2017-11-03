@@ -131,7 +131,7 @@ checkSet :: a -> TypeDecls l -> Set Constructor -> Either (Warning l a) ()
 checkSet a decls seen =
   fromMaybe (Left (Invariant "BUG: Could not determine type (checkSet)")) $ do
     witness <- head seen
-    (tn, _tys) <- lookupConstructor witness decls
+    (tn, _ps, _tys) <- lookupConstructor witness decls
     defn <- lookupType tn decls
     let missing = case defn of
           DVariant _ps cts ->

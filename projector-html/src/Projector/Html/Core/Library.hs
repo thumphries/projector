@@ -83,7 +83,7 @@ tTag =
 
 dTag :: HtmlDecl
 dTag =
-  DVariant [
+  DVariant [] [
       (Constructor "Tag", [TLit TString])
     ]
 
@@ -99,7 +99,7 @@ tAttribute =
 
 dAttribute :: HtmlDecl
 dAttribute =
-  DVariant [
+  DVariant [] [
       (Constructor "Attribute", [tAttributeKey, tAttributeValue])
     ]
 
@@ -115,7 +115,7 @@ tAttributeKey =
 
 dAttributeKey :: HtmlDecl
 dAttributeKey =
-  DVariant [
+  DVariant [] [
       (Constructor "AttributeKey", [TLit TString])
     ]
 
@@ -131,7 +131,7 @@ tAttributeValue =
 
 dAttributeValue :: HtmlDecl
 dAttributeValue =
-  DVariant [
+  DVariant [] [
       (Constructor "AttributeValue", [TLit TString])
     ]
 
@@ -147,7 +147,7 @@ tHtml =
 
 dHtml :: HtmlDecl
 dHtml =
-  DVariant [
+  DVariant [] [
       (Constructor "Element", [tTag, TList tAttribute, tHtml])
     , (Constructor "VoidElement", [tTag, TList tAttribute])
     , (Constructor "Comment", [TLit TString])

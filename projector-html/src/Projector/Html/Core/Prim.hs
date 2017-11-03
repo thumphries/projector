@@ -10,6 +10,10 @@ module Projector.Html.Core.Prim (
   , tBool
   , dBool
   , nBool
+  -- ** Maybe
+  , tMaybe
+  , dMaybe
+  , nMaybe
   -- * Primitive functions
   , exprs
   -- ** String append
@@ -45,6 +49,7 @@ types :: HtmlDecls
 types =
   TypeDecls $ M.fromList [
       (nBool, dBool)
+    , (nMaybe, dMaybe)
     ]
 
 exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, Annotation a))
@@ -67,11 +72,27 @@ tBool =
 
 dBool :: HtmlDecl
 dBool =
-  DVariant [
+  DVariant [] [
       (Constructor "True", [])
     , (Constructor "False", [])
     ]
 
+-- -----------------------------------------------------------------------------
+
+nMaybe :: TypeName
+nMaybe =
+  TypeName "Maybe"
+
+tMaybe :: HtmlType
+tMaybe =
+  TVar nMaybe
+
+dMaybe :: HtmlDecl
+dMaybe =
+  DVariant [TypeName "a"] [
+      (Constructor "Just", [TVar (TypeName "a")])
+    , (Constructor "Nothing", [])
+    ]
 
 -- -----------------------------------------------------------------------------
 

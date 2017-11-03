@@ -144,13 +144,14 @@ subtractTypes :: TypeDecls l -> TypeDecls l -> TypeDecls l
 subtractTypes (TypeDecls m) (TypeDecls n) =
   TypeDecls (M.difference m n)
 
--- FIX this really sucks, maintain the map in Decls if need be
-lookupConstructor :: Constructor -> TypeDecls l -> Maybe (TypeName, [Type l])
+-- FIX recomputing this all the time really sucks
+--     if this becomes a bottleneck, compute it during declareType
+lookupConstructor :: Constructor -> TypeDecls l -> Maybe (TypeName, [TypeName], [Type l])
 lookupConstructor con (TypeDecls m) =
   M.lookup con . M.fromList . mconcat . with (M.toList m) $ \(tn, dec) ->
     case dec of
-      DVariant _ps cts ->
+      DVariant ps cts ->
         with cts $ \(c, ts) ->
-          (c, (tn, ts))
-      DRecord _ps fts ->
-        [(Constructor (unTypeName tn), (tn, fmap snd fts))]
+          (c, (tn, ps, ts))
+      DRecord ps fts ->
+        [(Constructor (unTypeName tn), (tn, ps, fmap snd fts))]
