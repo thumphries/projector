@@ -10,6 +10,8 @@ module Projector.Html.Runtime (
   , attr
   , foldHtml
   -- * Primitives
+  , Maybe (..)
+  , Either (..)
   , append
   , concat
   , fold
@@ -21,6 +23,8 @@ import Control.Monad as Monad
 import Data.Array as Array
 import Data.Function.Uncurried (runFn3)
 import Data.Functor as Functor
+import Data.Either (Either (..))
+import Data.Maybe (Maybe (..))
 import Data.String as String
 import Prelude
 import Pux.Html.Attributes (attr) as Pux

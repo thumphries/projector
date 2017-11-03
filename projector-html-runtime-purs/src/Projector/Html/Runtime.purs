@@ -11,6 +11,8 @@ module Projector.Html.Runtime (
   , attr
   , foldHtml
   -- * Primitives
+  , Maybe (..)
+  , Either (..)
   , append
   , concat
   , fold
@@ -18,6 +20,8 @@ module Projector.Html.Runtime (
   , map
   ) where
 
+import Data.Either (Either (..))
+import Data.Maybe (Maybe (..))
 import Control.Monad as Monad
 import Data.Array as Array
 import Data.Functor as Functor
