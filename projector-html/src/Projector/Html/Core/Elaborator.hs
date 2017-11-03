@@ -23,15 +23,14 @@ import           Projector.Html.Data.Template
 
 
 data ElaboratorError a =
-    KindError a
+    ElaboratorError a
   deriving (Eq, Ord, Show)
 
 renderElaboratorError :: (a -> Text) -> ElaboratorError a -> Text
 renderElaboratorError f e =
   case e of
-    KindError a ->
-      -- This error could be better...
-      f a <> "illegal higher-kinded type"
+    ElaboratorError a ->
+      f a <> " BUG: elaborator error"
 
 elaborate :: Template a -> Either (ElaboratorError (Annotation a)) (HtmlExpr (Annotation a))
 elaborate (Template _ mts expr) = do
@@ -68,8 +67,8 @@ eType ty =
     TTApp _ (TTVar _ (TId "List")) x ->
       TList <$> eType x
 
-    TTApp a _ _ ->
-      Left (KindError (TypeSignature a))
+    TTApp _ f g ->
+      TApp <$> eType f <*> eType g
 
 eHtml :: THtml a -> HtmlExpr (Annotation a)
 eHtml html =
