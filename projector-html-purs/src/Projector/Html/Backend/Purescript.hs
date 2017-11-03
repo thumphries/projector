@@ -91,9 +91,9 @@ htmlConstructors =
   where
   sumCons x =
     case x of
-      DVariant cts ->
+      DVariant _ps cts ->
         S.fromList (fmap fst cts)
-      DRecord _ ->
+      DRecord _ps _ ->
         mempty
 
 -- -----------------------------------------------------------------------------
@@ -166,12 +166,16 @@ genTypeDecs decls =
 
 type KnownParams = Map TypeName (Set TypeName, HtmlDecl)
 
--- | Figure out which declarations should have type parameters.
+-- | Figure out which declarations should have type parameters injected.
 --
 -- This is extremely naive and relies on the fact that we usually only
 -- have a single type parameter, 'ev'. No freshening of type variables.
 --
--- If you extended the language with real polymorphism, this code would collapse.
+-- If you extended the language with real polymorphism, it would be worth
+-- somehow ensuring that the 'ev' magic type parameter is free first.
+-- The world won't end if we don't do this, but users can't be allowed
+-- to create a parameter 'ev', and they shouldn't create types that are
+-- crazy large.
 gatherTypeParams :: HtmlDecls -> KnownParams
 gatherTypeParams (TypeDecls dmap) =
   fix $ \result ->
@@ -181,9 +185,9 @@ gatherTypeParams (TypeDecls dmap) =
     go :: TypeName -> HtmlDecl -> Map TypeName (Set TypeName, HtmlDecl) -> (Set TypeName, HtmlDecl)
     go tn td result =
       case td of
-        DVariant cts ->
+        DVariant _ps cts ->
           (,td) (foldMap (foldMap (flip (gather (Just tn)) result) . snd) cts)
-        DRecord fts ->
+        DRecord _ps fts ->
           (,td) (foldMap (flip (gather (Just tn)) result . snd) fts)
 
 -- | The set of built-in types parameterised by some event.
@@ -194,6 +198,7 @@ builtInEventedTypes =
     , TypeName "Attribute"
     ]
 
+-- | does a type recursively contain any of our magic type parameters? (e.g. ev)
 gather :: Maybe TypeName -> HtmlType -> Map TypeName (Set TypeName, HtmlDecl) -> Set TypeName
 gather self ty result =
   case ty of
@@ -212,6 +217,8 @@ gather self ty result =
                  S.empty
     Type (TArrowF a b) ->
       gather self a result <> gather self b result
+    Type (TAppF a b) ->
+      gather self a result <> gather self b result
     Type (TListF a) ->
       gather self a result
     Type (TForallF ps b) ->
@@ -220,18 +227,18 @@ gather self ty result =
 genTypeDec :: TypeName -> Set TypeName -> HtmlDecl -> KnownParams -> Doc a
 genTypeDec (TypeName n) ps ty kps =
   case ty of
-    DVariant cts ->
+    DVariant dps cts ->
       WL.hang 2
-        (text "data" <+> text n <+> typeParams ps WL.<$$> text "="
+        (text "data" <+> text n <+> typeParams (S.fromList dps <> ps) WL.<$$> text "="
           WL.<> (foldl'
                   (<+>)
                   WL.empty
                   (WL.punctuate (WL.linebreak WL.<> text "|") (fmap (\(c, ts) -> genCon c ts kps) cts))))
-    DRecord fts ->
+    DRecord dps fts ->
       WL.vcat [
         -- newtype
           WL.hang 2
-            (text "newtype" <+> text n <+> typeParams ps <+> text "=" <+> text n <+> WL.lbrace
+            (text "newtype" <+> text n <+> typeParams (S.fromList dps <> ps) <+> text "=" <+> text n <+> WL.lbrace
               WL.<$$> WL.vcat (WL.punctuate WL.comma (with fts $ \(FieldName fn, ft) -> text fn <+> text "::" <+> genType ft kps))
               WL.<$$> WL.rbrace)
         ]
@@ -276,6 +283,9 @@ genType ty kps =
 
     Type (TArrowF t1 t2) ->
       WL.parens (genType t1 kps <+> text "->" <+> genType t2 kps)
+
+    Type (TAppF t1 t2) ->
+      WL.parens (genType t1 kps <+> genType t2 kps)
 
     Type (TListF t)->
       WL.parens (text "Array" <+> genType t kps)
@@ -396,7 +406,7 @@ genPat decls p =
       in case a of
         (TVar tn@(TypeName tname), _) ->
           case lookupType tn decls of
-            Just (DRecord fts) ->
+            Just (DRecord _ps fts) ->
               WL.annotate a $
                 WL.parens $
                   (text tname <+>

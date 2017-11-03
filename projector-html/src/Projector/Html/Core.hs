@@ -119,11 +119,16 @@ constructorFunctions :: PC.TypeDecls a -> Map PC.Name (PC.Type a, PC.Expr a (PC.
 constructorFunctions (PC.TypeDecls m) =
   M.fromList $ M.toList m >>= \(tn, decl) ->
     case decl of
-      PC.DVariant cts ->
+      PC.DVariant ps cts ->
         with cts $ \(c@(PC.Constructor cn), ts) ->
-          (PC.Name cn, (foldr PC.TArrow (PC.TVar tn) ts, mkCon (DataConstructor c tn) c tn ts))
-      PC.DRecord fts ->
-        [(PC.Name (PC.unTypeName tn), (foldr PC.TArrow (PC.TVar tn) (fmap snd fts), mkRec (RecordConstructor tn) tn fts))]
+          (PC.Name cn, (conSig ps tn ts, mkCon (DataConstructor c tn) c tn ts))
+      PC.DRecord ps fts ->
+        [(PC.Name (PC.unTypeName tn), (conSig ps tn (fmap snd fts), mkRec (RecordConstructor tn) tn fts))]
+
+conSig :: [PC.TypeName] -> PC.TypeName -> [PC.Type l] -> PC.Type l
+conSig ps tn ts =
+  PC.TForall ps $
+    foldr PC.TArrow (foldl' PC.TApp (PC.TVar tn) (fmap PC.TVar ps)) ts
 
 mkCon :: a -> PC.Constructor -> PC.TypeName -> [PC.Type l] -> PC.Expr l (PC.Type l, a)
 mkCon a c tn ts =

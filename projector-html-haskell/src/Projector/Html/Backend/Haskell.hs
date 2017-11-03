@@ -100,9 +100,9 @@ htmlConstructors =
   where
   sumCons x =
     case x of
-      DVariant cts ->
+      DVariant _ps cts ->
         S.fromList (fmap fst cts)
-      DRecord _ ->
+      DRecord _ps _ ->
         mempty
 
 
@@ -180,10 +180,10 @@ genTypeDecs =
 genTypeDec :: TypeName -> HaskellDecl -> TH.Dec
 genTypeDec (TypeName n) ty =
   case ty of
-    DVariant cts ->
-      data_ (mkName_ n) [] (fmap (uncurry genCon) cts)
-    DRecord fts ->
-      data_ (mkName_ n) [] [recordCon (Constructor n) fts]
+    DVariant ps cts ->
+      data_ (mkName_ n) (fmap (mkName_ . unTypeName) ps) (fmap (uncurry genCon) cts)
+    DRecord ps fts ->
+      data_ (mkName_ n) (fmap (mkName_ . unTypeName) ps) [recordCon (Constructor n) fts]
 
 -- | Constructor declarations.
 genCon :: Constructor -> [HaskellType] -> TH.Con
@@ -218,6 +218,9 @@ genType (Type ty) =
 
     TArrowF t1 t2 ->
       arrowT_ (genType t1) (genType t2)
+
+    TAppF t1 t2 ->
+      appT (genType t1) (genType t2)
 
     TListF t ->
       listT_ (genType t)

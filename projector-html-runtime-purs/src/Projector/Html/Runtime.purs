@@ -16,8 +16,11 @@ module Projector.Html.Runtime (
   , fold
   , isEmpty
   , map
+  , module Exports
   ) where
 
+import Data.Either (Either (..)) as Exports
+import Data.Maybe (Maybe (..)) as Exports
 import Control.Monad as Monad
 import Data.Array as Array
 import Data.Functor as Functor

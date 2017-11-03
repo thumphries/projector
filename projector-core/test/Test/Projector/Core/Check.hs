@@ -73,7 +73,7 @@ nRecord =
 
 tRecord :: Decl TestLitT
 tRecord =
-  DRecord [
+  DRecord [] [
       (FieldName "foo", TLit TBool)
     , (FieldName "bar", TLit TString)
     , (FieldName "baz", TLit TInt)
@@ -282,7 +282,126 @@ prop_forall_unit_id_explicit_neg =
           (Name "id", ELam () (Name "x") (Just (TLit TBool)) (EVar () (Name "x")))
         ]
 
+-- -----------------------------------------------------------------------------
+-- maybe
 
+prop_maybe_unit_just =
+  once $
+    typeCheck maybeDecls expr
+    ===
+    Right (TApp (TVar (TypeName "Maybe")) (TLit TBool))
+  where
+    expr =
+      ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)]
+
+prop_maybe_unit_nothing =
+  once $
+    typeCheck maybeDecls expr
+    ===
+    Right (TForall [TypeName "a"] (TApp (TVar (TypeName "Maybe")) (TVar (TypeName "a"))))
+  where
+    expr :: Expr TestLitT ()
+    expr =
+      ECon () (Constructor "Nothing") (TypeName "Maybe") []
+
+prop_maybe_unit_case =
+  once $
+    typeCheck maybeDecls expr
+    ===
+    Right (TLit TBool)
+  where
+    expr =
+      ECase ()
+        (ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)])
+        [
+          (PCon () (Constructor "Just") [PVar () (Name "x")], EVar () (Name "x"))
+        , (PCon () (Constructor "Nothing") [], ELit () (VBool False))
+        ]
+
+
+maybeDecls =
+  TypeDecls $ M.fromList [
+     (TypeName "Maybe", DVariant [TypeName "a"] [
+         (Constructor "Just", [TVar (TypeName "a")])
+       , (Constructor "Nothing", [])
+       ])
+   ]
+
+-- -----------------------------------------------------------------------------
+
+prop_either_unit_right =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TForall [TypeName "a"] (TApp (TApp (TVar (TypeName "Either")) (TVar (TypeName "a"))) (TLit TString)))
+  where
+    expr =
+      ECon () (Constructor "Right") (TypeName "Either") [ELit () (VString "foobar")]
+
+prop_either_unit_left =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TForall [TypeName "a"] (TApp (TApp (TVar (TypeName "Either")) (TLit TBool)) (TVar (TypeName "a"))))
+  where
+    expr =
+      ECon () (Constructor "Left") (TypeName "Either") [ELit () (VBool True)]
+
+prop_either_unit_case =
+  once $
+    typeCheck eitherDecls expr
+    ===
+    Right (TLit TBool)
+  where
+    expr =
+      ECase ()
+        (ECon () (Constructor "Right") (TypeName "Either") [ELit () (VBool True)])
+        [
+          (PCon () (Constructor "Left") [PVar () (Name "x")], EVar () (Name "x"))
+        , (PCon () (Constructor "Right") [PVar () (Name "x")], ELit () (VBool False))
+        ]
+
+eitherDecls =
+  TypeDecls $ M.fromList [
+      (TypeName "Either", DVariant [TypeName "a", TypeName "b"] [
+            (Constructor "Left", [TVar (TypeName "a")])
+          , (Constructor "Right", [TVar (TypeName "b")])
+          ])
+    ]
+
+-- -----------------------------------------------------------------------------
+-- quantified record
+
+prop_blob_unit_rec =
+  once $
+    typeCheck blobDecls expr
+    ===
+    Right (TApp (TVar (TypeName "Blob")) (TLit TBool))
+  where
+    expr =
+      ERec () (TypeName "Blob") [
+          (FieldName "value", ELit () (VBool False))
+        ]
+
+prop_blob_unit_prj =
+  once $
+    typeCheck blobDecls expr
+    ===
+    Right (TLit TBool)
+  where
+    expr =
+      EPrj ()
+        (ERec () (TypeName "Blob") [
+            (FieldName "value", ELit () (VBool False))
+          ])
+        (FieldName "value")
+
+blobDecls =
+  TypeDecls $ M.fromList [
+      (TypeName "Blob", DRecord [TypeName "a"] [
+          (FieldName "value", TVar (TypeName "a"))
+        ])
+    ]
 
 return []
 tests = $disorderCheckEnvAll TestRunNormal

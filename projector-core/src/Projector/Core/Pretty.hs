@@ -50,7 +50,7 @@ ppTypeError' err =
         WL.empty WL.<$$> text ("Not in scope: '" <> n <> "'")
     BadConstructorName (Constructor c) (TypeName tn) d a ->
       case d of
-        DVariant cts ->
+        DVariant _ps cts ->
           WL.annotate a $
           text
             (mconcat
@@ -61,7 +61,7 @@ ppTypeError' err =
                , ". Perhaps you meant one of:"
                , T.intercalate ", " (fmap (unConstructor . fst) cts)
                ])
-        DRecord _ ->
+        DRecord _ _ ->
           WL.annotate a $
           text
             (mconcat
@@ -140,15 +140,15 @@ annNL a val =
 
 -- -----------------------------------------------------------------------------
 
-ppWarning :: Ground l => Warning l a -> Text
+ppWarning :: Warning l a -> Text
 ppWarning =
   prettyUndecorated . ppWarning'
 
-ppWarningDecorated :: Ground l => (a -> Text) -> (a -> Text) -> Warning l a -> Text
+ppWarningDecorated :: (a -> Text) -> (a -> Text) -> Warning l a -> Text
 ppWarningDecorated start end =
   prettyDecorated start end . ppWarning'
 
-ppWarning' :: Ground l => Warning l a -> Doc a
+ppWarning' :: Warning l a -> Doc a
 ppWarning' w =
   case w of
     ShadowedName a (Name n) ->
@@ -178,10 +178,10 @@ ppType' ctx verbose t =
     Type (TVarF tn@(TypeName ty)) ->
       let mty = lookupType tn ctx
       in ty <> case (verbose, mty) of
-           (True, Just (DVariant cts)) ->
-             " = " <> ppConstructors cts
-           (True, Just (DRecord fts)) ->
-             " = " <> ppRecordFields fts
+           (True, Just (DVariant ps cts)) ->
+             ppTypeParams ps <> " = " <> ppConstructors cts
+           (True, Just (DRecord ps fts)) ->
+             ppTypeParams ps <> " = " <> ppRecordFields fts
            (False, _) ->
              T.empty
            (_, Nothing) ->
@@ -190,11 +190,18 @@ ppType' ctx verbose t =
     Type (TArrowF a b) ->
       "(" <> ppType a <> " -> " <> ppType b <> ")"
 
+    Type (TAppF a b) ->
+      "(" <> ppType a <> " " <> ppType b <> ")"
+
     Type (TListF ty) ->
       "[" <> ppType ty <> "]"
 
     Type (TForallF as b) ->
       "forall " <> T.intercalate " " (fmap unTypeName as) <> ". " <> ppType b
+
+ppTypeParams :: [TypeName] -> Text
+ppTypeParams =
+  T.unwords . fmap unTypeName
 
 ppConstructors :: Ground l => [(Constructor, [Type l])] -> Text
 ppConstructors =

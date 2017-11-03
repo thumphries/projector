@@ -70,10 +70,10 @@ toHaskellTypeDecls :: HtmlDecls -> HaskellDecls
 toHaskellTypeDecls (TypeDecls decls) =
   TypeDecls . with decls $ \decl ->
     case decl of
-      DVariant cts ->
-        DVariant (with cts (fmap (fmap toHaskellType)))
-      DRecord fts ->
-        DRecord (with fts (fmap toHaskellType))
+      DVariant ps cts ->
+        DVariant ps (with cts (fmap (fmap toHaskellType)))
+      DRecord ps fts ->
+        DRecord ps (with fts (fmap toHaskellType))
 
 -- if we encounter library types we also have to tweak them
 swapLibTypes :: HaskellType -> HaskellType

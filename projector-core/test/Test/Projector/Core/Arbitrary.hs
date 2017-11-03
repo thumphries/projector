@@ -175,11 +175,11 @@ genTypeDecls' g tts@(t:ts) (c:cs) tc =
   oneOf [
       do
        (vars, cs') <- genVariantsFromContext' g c cs tc
-       let ty = DVariant vars
+       let ty = DVariant [] vars
        genTypeDecls' g ts cs' (declareType t ty tc)
     , do
        fts <- genRecordFromContext' g tc
-       let ty = DRecord fts
+       let ty = DRecord [] fts
            tn = TypeName (unConstructor c)
        genTypeDecls' g tts cs (declareType tn ty tc)
     ]
@@ -225,13 +225,25 @@ genTypeFromContext tc@(TypeDecls m) g =
                <*> genTypeFromContext tc g
            ]
     else oneOfRec [
-             TVar <$> elements (M.keys m)
+             TVar <$> elements (simpleTypes tc)
            , TLit <$> g
            ] [
              TArrow
                <$> genTypeFromContext tc g
                <*> genTypeFromContext tc g
            ]
+
+-- Cheat a bit and only generate simple types
+simpleTypes :: TypeDecls l -> [TypeName]
+simpleTypes (TypeDecls m) =
+  M.keys . flip M.filter m $ \decl ->
+    case decl of
+      DVariant [] _ ->
+        True
+      DRecord [] _ ->
+        True
+      _ ->
+        False
 
 -- need to track the types of things we've generated so we can use variables
 -- need to be careful about shadowing
@@ -277,6 +289,9 @@ pinsert ctx (Context ns p) n t =
     Type (TArrowF _ to) ->
       mcons to (n, t) p
 
+    Type (TAppF _ _) ->
+      p
+
     Type (TListF _) ->
       p
 
@@ -291,7 +306,7 @@ pinsert ctx (Context ns p) n t =
 declPaths :: Ord l => Name -> Type l -> Paths l -> Decl l -> Paths l
 declPaths n t p ty =
   case ty of
-    DVariant cts ->
+    DVariant _ps cts ->
       -- break it apart just one tier (top level types in in our constructors)
       -- TODO: try recursing, might be cool
       foldl'
@@ -303,7 +318,7 @@ declPaths n t p ty =
             ts)
         p
         cts
-    DRecord fts ->
+    DRecord _ps fts ->
       foldl' (\m (_fn, ft) -> mcons ft (n, t) m) p fts
 
 mcons :: Ord k => k -> v -> Map k [v] -> Map k [v]
@@ -341,11 +356,11 @@ genWellTypedExpr' n ty ctx names genty genval =
         Type (TVarF x) ->
           -- Look it up in ctx
           case lookupType x ctx of
-            Just (DVariant cts) -> do
+            Just (DVariant _ps cts) -> do
               (conn, tys) <- elements cts
               con conn x <$> traverse (\t -> genWellTypedExpr' (n `div` (length tys)) t ctx names genty genval) tys
 
-            Just (DRecord fts) -> do
+            Just (DRecord _ps fts) -> do
               rec_ x
                 <$> traverse (traverse (\t -> genWellTypedExpr' (n `div` (max 1 (length fts))) t ctx names genty genval)) fts
 
@@ -354,6 +369,9 @@ genWellTypedExpr' n ty ctx names genty genval =
 
         Type (TArrowF t1 t2) ->
           genWellTypedLam (max 1 (n `div` 2)) t1 t2 ctx names genty genval
+
+        Type (TAppF _ _) ->
+          fail "can't generate quantified types"
 
         Type (TListF lty) -> do
           k <- chooseInt (1, n+1)
@@ -403,6 +421,10 @@ genWellTypedPath ctx names more want x have =
         arg <- more names from
         pure (app (var x) arg)
 
+      Type (TAppF _ _) ->
+        -- impossible
+        pure (var x)
+
       Type (TLitF _) ->
         -- impossible
         pure (var x)
@@ -421,9 +443,9 @@ genWellTypedPath ctx names more want x have =
       Type (TVarF n) ->
         -- look up in ctx, run with that
         case lookupType n ctx of
-          Just (DVariant cts) ->
+          Just (DVariant _ps cts) ->
             case_ (var x) <$> genAlternatives ctx names more cts want
-          Just (DRecord fts) ->
+          Just (DRecord _ps fts) ->
             maybe (fail "invariant fail: can't find type in record!")
               (\(fn, _ft) -> pure (prj (var x) fn))
               (P.find (\(_fn,ft) -> ft == want) fts)
@@ -554,9 +576,9 @@ genIllTypedExpr' n ctx names genty genval =
         -- then put some bound variable of a different type in the case statement
         (tn, decl) <- elements (M.toList (unTypeDecls ctx))
         let cts = case decl of
-              DVariant dts ->
+              DVariant _ps dts ->
                 dts
-              DRecord fts ->
+              DRecord _ps fts ->
                 [(Constructor (unTypeName tn), fmap snd fts)]
         nty <- genty `suchThat` (/= TVar tn)
         na <- fmap Name (elements muppets) -- name for the value of Variant type
@@ -579,9 +601,9 @@ genIllTypedExpr' n ctx names genty genval =
 
         (tn, decl) <- elements (M.toList (unTypeDecls ctx))
         let cts = case decl of
-              DVariant dts ->
+              DVariant _ps dts ->
                 dts
-              DRecord fts ->
+              DRecord _ps fts ->
                 [(Constructor (unTypeName tn), fmap snd fts)]
 
         nn <- fmap Name (elements muppets)
@@ -603,9 +625,9 @@ genIllTypedExpr' n ctx names genty genval =
         -- grab some variant
         (tn, decl) <- elements (M.toList (unTypeDecls ctx))
         let cts = case decl of
-              DVariant dts ->
+              DVariant _ps dts ->
                 dts
-              DRecord fts ->
+              DRecord _ps fts ->
                 [(Constructor (unTypeName tn), fmap snd fts)]
 
 

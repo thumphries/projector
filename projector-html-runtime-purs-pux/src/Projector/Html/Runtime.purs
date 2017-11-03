@@ -15,12 +15,15 @@ module Projector.Html.Runtime (
   , fold
   , isEmpty
   , map
+  , module Exports
   ) where
 
 import Control.Monad as Monad
 import Data.Array as Array
 import Data.Function.Uncurried (runFn3)
 import Data.Functor as Functor
+import Data.Either (Either (..)) as Exports
+import Data.Maybe (Maybe (..)) as Exports
 import Data.String as String
 import Prelude
 import Pux.Html.Attributes (attr) as Pux

@@ -210,6 +210,7 @@ data IType l a
   | IOpenRecord a Var (Fields l a)
   | IList a (IType l a)
   | IForall a [TypeName] (IType l a)
+  | IApp a (IType l a) (IType l a)
   deriving (Eq, Ord, Show)
 
 newtype Fields l a = Fields {
@@ -228,9 +229,10 @@ hoistType decls a (Type ty) =
       ILit a l
     TVarF tn ->
       case lookupType tn decls of
-        Just (DVariant _cns) ->
+        Just (DVariant _ps _cns) ->
           IVar a tn
-        Just (DRecord fts) ->
+        Just (DRecord _ps fts) ->
+          -- FIXME hmmmm what should happen here
           IClosedRecord a tn (hoistFields decls a fts)
         Nothing ->
           -- 'a' or an unknown type.
@@ -243,10 +245,16 @@ hoistType decls a (Type ty) =
       IList a (hoistType decls a f)
     TForallF ps t ->
       IForall a ps (hoistType decls a t)
+    TAppF f g ->
+      IApp a (hoistType decls a f) (hoistType decls a g)
 
 hoistFields :: Ground l => TypeDecls l -> a -> [(FieldName, Type l)] -> Fields l a
 hoistFields decls a =
   Fields . M.fromList . fmap (fmap (hoistType decls a))
+
+substFields :: Map TypeName (IType l a) -> Fields l a -> Fields l a
+substFields subs (Fields m) =
+  Fields (fmap (subst subs) m)
 
 -- | Convert our internal type representation back to the concrete.
 lowerIType :: IType l a -> Either (TypeError l a) (Type l)
@@ -282,6 +290,8 @@ lowerIType ity' = do
         TList <$> go f
       IForall _ bs t ->
         TForall bs <$> go t
+      IApp _ f g ->
+        TApp <$> go f <*> go g
 
 freeTVar :: Var -> StateT (Int, Map Var TypeName) (Either (TypeError l a)) TypeName
 freeTVar x = do
@@ -335,6 +345,8 @@ flattenIType ity =
       IList a _ ->
         a
       IForall a _ _ ->
+        a
+      IApp a _ _ ->
         a)
 
 flattenIType' :: IType l a -> Type l
@@ -358,6 +370,8 @@ flattenIType' ity =
       TList (flattenIType' ty)
     IForall _ ps t ->
       TForall ps (flattenIType' t)
+    IApp _ f g ->
+      TApp (flattenIType' f) (flattenIType' g)
 
 -- | Report a unification error.
 unificationError :: IType l a -> IType l a -> TypeError l a
@@ -591,19 +605,30 @@ generateConstraints' decls expr =
 
     ECon a c tn es ->
       case lookupType tn decls of
-        Just ty@(DVariant cns) -> do
+        Just ty@(DVariant ps cns) -> do
           -- Look up the constructor, check its arity, and introduce
           -- constraints for each of its subterms, for which we expect certain types.
           ts <- maybe (throwError (BadConstructorName c tn ty a)) pure (L.lookup c cns)
           unless (length ts == length es) (throwError (BadConstructorArity c (length ts) (length es) a))
+
+          -- Generate fresh type variables for each type parameter
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          -- Put them in a map so we can substitute
+          let typeParams = M.fromList ps'
+
+          -- Generate constraints for each subexpression
           es' <- for es (generateConstraints' decls)
           for_ (L.zip (fmap (hoistType decls a) ts) (fmap extractType es'))
-            (\(expected, inferred) -> addConstraint (Equal (Just a) expected inferred))
-          let ty' = IVar a tn
+          -- Add constraints linking subexpression inferred types to the type definition
+          -- (Substitute the type parameters for instantiated versions first)
+            (\(expected, inferred) ->
+               addConstraint (Equal (Just a) (subst typeParams expected) inferred))
+
+          let ty' = foldl' (IApp a) (IVar a tn) (fmap snd ps')
           pure (ECon (ty', a) c tn es')
 
         -- Records should be constructed via ERec, not ECon
-        Just ty@(DRecord _) -> do
+        Just ty@(DRecord _ _) -> do
           throwError (BadConstructorName c tn ty a)
 
         Nothing ->
@@ -628,7 +653,12 @@ generateConstraints' decls expr =
 
     ERec a tn fes -> do
       case lookupType tn decls of
-        Just (DRecord fts) -> do
+        Just (DRecord ps fts) -> do
+          -- Generate fresh type variables for each type parameter
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          -- Put them in a map so we can substitute
+          let typeParams = M.fromList ps'
+
           -- recurse into each field
           fes' <- traverse (traverse (generateConstraints' decls)) fes
           let need = M.fromList (fmap (fmap (hoistType decls a)) fts)
@@ -639,7 +669,7 @@ generateConstraints' decls expr =
             -- When an extraneous field is present
             (M.traverseMissing (\fn ty -> throwError (ExtraRecordField tn fn (flattenIType ty) a)))
             -- When present in both, add a constraint
-            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal (Just a) twant thave)))
+            (M.zipWithAMatched (\_fn twant thave -> addConstraint (Equal (Just a) (subst typeParams twant) thave)))
             need
             have
           -- catch duplicate fields too
@@ -647,11 +677,11 @@ generateConstraints' decls expr =
             throwError (DuplicateRecordFields tn (fmap fst fes L.\\ fmap fst fts) a)
 
           -- set type as the closed record
-          let ty' = IClosedRecord a tn (hoistFields decls a fts)
+          let ty' = foldl' (IApp a) (IClosedRecord a tn (substFields typeParams (hoistFields decls a fts))) (fmap snd ps')
           pure (ERec (ty', a) tn fes')
 
         -- Variants should be constructed via ECon, not ERec
-        Just ty@(DVariant _) -> do
+        Just ty@(DVariant _ _) -> do
           throwError (BadConstructorName (Constructor (unTypeName tn)) tn ty a)
 
         Nothing ->
@@ -688,12 +718,15 @@ patternConstraints decls ty pat =
 
     PCon a c pats ->
       case lookupConstructor c decls of
-        Just (tn, ts) -> do
+        Just (tn, ps, ts) -> do
           unless (length ts == length pats)
             (throwError (BadPatternArity c (TVar tn) (length ts) (length pats) a))
-          let ty' = hoistType decls a (TVar tn)
-          addConstraint (Equal (Just a) ty' ty)
-          pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) (uncurry (patternConstraints decls))
+          ps' <- for ps (\p -> (p,) <$> freshTypeVar a)
+          let ty' = foldl' (IApp a) (hoistType decls a (TVar tn)) (fmap snd ps')
+              typeParams = M.fromList ps'
+          pats' <- for (L.zip (fmap (hoistType decls a) ts) pats) $ \(ty2, pat2) ->
+            patternConstraints decls (subst typeParams ty2) pat2
+          addConstraint (Equal (Just a) ty' (subst typeParams ty))
           pure (PCon (ty', a) c pats')
 
         Nothing ->
@@ -736,6 +769,9 @@ substituteType subs top ty =
 
     IArrow a t1 t2 ->
       IArrow a (substituteType subs False t1) (substituteType subs False t2)
+
+    IApp a t1 t2 ->
+      IApp a (substituteType subs False t1) (substituteType subs False t2)
 
     IList a t ->
       IList a (substituteType subs False t)
@@ -797,6 +833,10 @@ mguST points t1 t2 =
       _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t2
 
+    (IOpenRecord a x fs, IApp _ (IClosedRecord _ tn gs) _) -> do
+      _hs <- unifyClosedFields points fs tn gs
+      unifyVar points a x t2
+
     (IClosedRecord _ tn gs, IOpenRecord a x fs) -> do
       _hs <- unifyClosedFields points fs tn gs
       unifyVar points a x t1
@@ -818,12 +858,15 @@ mguST points t1 t2 =
       [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
 
+    (IApp a f g, IApp _ h i) -> do
+      [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
+      pure (IApp a j k)
+
     (IList k a, IList _ b) -> do
       c <- mguST points a b
       pure (IList k c)
 
     (IForall a ts1 ot1, IForall b ts2 ot2) ->
-      -- TODO normalise, check param list is equal, then unify result type
       case (normalise a ts1 ot1, normalise b ts2 ot2) of
         (IForall _ ps1 tt1, IForall _ ps2 tt2) -> do
           unless (ps1 == ps2) (left [unificationError t1 t2])
@@ -874,6 +917,8 @@ occurs a q ity =
         ILit _ _ ->
           pure ()
         IArrow _ f g ->
+          go x f *> go x g
+        IApp _ f g ->
           go x f *> go x g
         IClosedRecord _ _ (Fields fs) ->
           traverse_ (go x) fs
@@ -965,8 +1010,9 @@ normalise a ps t =
   in IForall a vars (subst bnds t)
 
 subst :: Map TypeName (IType l a) -> IType l a -> IType l a
-subst bnds' ty' =
-  go bnds' ty'
+subst bnds' ty'
+  | null bnds' = ty'
+  | otherwise = go bnds' ty'
   where
     go bnds ity =
       case ity of
@@ -976,6 +1022,8 @@ subst bnds' ty' =
           IForall a bs (go (foldl' (flip M.delete) bnds bs) t)
         IArrow a t1 t2 ->
           IArrow a (go bnds t1) (go bnds t2)
+        IApp a t1 t2 ->
+          IApp a (go bnds t1) (go bnds t2)
         IList a t1 ->
           IList a (go bnds t1)
         IHole a x mty ->

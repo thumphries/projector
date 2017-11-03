@@ -32,10 +32,10 @@ fromMachinatorDT :: MC.DataType -> HtmlDecl
 fromMachinatorDT dt =
   case dt of
     MC.Variant nts ->
-      DVariant . toList . with nts $ \(MC.Name n, ts) ->
+      DVariant [] . toList . with nts $ \(MC.Name n, ts) ->
         (Constructor n, fmap fromMachinatorT ts)
     MC.Record fts ->
-      DRecord . with fts $ \(MC.Name n, t) ->
+      DRecord [] . with fts $ \(MC.Name n, t) ->
         (FieldName n, fromMachinatorT t)
 
 fromMachinatorT :: MC.Type -> HtmlType
@@ -47,6 +47,11 @@ fromMachinatorT mt =
       fromMachinatorGT g
     MC.ListT t ->
       TList (fromMachinatorT t)
+{-- When Machinator syntax gets proper TApp, proceed as follows:
+    MC.AppT f g ->
+      TApp (fromMachinatorT f) (fromMachinatorT g)
+--}
+
 
 fromMachinatorGT :: MC.Ground -> HtmlType
 fromMachinatorGT g =
