@@ -14,6 +14,10 @@ module Projector.Html.Core.Prim (
   , tMaybe
   , dMaybe
   , nMaybe
+  -- ** Either
+  , tEither
+  , dEither
+  , nEither
   -- * Primitive functions
   , exprs
   -- ** String append
@@ -50,6 +54,7 @@ types =
   TypeDecls $ M.fromList [
       (nBool, dBool)
     , (nMaybe, dMaybe)
+    , (nEither, dEither)
     ]
 
 exprs :: Map Name (HtmlType, HtmlExpr (HtmlType, Annotation a))
@@ -92,6 +97,23 @@ dMaybe =
   DVariant [TypeName "a"] [
       (Constructor "Just", [TVar (TypeName "a")])
     , (Constructor "Nothing", [])
+    ]
+
+-- -----------------------------------------------------------------------------
+
+nEither :: TypeName
+nEither =
+  TypeName "Either"
+
+tEither :: HtmlType
+tEither =
+  TVar nEither
+
+dEither :: HtmlDecl
+dEither =
+  DVariant [TypeName "a", TypeName "b"] [
+      (Constructor "Left", [TVar (TypeName "a")])
+    , (Constructor "Right", [TVar (TypeName "b")])
     ]
 
 -- -----------------------------------------------------------------------------
