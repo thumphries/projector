@@ -39,8 +39,8 @@ import           Projector.Core.Match
 import           Projector.Core.Syntax
 import           Projector.Core.Type (Constructor (..), TypeName (..))
 
-import           Umami.Monad.FixT (FixT (..))
-import qualified Umami.Monad.FixT as U
+import           Control.Monad.Trans.Fix (FixT (..))
+import qualified Control.Monad.Trans.Fix as U
 
 
 -- -----------------------------------------------------------------------------

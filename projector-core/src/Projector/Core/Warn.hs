@@ -23,8 +23,6 @@ import           Projector.Core.Match
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           X.Control.Monad.Trans.Either as XE
-
 
 data Warning l a
   = ShadowedName a Name

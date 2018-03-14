@@ -48,8 +48,8 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           X.Control.Monad.Trans.Either (EitherT, left, runEitherT)
-import qualified X.Control.Monad.Trans.Either as ET
+import           Control.Monad.Trans.Either (EitherT, left, runEitherT)
+import qualified Control.Monad.Trans.Either as ET
 
 
 data TypeError l a
@@ -165,7 +165,7 @@ typeCheckAll' decls known exprs = do
   -- substitute solved types, all at once
   let subbed = fmap (substitute subs) annotated
   -- lower them from IType into Type, all at once
-  first D.toList (ET.sequenceEither (fmap lowerExpr subbed))
+  first D.toList (sequenceEither (fmap lowerExpr subbed))
 
 typeCheck :: Ground l => TypeDecls l -> Expr l a -> Either [TypeError l a] (Type l)
 typeCheck decls =
@@ -380,7 +380,7 @@ unificationError =
 
 lowerExpr :: Expr l (IType l a, a) -> Either (DList (TypeError l a)) (Expr l (Type l, a))
 lowerExpr =
-  ET.sequenceEither . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
+  sequenceEither . fmap (\(ity, a) -> fmap (,a) (first D.singleton (lowerIType ity)))
 
 typeVar :: IType l a -> Maybe Var
 typeVar ty =
@@ -433,7 +433,7 @@ throwError =
 
 sequenceCheck :: Traversable t => t (Check l a b) -> Check l a (t b)
 sequenceCheck =
-  Check . ET.sequenceEitherT . fmap unCheck
+  Check . sequenceExceptT . fmap unCheck
 
 -- -----------------------------------------------------------------------------
 -- Name supply
@@ -855,11 +855,11 @@ mguST points t1 t2 =
 
     (IArrow a f g, IArrow _ h i) -> do
       -- Would be nice to have an applicative newtype for this...
-      [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
+      [j, k] <- sequenceExceptT [mguST points f h, mguST points g i]
       pure (IArrow a j k)
 
     (IApp a f g, IApp _ h i) -> do
-      [j, k] <- ET.sequenceEitherT [mguST points f h, mguST points g i]
+      [j, k] <- sequenceExceptT [mguST points f h, mguST points g i]
       pure (IApp a j k)
 
     (IList k a, IList _ b) -> do
@@ -939,7 +939,7 @@ unifyOpenFields ::
   -> Fields l a
   -> EitherT [TypeError l a] (ST s) (Fields l a)
 unifyOpenFields points (Fields fs1) (Fields fs2) = do
-  fmap Fields . ET.sequenceEitherT $
+  fmap Fields . sequenceExceptT $
     M.merge
       -- missing fields either side just get propagated
       (M.mapMissing (const (firstT pure . pure)))
@@ -957,7 +957,7 @@ unifyClosedFields ::
   -> Fields l a
   -> EitherT [TypeError l a] (ST s) (Fields l a)
 unifyClosedFields points (Fields have) tn (Fields want) = do
-  fmap Fields . ET.sequenceEitherT $
+  fmap Fields . sequenceExceptT $
     M.merge
       -- invocation order really matters here
       -- extra fields in 'have' are very bad
@@ -979,7 +979,7 @@ solveConstraints constraints =
           fmap (first (D.fromList . fmap (maybe id Annotated ma))) (lift $ mostGeneralUnifierST points t1 t2)
 
     -- Solve all the constraints independently.
-    es <- fmap ET.sequenceEither . for constraints $ \c ->
+    es <- fmap sequenceEither . for constraints $ \c ->
       case c of
         Equal ma t1 t2 ->
           mgu ma t1 t2

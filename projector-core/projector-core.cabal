@@ -1,26 +1,29 @@
-name:                  ambiata-projector-core
-version:               0.0.1
+name:                  projector-core
+version:               0.1
 license:               BSD3
-author:                Ambiata <info@ambiata.com>
-maintainer:            Ambiata <info@ambiata.com>
-copyright:             (c) 2016 Ambiata.
+author:                Tim Humphries
+maintainer:            Tim Humphries <tim@utf8.me>
+copyright:             (c) 2017 Ambiata. (c) 2017-2018 Tim Humphries
 synopsis:              ambiata-projector-core
-category:              System
-cabal-version:         >= 1.8
+category:              Language
+cabal-version:         >= 1.10
 build-type:            Custom
 description:           ambiata-projector-core
 
 library
+  default-language:
+                       Haskell2010
+
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-p
-                     , ambiata-umami
-                     , ambiata-x-eithert
-                     , transformers                    >= 0.4        && < 0.6
-                     , dlist                           == 0.8.*
-                     , containers                      >= 0.5.8      && < 0.7
-                     , text                            == 1.2.*
                      , annotated-wl-pprint             == 0.7.*
+                     , containers                      >= 0.5.8      && < 0.7
+                     , dlist                           == 0.8.*
+                     , projector-prelude
+                     , text                            == 1.2.*
+                     , transformers                    >= 0.4        && < 0.6
+                     , transformers-either             == 0.0.*
+                     , transformers-fix                >= 1.0        && < 2.0
                      , union-find                      == 0.2.*
 
   ghc-options:
@@ -30,8 +33,6 @@ library
                        src
 
   exposed-modules:
-                       Paths_ambiata_projector_core
-
                        Projector.Core
                        Projector.Core.Check
                        Projector.Core.Eval
@@ -47,6 +48,8 @@ test-suite test
 
   main-is:             test.hs
 
+  default-language:    Haskell2010
+
   ghc-options:         -Wall -threaded -O2
 
   hs-source-dirs:
@@ -54,35 +57,36 @@ test-suite test
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-jack
-                     , ambiata-p
-                     , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
-                     , quickcheck-instances            == 0.3.*
+                     , ambiata-disorder-core
+                     , ambiata-disorder-jack
                      , comonad
-                     , mtl
                      , containers
+                     , hedgehog-corpus                 >= 0.1        && < 2
+                     , mtl
+                     , pretty-show
+                     , projector-core
+                     , projector-prelude
+                     , quickcheck-instances            == 0.3.*
+                     , semigroups
                      , text
                      , transformers
-                     , semigroups
-                     , pretty-show
 
 benchmark bench
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             bench.hs
+  default-language:    Haskell2010
   ghc-options:         -Wall -threaded -O2
   build-depends:       base
-                     , ambiata-projector-core
-                     , ambiata-p
                      , ambiata-disorder-core
-                     , ambiata-disorder-corpus
                      , ambiata-disorder-jack
-                     , criterion                       == 1.1.*
-                     , text
                      , comonad
                      , containers
-                     , semigroups
+                     , criterion                       == 1.1.*
+                     , hedgehog-corpus                 >= 0.1        && < 2
                      , pretty-show
+                     , projector-core
+                     , projector-prelude
+                     , semigroups
+                     , text

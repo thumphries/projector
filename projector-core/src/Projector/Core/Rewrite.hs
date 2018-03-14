@@ -20,8 +20,8 @@ import           P
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           Umami.Monad.FixT (FixT (..))
-import qualified Umami.Monad.FixT as U
+import           Control.Monad.Trans.Fix (FixT (..))
+import qualified Control.Monad.Trans.Fix as U
 
 
 data RewriteRule l a
