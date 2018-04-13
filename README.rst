@@ -117,68 +117,16 @@ We can write simple combinators, too::
     { col2 }
   </div>
 
-*****
-Types
-*****
-
-Literals
-========
-
-Sum types
-=========
-
-Projector sums have the following restrictions:
-
-- They may not contain functions
-- They may not be defined recursively
-
-Records
-=======
-
-Projector supports *sealed records*. Field names need not be unique,
-but every record needs a name, and polymorphism over record fields is
-not supported.
-
-Higher-order types
-==================
-
-While user-defined parameterised types are disallowed
-[#higherordertypes]_, there are a number of special cases built into
-the language.
-
-Lists
------
-
-Lists are homogeneous and are declared like so:
-
-
-
-Maybe
------
-
-Either
-------
-
-
-******
-Syntax
-******
-
-********************
-The standard library
-********************
-
-Projector provides a number of built-in functions.
-
-
-
 ********
 Backends
 ********
 
 The Projector backend scene is currently a little bit
-limited. However, supporting additional languages is fairly easy, as
-long as that language can represent functions and a consistent
+limited. Currently we support only Haskell (via Hydrant) and
+Purescript (only tested with Pux).
+
+However, supporting additional languages / frameworks is fairly easy,
+as long as that language can represent functions and a consistent
 representation for all the datatypes Projector supports.
 
 The existing backends run over the simplified and typechecked
@@ -203,24 +151,10 @@ the JS directly using some optimising intermediate representation.
 However, a second typechecker is a rather helpful counterbalance when
 generating code!
 
-Generic
--------
-
-Pux
----
-
 Prospective backends
 ====================
 
-Here are a few platforms Projector could/should support.
-
-- JS (plain DOM)
-- React
-- SDOM
-- Spork
-- Elm
-- Reflex
-- Blaze / Lucid
+Projector could and should support a variety of backend targets.
 
 Volunteer labour would be helpful! If you think you could take on such
 a project, please do get in touch. It would require deep knowledge of
@@ -244,14 +178,14 @@ techniques glued together and made to do templating.
 - Extensive property-based testing
 
 The core calculus is fairly generic and could be used for other
-purposes.
+purposes, though you may run into some cut corners.
 
 *********
 Blemishes
 *********
 
 - The language is being grown on an as-needed basis. Thus, your
-  workflow may not yet be totally supported.
+  workflow may not be supported.
 - Computation has been pushed out of the templating language wherever
   possible, along with side effects. The expression language is rather
   underpowered.
@@ -268,19 +202,6 @@ Blemishes
 - Most of the Projector code in existence is proprietary. Hopefully
   this will change!
 
-************
-Contributors
-************
-
-Projector emerged from a long-running dialogue between Tim Humphries,
-Charles O'Farrell, Rob Howard, and Jacob Stanley while all were
-employed at Ambiata. Tim and Charles wrote most of the code. Mark
-Hibberd egged us on. Russ Weakley and Stephen Underwood both helped
-immensely as early subjects.
-
-The project is now maintained by Tim Humphries [#thirdperson]_. The
-others are not to blame.
-
 *********
 Footnotes
 *********
@@ -296,4 +217,3 @@ Footnotes
 .. [#higherordertypes] The core calculus supports parameterised types
   just fine. Syntactic restrictions prevent users from creating their
   own. This restriction may be lifted at some point.
-.. [#thirdperson] Writing in the third person is really hard!
