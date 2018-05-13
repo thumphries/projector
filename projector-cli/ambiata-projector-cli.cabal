@@ -26,8 +26,8 @@ executable cinema
                      , ambiata-x-eithert
                      , ambiata-x-optparse
                      , containers
-                     , directory                       == 1.2.*
-                     , filepath                        == 1.4.*
+                     , directory                       == 1.*
+                     , filepath                        == 1.*
                      , Glob                            == 0.7.*
                      , optparse-applicative            == 0.12.*
                      , text                            == 1.2.*
