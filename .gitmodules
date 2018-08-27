@@ -1,18 +1,18 @@
 [submodule "lib/p"]
 	path = lib/p
-	url = git@github.com:ambiata/p
+	url = git@github.com:markhibberd/p
 [submodule "lib/disorder"]
 	path = lib/disorder
-	url = git@github.com:ambiata/disorder.hs
+	url = git@github.com:markhibberd/disorder.hs
 [submodule "lib/x"]
 	path = lib/x
-	url = git@github.com:ambiata/x
+	url = git@github.com:markhibberd/x
 [submodule "lib/umami"]
 	path = lib/umami
-	url = git@github.com:ambiata/umami
+	url = git@github.com:markhibberd/umami
 [submodule "lib/hydrant"]
 	path = lib/hydrant
-	url = git@github.com:ambiata/hydrant
+	url = git@github.com:markhibberd/hydrant
 [submodule "lib/machinator"]
 	path = lib/machinator
-	url = git@github.com:ambiata/machinator
+	url = git@github.com:markhibberd/machinator
