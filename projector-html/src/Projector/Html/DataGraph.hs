@@ -15,7 +15,6 @@ import qualified Data.Set as S
 import           Projector.Core (TypeName (..))
 import           Projector.Core.Type (free)
 import           Projector.Html.Data.Prim
-import qualified Projector.Html.Backend as Backend
 
 import           P
 
