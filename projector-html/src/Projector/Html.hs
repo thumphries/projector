@@ -68,6 +68,8 @@ import qualified Projector.Html.Data.Module as HB
 import           Projector.Html.Data.Position  (Range, renderRange)
 import           Projector.Html.Data.Prim
 import           Projector.Html.Data.Template  (Template)
+import           Projector.Html.DataGraph (DataGraph (..))
+import qualified Projector.Html.DataGraph as DataGraph
 import           Projector.Html.ModuleGraph
 import           Projector.Html.Syntax (SyntaxError (..), renderSyntaxError)
 import qualified Projector.Html.Syntax as Syntax
@@ -356,15 +358,19 @@ buildDataTypes ::
   -> UserDataTypes
   -> HtmlModules
 buildDataTypes mnr dmns (UserDataTypes udts) =
-  let someModules :: Map HB.ModuleName HB.Imports
-      someModules = M.fromList (fmap ((,HB.OpenImport) . unDataModuleName) dmns)
-      allModules :: Map HB.ModuleName HB.Imports
-      allModules = someModules <> M.fromList (fmap ((,HB.OpenImport) . pathToDataModuleName mnr) (fmap fst udts))
+  let
+    someModules :: Map HB.ModuleName HB.Imports
+    someModules = M.fromList (fmap ((,HB.OpenImport) . unDataModuleName) dmns)
+    DataGraph graph = DataGraph.buildFileGraph udts
+    mappings = M.mapKeys (pathToDataModuleName mnr) (fmap (S.map (pathToDataModuleName mnr)) graph)
   in M.fromListWith (<>) . with udts $ \(fn, typs) ->
     let mn = pathToDataModuleName mnr fn
         decls = PC.TypeDecls typs :: HtmlDecls
-        imports = M.delete mn allModules
-    in (mn, HB.Module decls imports mempty)
+        imports =
+          M.fromList . fmap (\m -> (m, HB.OpenImport)) .
+            maybe [] S.toList $
+              M.lookup mn mappings
+    in (mn, HB.Module decls (imports <> someModules)  mempty)
 
 -- TODO hmm is this a compilation detail we should hide in HC?
 libraryExprs :: Map PC.Name (HtmlType, SrcAnnotation)

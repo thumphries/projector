@@ -59,6 +59,8 @@ library
                        Projector.Html.Data.Template
                        Projector.Html.Data.Token
 
+                       Projector.Html.DataGraph
+
                        Projector.Html.Interpreter
                        Projector.Html.Interpreter.Hydrant
 
