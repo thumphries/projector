@@ -112,29 +112,32 @@ data Decl l
 free :: Decl l -> Set TypeName
 free decl =
   case decl of
-    DVariant _ cs ->
+    DVariant bindings cs ->
       fold . with cs $ \(_, ts) ->
         S.fromList . mconcat . with ts $
-          freeInType
-    DRecord _ fs ->
+          freeInType (S.fromList bindings)
+    DRecord bindings fs ->
       S.fromList . mconcat . with fs $ \(_, t) ->
-        freeInType t
+        freeInType (S.fromList bindings) t
 
-freeInType :: Type l -> [TypeName]
-freeInType (Type t) =
+freeInType :: Set TypeName -> Type l -> [TypeName]
+freeInType bindings (Type t) =
   case t of
     TLitF _ ->
       []
     TVarF tn ->
-      [tn]
+      if S.member tn bindings then
+        []
+      else
+        [tn]
     TArrowF a b ->
-      freeInType a <> freeInType b
+      freeInType bindings a <> freeInType bindings b
     TListF a ->
-      freeInType a
+      freeInType bindings a
     TForallF as bs ->
-      as <> freeInType bs
+      freeInType (bindings <> S.fromList as) bs
     TAppF a b ->
-      freeInType a <> freeInType b
+      freeInType bindings a <> freeInType bindings b
 
 -- | The class of user-supplied primitive types.
 class (Eq l, Ord l, Show l, Eq (Value l), Ord (Value l), Show (Value l)) => Ground l where
