@@ -95,6 +95,10 @@ swapLibTypes ty =
       TVar (TypeName "Projector.Html.Runtime.Tag")
     TVar (TypeName "Bool") ->
       TVar (TypeName "Projector.Html.Runtime.Bool")
+    TVar (TypeName "Maybe") ->
+      TVar (TypeName "Projector.Html.Runtime.Maybe")
+    TVar (TypeName "Either") ->
+      TVar (TypeName "Projector.Html.Runtime.Either")
     _ ->
       ty
 {-# INLINE swapLibTypes #-}

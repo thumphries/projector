@@ -152,6 +152,14 @@ qualifyConstructor c =
       pure $ Constructor "Projector.Html.Runtime.True"
     Constructor "False" ->
       pure $ Constructor "Projector.Html.Runtime.False"
+    Constructor "Just" ->
+      pure $ Constructor "Projector.Html.Runtime.Just"
+    Constructor "Nothing" ->
+      pure $ Constructor "Projector.Html.Runtime.Nothing"
+    Constructor "Left" ->
+      pure $ Constructor "Projector.Html.Runtime.Left"
+    Constructor "Right" ->
+      pure $ Constructor "Projector.Html.Runtime.Right"
     _ ->
       empty
 
