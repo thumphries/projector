@@ -47,6 +47,10 @@ fromMachinatorT mt =
       fromMachinatorGT g
     MC.ListT t ->
       TList (fromMachinatorT t)
+    MC.MaybeT t ->
+      TApp (TVar (TypeName "Maybe")) (fromMachinatorT t)
+    MC.EitherT a b ->
+      TApp (TApp (TVar (TypeName "Either")) (fromMachinatorT a)) (fromMachinatorT b)
 {-- When Machinator syntax gets proper TApp, proceed as follows:
     MC.AppT f g ->
       TApp (fromMachinatorT f) (fromMachinatorT g)

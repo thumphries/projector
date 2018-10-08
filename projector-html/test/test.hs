@@ -1,5 +1,7 @@
 import           Disorder.Core.Main
 
+import           Projector.Html.Core.Machinator
+
 import qualified Test.Projector.Html.Syntax as Syntax
 import qualified Test.Projector.Html.Core.Elaborator as Elab
 import qualified Test.Projector.Html.Data.Prim as Prim
