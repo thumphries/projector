@@ -1,0 +1,144 @@
+version: 2
+jobs:
+  projector-core:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-core && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-core && mafia test'
+  projector-cli:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-cli && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-cli && mafia test'
+  projector-html:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-html && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-html && mafia test'
+  projector-html-haskell:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-html-haskell && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-html-haskell && mafia test'
+  projector-html-purs:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-html-purs && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-html-purs && mafia test'
+  projector-html-runtime-hs:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+          version: 18.06.0-ce
+      - restore_cache:
+          keys:
+            - 'mafia-'
+      - run:
+          name: 'build'
+          command: 'cd projector-html-runtime-hs && mafia build'
+      - save_cache:
+          key: 'mafia-{{ epoch }}'
+          paths:
+            - '/root/.mafia'
+      - run:
+          name: 'test'
+          command: 'cd projector-html-runtime-hs && mafia test'
+workflows:
+  version: 2
+  all:
+    jobs:
+      - projector-core
+      - projector-cli
+      - projector-html
+      - projector-html-haskell
+      - projector-html-purs
+      - projector-html-runtime-hs
