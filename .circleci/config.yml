@@ -13,6 +13,9 @@ jobs:
           keys:
             - 'mafia-'
       - run:
+          name: 'cabal'
+          command: 'cabal update'
+      - run:
           name: 'build'
           command: 'cd projector-core && mafia build'
       - save_cache:
@@ -34,6 +37,9 @@ jobs:
       - restore_cache:
           keys:
             - 'mafia-'
+      - run:
+          name: 'cabal'
+          command: 'cabal update'
       - run:
           name: 'build'
           command: 'cd projector-cli && mafia build'
@@ -57,6 +63,9 @@ jobs:
           keys:
             - 'mafia-'
       - run:
+          name: 'cabal'
+          command: 'cabal update'
+      - run:
           name: 'build'
           command: 'cd projector-html && mafia build'
       - save_cache:
@@ -66,6 +75,9 @@ jobs:
       - run:
           name: 'test'
           command: 'cd projector-html && mafia test'
+      - run:
+          name: 'cabal'
+          command: 'cabal update'
   projector-html-haskell:
     docker:
       - image: markhibberd/haskell-circleci:latest
@@ -78,6 +90,9 @@ jobs:
       - restore_cache:
           keys:
             - 'mafia-'
+      - run:
+          name: 'cabal'
+          command: 'cabal update'
       - run:
           name: 'build'
           command: 'cd projector-html-haskell && mafia build'
@@ -101,6 +116,9 @@ jobs:
           keys:
             - 'mafia-'
       - run:
+          name: 'cabal'
+          command: 'cabal update'
+      - run:
           name: 'build'
           command: 'cd projector-html-purs && mafia build'
       - save_cache:
@@ -122,6 +140,9 @@ jobs:
       - restore_cache:
           keys:
             - 'mafia-'
+      - run:
+          name: 'cabal'
+          command: 'cabal update'
       - run:
           name: 'build'
           command: 'cd projector-html-runtime-hs && mafia build'
