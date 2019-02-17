@@ -13,7 +13,7 @@ module Projector.Html.Data.Backend (
   ) where
 
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Module

@@ -9,7 +9,7 @@ module Projector.Html.Syntax.Lexer.Layout (
 
 import qualified Data.List as L
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Data.Position
 import           Projector.Html.Syntax.Token

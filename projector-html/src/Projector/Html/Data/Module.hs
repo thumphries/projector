@@ -22,7 +22,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 

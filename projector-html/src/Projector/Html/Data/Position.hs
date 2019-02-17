@@ -24,7 +24,7 @@ import qualified Data.Text as T
 
 import           GHC.Generics  (Generic)
 
-import           P hiding ((<>))
+import           Projector.Core.Prelude hiding ((<>))
 
 import           System.IO (FilePath)
 

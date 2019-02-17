@@ -12,7 +12,7 @@ module Projector.Html.Interpreter (
 
 import           Data.Map (Map)
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Core.Eval as Eval
 import qualified Projector.Core.Rewrite as Rewrite

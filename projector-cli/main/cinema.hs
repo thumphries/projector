@@ -16,7 +16,7 @@ import qualified Options.Applicative as O
 
 import qualified Machinator.Core as MC
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Core as PC
 import           Projector.Html
@@ -31,7 +31,6 @@ import           System.FilePath.Posix ((</>), makeRelative, takeDirectory)
 import           System.IO  (FilePath, IO)
 import qualified System.IO as IO
 
-import           X.Control.Monad.Trans.Either
 import           X.Control.Monad.Trans.Either.Exit
 import           X.Options.Applicative (dispatch, safeCommand, RunType (..), SafeCommand (..))
 import qualified X.Options.Applicative as XO

@@ -17,7 +17,7 @@ module Projector.Html.Backend.Haskell.Prim (
 
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Module

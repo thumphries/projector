@@ -14,7 +14,6 @@ library
   build-depends:
                        base                            >= 3          && < 5
                      , ambiata-hydrant
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-machinator-core
                      , ambiata-x-eithert
@@ -93,7 +92,6 @@ test-suite test
                      , ambiata-disorder-corpus
                      , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-core-test
                      , ambiata-projector-html
@@ -134,7 +132,6 @@ test-suite test-io
                      , ambiata-disorder-corpus
                      , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-core-test
                      , ambiata-projector-html

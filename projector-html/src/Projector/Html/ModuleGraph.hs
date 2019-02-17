@@ -25,7 +25,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Tree as Tree
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Module

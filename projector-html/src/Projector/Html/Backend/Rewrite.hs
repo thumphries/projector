@@ -8,7 +8,7 @@ module Projector.Html.Backend.Rewrite (
   ) where
 
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Prim

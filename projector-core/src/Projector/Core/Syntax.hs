@@ -59,7 +59,7 @@ import           Data.Functor.Identity
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Type
 

@@ -32,7 +32,7 @@ import qualified Data.Text as T
 
 import qualified Language.Haskell.TH as TH
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 

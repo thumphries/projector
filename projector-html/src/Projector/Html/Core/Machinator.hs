@@ -9,7 +9,7 @@ module Projector.Html.Core.Machinator (
 import           Machinator.Core (Definition (..))
 import qualified Machinator.Core.Data.Definition as MC
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import qualified Projector.Html.Core.Prim as Prim

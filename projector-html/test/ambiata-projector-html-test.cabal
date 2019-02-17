@@ -16,7 +16,6 @@ library
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-core-test
                      , ambiata-projector-html

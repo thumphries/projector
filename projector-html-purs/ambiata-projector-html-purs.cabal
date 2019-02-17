@@ -13,7 +13,6 @@ description:           ambiata-projector-html-purs
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-html
                      , annotated-wl-pprint             == 0.7.*
@@ -47,7 +46,6 @@ test-suite test-io
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
                      , ambiata-disorder-jack
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-core-test
                      , ambiata-projector-html

@@ -7,7 +7,7 @@ module Test.Projector.Html.Data.Prim where
 
 import           Disorder.Core (ExpectedTestSpeed (..), disorderCheckEnvAll)
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Prim

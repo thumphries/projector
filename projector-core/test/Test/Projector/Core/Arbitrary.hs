@@ -22,7 +22,7 @@ import qualified Data.Text as T
 import           Disorder.Corpus
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Eval (whnf)
 import           Projector.Core.Syntax
@@ -386,7 +386,7 @@ genWellTypedExpr' n ty ctx names genty genval =
        Nothing -> gen
        Just xs ->
          let (nonrec, recc) = partitionPaths xs
-             oneOfOr ys = if isJust (P.head ys) then oneOf ys else gen
+             oneOfOr ys = if isJust (Projector.Core.Prelude.head ys) then oneOf ys else gen
              genPath = uncurry (genWellTypedPath ctx names (\c t -> genWellTypedExpr' (n `div` 2) t ctx c genty genval) ty)
          in (oneOfOr . fmap genPath) $ if n <= 1 then nonrec else recc
 
@@ -448,7 +448,7 @@ genWellTypedPath ctx names more want x have =
           Just (DRecord _ps fts) ->
             maybe (fail "invariant fail: can't find type in record!")
               (\(fn, _ft) -> pure (prj (var x) fn))
-              (P.find (\(_fn,ft) -> ft == want) fts)
+              (Projector.Core.Prelude.find (\(_fn,ft) -> ft == want) fts)
           Nothing ->
             fail "free type variable!"
 

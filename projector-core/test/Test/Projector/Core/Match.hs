@@ -8,7 +8,7 @@ module Test.Projector.Core.Match where
 import           Disorder.Core
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Match
 

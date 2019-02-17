@@ -31,9 +31,6 @@ import           System.IO  (IO, FilePath)
 
 import           Text.Show.Pretty (ppShow)
 
-import           X.Control.Monad.Trans.Either
-
-
 
 main :: IO ()
 main = do

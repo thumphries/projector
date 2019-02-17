@@ -33,7 +33,7 @@ import qualified Data.Map.Strict as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Match
 import           Projector.Core.Syntax

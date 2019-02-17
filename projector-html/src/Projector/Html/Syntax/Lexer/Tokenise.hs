@@ -15,7 +15,7 @@ import           Control.Monad.Trans.State (State, evalState, gets, modify')
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Data.Position
 import           Projector.Html.Syntax.Token

@@ -14,7 +14,7 @@ import           Control.Comonad
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Data.Position
 import           Projector.Html.Data.Template

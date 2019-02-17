@@ -13,7 +13,6 @@ description:           ambiata-projector-html-haskell
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-html
                      , ambiata-x-templatehaskell
@@ -51,7 +50,6 @@ test-suite test-io
                      , ambiata-disorder-core
                      , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
                      , ambiata-projector-core
                      , ambiata-projector-core-test
                      , ambiata-projector-html

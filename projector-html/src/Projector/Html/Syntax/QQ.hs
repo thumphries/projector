@@ -8,7 +8,7 @@ module Projector.Html.Syntax.QQ (
 
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Prelude
 

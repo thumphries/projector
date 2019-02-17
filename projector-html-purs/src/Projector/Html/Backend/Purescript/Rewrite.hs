@@ -13,7 +13,7 @@ import qualified Control.Monad.Trans.State as State
 
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import qualified Projector.Core as Core

@@ -9,7 +9,7 @@ import           Criterion.Main (defaultConfig, defaultMainWith, bgroup, bench)
 import           Criterion.Types (Config (..))
 import qualified Criterion.Main as C
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 

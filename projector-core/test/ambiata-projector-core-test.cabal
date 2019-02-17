@@ -19,7 +19,6 @@ library
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
                      , ambiata-disorder-jack
-                     , ambiata-p
                      , ambiata-projector-core
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*

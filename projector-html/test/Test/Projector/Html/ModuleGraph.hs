@@ -11,7 +11,7 @@ import qualified Data.Set as S
 import           Disorder.Core hiding (vectorOfUnique)
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Syntax
 import           Projector.Html.Core

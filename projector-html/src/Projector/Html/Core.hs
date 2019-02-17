@@ -33,7 +33,7 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Core as PC
 import qualified Projector.Core.Pretty as PCP
