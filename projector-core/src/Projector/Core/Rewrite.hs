@@ -20,8 +20,8 @@ import           Projector.Core.Prelude
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           Umami.Monad.FixT (FixT (..))
-import qualified Umami.Monad.FixT as U
+import           Control.Monad.Trans.Fix (FixT (..))
+import qualified Control.Monad.Trans.Fix as Fix
 
 
 data RewriteRule l a
@@ -30,16 +30,16 @@ data RewriteRule l a
 
 rewrite :: Ground l => [RewriteRule l a] -> Expr l a -> Expr l a
 rewrite rules =
-  runIdentity . U.once . rewriteT rules
+  runIdentity . Fix.once . rewriteT rules
 
 rewriteFix :: Ground l => [RewriteRule l a] -> Expr l a -> Expr l a
 rewriteFix rules =
-  runIdentity . U.fixpoint (rewriteT rules)
+  runIdentity . Fix.fixpoint (rewriteT rules)
 
 -- | Apply a single rewrite rule to a single expr, nonrecursively.
 applyRule :: Monad m => Expr l a -> RewriteRule l a -> FixT m (Expr l a)
 applyRule g (Rewrite f) =
-  maybe (pure g) U.progress (f g)
+  maybe (pure g) Fix.progress (f g)
 {-# INLINE applyRule #-}
 
 -- | Apply a set of rewrite rules to a single expr, nonrecursively.
