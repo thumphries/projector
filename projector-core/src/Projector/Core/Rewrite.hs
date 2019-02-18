@@ -15,7 +15,7 @@ module Projector.Core.Rewrite (
 
 import           Data.Functor.Identity (Identity(..), runIdentity)
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Syntax
 import           Projector.Core.Type

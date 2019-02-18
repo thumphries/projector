@@ -1,24 +1,21 @@
-name:                  ambiata-projector-html
+name:                  projector-html
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-html
+synopsis:              projector-html
 category:              System
 cabal-version:         >= 1.8
-build-type:            Custom
-description:           ambiata-projector-html
+build-type:            Simple
+description:           projector-html
 
 library
   build-depends:
                        base                            >= 3          && < 5
                      , ambiata-hydrant
-                     , ambiata-p
-                     , ambiata-projector-core
+                     , projector-core
                      , ambiata-machinator-core
-                     , ambiata-x-eithert
-                     , ambiata-x-templatehaskell
                      , ambiata-umami
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
@@ -26,6 +23,7 @@ library
                      , filepath
                      , megaparsec                      == 5.1.*
                      , semigroups                      == 0.18.*
+                     , syb                             >= 0.4        && < 0.8
                      , template-haskell                >= 2.10       && < 2.14
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
@@ -38,8 +36,6 @@ library
                        src
 
   exposed-modules:
-                       Paths_ambiata_projector_html
-
                        Projector.Html
 
                        Projector.Html.Core
@@ -93,11 +89,11 @@ test-suite test
                      , ambiata-disorder-corpus
                      , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-core-test
-                     , ambiata-projector-html
-                     , ambiata-projector-html-runtime
+                     , projector-core
+                     , projector-core-test
+                     , projector-html
+                     , projector-html-runtime
+                     , hedgehog                        == 0.6.*
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , string-qq                       == 0.0.*
@@ -134,11 +130,11 @@ test-suite test-io
                      , ambiata-disorder-corpus
                      , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-core-test
-                     , ambiata-projector-html
-                     , ambiata-projector-html-runtime
+                     , projector-core
+                     , projector-core-test
+                     , projector-html
+                     , projector-html-runtime
+                     , hedgehog                        == 0.6.*
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , temporary                       == 1.2.*

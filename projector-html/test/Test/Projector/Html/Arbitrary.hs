@@ -16,7 +16,7 @@ import           Data.Text.Arbitrary ()
 import           Disorder.Corpus
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html

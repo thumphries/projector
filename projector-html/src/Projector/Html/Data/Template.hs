@@ -42,7 +42,7 @@ import           Data.List.NonEmpty  (NonEmpty(..))
 
 import           GHC.Generics (Generic)
 
-import           P
+import           Projector.Core.Prelude
 
 
 data Template a

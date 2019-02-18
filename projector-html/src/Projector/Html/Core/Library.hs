@@ -46,7 +46,7 @@ module Projector.Html.Core.Library (
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Annotation

@@ -1,25 +1,24 @@
-name:                  ambiata-projector-html-purs
+name:                  projector-html-haskell
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-html-purs
+synopsis:              projector-html-haskell
 category:              System
 cabal-version:         >= 1.8
-build-type:            Custom
-description:           ambiata-projector-html-purs
+build-type:            Simple
+description:           projector-html-haskell
 
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-html
-                     , annotated-wl-pprint             == 0.7.*
+                     , projector-core
+                     , projector-html
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
-                     , transformers                    >= 0.4        && < 0.7
+                     , template-haskell                >= 2.10       && < 2.14
+                     , transformers
 
   ghc-options:
                        -Wall
@@ -28,10 +27,11 @@ library
                        src
 
   exposed-modules:
-                       Paths_ambiata_projector_html_purs
+                       Projector.Html.Backend.Haskell
+                       Projector.Html.Backend.Haskell.Prim
+                       Projector.Html.Backend.Haskell.Rewrite
+                       Projector.Html.Backend.Haskell.Syntax
 
-                       Projector.Html.Backend.Purescript
-                       Projector.Html.Backend.Purescript.Rewrite
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -46,17 +46,18 @@ test-suite test-io
   build-depends:
                        base                            >= 3          && < 5
                      , ambiata-disorder-core
+                     , ambiata-disorder-eithert
                      , ambiata-disorder-jack
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-core-test
-                     , ambiata-projector-html
-                     , ambiata-projector-html-purs
-                     , ambiata-projector-html-test
+                     , projector-core
+                     , projector-core-test
+                     , projector-html
+                     , projector-html-haskell
+                     , projector-html-runtime
+                     , projector-html-test
+                     , hedgehog                        == 0.6.*
                      , QuickCheck                      >= 2.8.2      && < 2.9
-                     , containers
                      , process
+                     , containers
                      , text
-
   other-modules:
-                       Test.IO.Projector.Html.Backend.Purescript
+                       Test.IO.Projector.Html.Backend.Haskell

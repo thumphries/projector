@@ -11,7 +11,7 @@ import qualified Data.Text.Lazy as LT
 
 import qualified Hydrant as H
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Interpreter as I
 

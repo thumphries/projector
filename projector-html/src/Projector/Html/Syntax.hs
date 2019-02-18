@@ -7,7 +7,7 @@ module Projector.Html.Syntax (
   ) where
 
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Data.Position (Range)
 import           Projector.Html.Data.Template (Template)

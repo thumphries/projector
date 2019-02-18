@@ -17,14 +17,11 @@ import qualified Data.DList as D
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Match
 import           Projector.Core.Syntax
 import           Projector.Core.Type
-
-import           X.Control.Monad.Trans.Either as XE
-
 
 data Warning l a
   = ShadowedName a Name

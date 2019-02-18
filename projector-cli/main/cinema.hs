@@ -3,20 +3,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-import           BuildInfo_ambiata_projector_cli
-import           DependencyInfo_ambiata_projector_cli
+import           BuildInfo_projector_cli
+import           DependencyInfo_projector_cli
 
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           Options.Applicative (Parser, ReadM)
+import           Options.Applicative (Parser, ReadM, long, short, help, hidden)
 import qualified Options.Applicative as O
 
 import qualified Machinator.Core as MC
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Core as PC
 import           Projector.Html
@@ -26,15 +26,11 @@ import           Projector.Html.Backend.Purescript
 import qualified Projector.Html.Core.Machinator as HMC
 
 import           System.Directory
+import qualified System.Exit as Exit
 import qualified System.FilePath.Glob as Glob
 import           System.FilePath.Posix ((</>), makeRelative, takeDirectory)
 import           System.IO  (FilePath, IO)
 import qualified System.IO as IO
-
-import           X.Control.Monad.Trans.Either
-import           X.Control.Monad.Trans.Either.Exit
-import           X.Options.Applicative (dispatch, safeCommand, RunType (..), SafeCommand (..))
-import qualified X.Options.Applicative as XO
 
 
 data BackendT
@@ -93,19 +89,22 @@ newtype StripPrefix = StripPrefix {
   } deriving (Eq, Show)
 
 
+data Command =
+    VersionCommand
+  | DependencyCommand
+  | CinemaCommand CinemaArgs
+
 main :: IO ()
 main = do
   IO.hSetBuffering IO.stdout IO.LineBuffering
   IO.hSetBuffering IO.stderr IO.LineBuffering
-  cmd <- dispatch (safeCommand cinemaP)
+  cmd <- dispatch (VersionCommand <$ versionFlag <|> DependencyCommand <$ dependencyFlag <|> CinemaCommand <$> cinemaP)
   case cmd of
     VersionCommand ->
       T.putStrLn ("cinema-" <> (T.pack buildInfoVersion))
     DependencyCommand ->
       traverse_ (T.putStrLn . T.pack) dependencyInfo
-    RunCommand DryRun c ->
-      IO.print c
-    RunCommand RealRun c ->
+    CinemaCommand c ->
       run c
 
 -- -----------------------------------------------------------------------------
@@ -202,7 +201,7 @@ backendP =
 
 prefixP :: Parser ModuleName
 prefixP =
-  O.option (ModuleName <$> XO.textRead) $ fold [
+  fmap (ModuleName . T.pack) $ O.strOption $ fold [
       O.short 'p'
     , O.long "prefix"
     , O.help "The module prefix to use for generated code."
@@ -224,7 +223,7 @@ dataModuleNameR =
 
 backendR :: ReadM BackendT
 backendR =
-  XO.eitherTextReader id $ \s ->
+  eitherTextReader id $ \s ->
     case s of
       "haskell" ->
         pure Haskell
@@ -276,3 +275,37 @@ stripPrefixP =
 stripPrefixR :: ReadM StripPrefix
 stripPrefixR =
   fmap StripPrefix O.str
+
+orDie :: (e -> Text) -> EitherT e IO a -> IO a
+orDie render e =
+  runEitherT e >>=
+    either (\err -> (IO.hPutStrLn IO.stderr . T.unpack . render) err >> Exit.exitFailure) pure
+
+versionFlag :: Parser ()
+versionFlag =
+  O.flag' () $
+       short 'v'
+    <> long "version"
+    <> help "Version information"
+
+dependencyFlag :: Parser ()
+dependencyFlag =
+  O.flag' () $
+       long "dependencies"
+    <> hidden
+
+dispatch :: Parser a -> IO a
+dispatch parser = do
+  O.customExecParser
+    (O.prefs . mconcat $ [
+        O.showHelpOnEmpty
+      , O.showHelpOnError
+      ])
+    (O.info
+      (parser <**> O.helper)
+      O.fullDesc)
+
+eitherTextReader :: (e -> Text) -> (Text -> Either e a) -> ReadM a
+eitherTextReader render f =
+  O.eitherReader $
+    either (Left . T.unpack . render) Right . f . T.pack

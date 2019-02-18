@@ -10,7 +10,7 @@ import           Control.Monad.Trans.State
 import           Disorder.Core
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Syntax
 

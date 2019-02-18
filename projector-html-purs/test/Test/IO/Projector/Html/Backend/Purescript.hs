@@ -12,7 +12,7 @@ import qualified Data.Text as T
 import           Disorder.Core
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Html as Html
 import           Projector.Html.Backend (checkModule)

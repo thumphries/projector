@@ -32,7 +32,7 @@ import qualified Data.Text as T
 
 import qualified Language.Haskell.TH as TH
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 
@@ -44,10 +44,9 @@ import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 import           Projector.Html.Backend.Haskell.Prim
 import           Projector.Html.Backend.Haskell.Rewrite
+import           Projector.Html.Backend.Haskell.Syntax
 
 import           System.IO (FilePath)
-
-import           X.Language.Haskell.TH.Syntax
 
 
 haskellBackend :: BE.Backend a HaskellError

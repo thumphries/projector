@@ -11,7 +11,7 @@ import qualified Data.Map.Strict as M
 import           Disorder.Core
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Check
 import           Projector.Core.Syntax

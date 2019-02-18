@@ -9,7 +9,7 @@ module Projector.Html.Syntax.Token (
 
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 
 data LexerMode =

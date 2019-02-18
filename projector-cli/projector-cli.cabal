@@ -1,14 +1,14 @@
-name:                  ambiata-projector-cli
+name:                  projector-cli
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-cli
+synopsis:              projector-cli
 category:              System
 cabal-version:         >= 1.8
 build-type:            Custom
-description:           ambiata-projector-cli
+description:           projector-cli
 
 executable cinema
   hs-source-dirs:     gen
@@ -17,14 +17,11 @@ executable cinema
 
   build-depends:
                        base
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-html
-                     , ambiata-projector-html-haskell
-                     , ambiata-projector-html-purs
+                     , projector-core
+                     , projector-html
+                     , projector-html-haskell
+                     , projector-html-purs
                      , ambiata-machinator-core
-                     , ambiata-x-eithert
-                     , ambiata-x-optparse
                      , containers
                      , directory                       == 1.*
                      , filepath                        == 1.*
@@ -33,11 +30,11 @@ executable cinema
                      , text                            == 1.2.*
                      , transformers
   other-modules:
-                       BuildInfo_ambiata_projector_cli
-                       DependencyInfo_ambiata_projector_cli
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli
   autogen-modules:
-                       BuildInfo_ambiata_projector_cli
-                       DependencyInfo_ambiata_projector_cli
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli
 
 executable slideshow
   hs-source-dirs:     gen
@@ -46,20 +43,18 @@ executable slideshow
 
   build-depends:
                        base
-                     , ambiata-p
-                     , ambiata-projector-core
-                     , ambiata-projector-html
-                     , ambiata-projector-html-haskell
-                     , ambiata-projector-html-purs
-                     , ambiata-x-eithert
+                     , projector-core
+                     , projector-html
+                     , projector-html-haskell
+                     , projector-html-purs
                      , containers
                      , haskeline                       == 0.7.*
                      , pretty-show                     == 1.*
                      , text
                      , transformers
   other-modules:
-                       BuildInfo_ambiata_projector_cli
-                       DependencyInfo_ambiata_projector_cli
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli
   autogen-modules:
-                       BuildInfo_ambiata_projector_cli
-                       DependencyInfo_ambiata_projector_cli
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli

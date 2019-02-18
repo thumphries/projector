@@ -1,0 +1,59 @@
+name:                  projector-html-purs
+version:               0.0.1
+license:               BSD3
+author:                Ambiata <info@ambiata.com>
+maintainer:            Ambiata <info@ambiata.com>
+copyright:             (c) 2016 Ambiata.
+synopsis:              projector-html-purs
+category:              System
+cabal-version:         >= 1.8
+build-type:            Simple
+description:           projector-html-purs
+
+library
+  build-depends:
+                       base                            >= 3          && < 5
+                     , projector-core
+                     , projector-html
+                     , annotated-wl-pprint             == 0.7.*
+                     , containers                      == 0.5.*
+                     , text                            == 1.2.*
+                     , transformers                    >= 0.4        && < 0.7
+
+  ghc-options:
+                       -Wall
+
+  hs-source-dirs:
+                       src
+
+  exposed-modules:
+                       Projector.Html.Backend.Purescript
+                       Projector.Html.Backend.Purescript.Rewrite
+
+test-suite test-io
+  type:                exitcode-stdio-1.0
+
+  main-is:             test-io.hs
+
+  ghc-options:         -Wall -threaded -O2
+
+  hs-source-dirs:
+                       test
+
+  build-depends:
+                       base                            >= 3          && < 5
+                     , ambiata-disorder-core
+                     , ambiata-disorder-jack
+                     , projector-core
+                     , projector-core-test
+                     , projector-html
+                     , projector-html-purs
+                     , projector-html-test
+                     , hedgehog                        == 0.6.*
+                     , QuickCheck                      >= 2.8.2      && < 2.9
+                     , containers
+                     , process
+                     , text
+
+  other-modules:
+                       Test.IO.Projector.Html.Backend.Purescript

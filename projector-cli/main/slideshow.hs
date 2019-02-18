@@ -14,7 +14,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           P hiding (bind)
+import           Projector.Core.Prelude hiding (bind)
 
 import qualified Projector.Core as Core
 import           Projector.Html
@@ -30,9 +30,6 @@ import           System.Console.Haskeline as HL
 import           System.IO  (IO, FilePath)
 
 import           Text.Show.Pretty (ppShow)
-
-import           X.Control.Monad.Trans.Either
-
 
 
 main :: IO ()

@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import           Disorder.Core hiding (tripping)
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html
 import           Projector.Html.Pretty

@@ -12,7 +12,7 @@ module Projector.Html.Backend.Haskell.Rewrite (
 
 import qualified Control.Monad.Trans.State as State
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Backend.Rewrite (globalRules)

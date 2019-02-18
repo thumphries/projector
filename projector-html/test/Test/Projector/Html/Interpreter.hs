@@ -11,7 +11,7 @@ import qualified Data.Text as T
 
 import           Disorder.Core
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html

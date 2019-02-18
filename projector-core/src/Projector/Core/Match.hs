@@ -11,7 +11,7 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Syntax
 import           Projector.Core.Type

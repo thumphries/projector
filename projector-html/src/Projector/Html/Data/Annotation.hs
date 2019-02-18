@@ -7,7 +7,7 @@ module Projector.Html.Data.Annotation (
   ) where
 
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Position

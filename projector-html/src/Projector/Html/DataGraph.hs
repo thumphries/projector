@@ -16,7 +16,7 @@ import           Projector.Core (TypeName (..))
 import           Projector.Core.Type (free)
 import           Projector.Html.Data.Prim
 
-import           P
+import           Projector.Core.Prelude
 
 import           System.IO (FilePath)
 

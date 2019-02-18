@@ -9,7 +9,7 @@ import qualified Data.Text.IO as T
 import           Disorder.Core.IO (testIO)
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           System.FilePath ((</>), (<.>))
 import           System.IO (FilePath, IO)

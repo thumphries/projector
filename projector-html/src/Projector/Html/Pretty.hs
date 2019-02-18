@@ -13,7 +13,7 @@ import qualified Data.List as L
 import           Data.List.NonEmpty  (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Html.Data.Template
 import           Projector.Html.Data.Token

@@ -11,7 +11,7 @@ import qualified Data.Text.IO as T
 import           Disorder.Core.IO
 import           Disorder.Jack
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 import           Projector.Html.Data.Annotation

@@ -19,7 +19,7 @@ module Projector.Html.Data.Prim (
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core
 

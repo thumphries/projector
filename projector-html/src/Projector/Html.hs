@@ -54,7 +54,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import qualified Projector.Core as PC
 import qualified Projector.Html.Backend as HB
@@ -76,9 +76,6 @@ import qualified Projector.Html.Syntax as Syntax
 
 import qualified System.FilePath.Posix as FilePath
 import           System.IO  (FilePath)
-
-import           X.Control.Monad.Trans.Either (sequenceEither)
-
 
 -- -----------------------------------------------------------------------------
 -- Top-level errors

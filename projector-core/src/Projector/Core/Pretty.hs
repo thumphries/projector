@@ -17,7 +17,7 @@ module Projector.Core.Pretty (
 import           Data.Functor.Identity (Identity, runIdentity)
 import qualified Data.Text as T
 
-import           P
+import           Projector.Core.Prelude
 
 import           Projector.Core.Check  (TypeError(..))
 import           Projector.Core.Syntax (Expr (..), Name (..), Pattern (..))
