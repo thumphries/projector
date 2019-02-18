@@ -41,6 +41,9 @@ jobs:
           name: 'cabal'
           command: 'cabal update'
       - run:
+          name: 'libtinfo'
+          command: 'apt-get install -y libtinfo-dev'
+      - run:
           name: 'build'
           command: 'cd projector-cli && mafia build'
       - save_cache:
