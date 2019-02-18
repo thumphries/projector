@@ -1,14 +1,14 @@
-name:                  ambiata-projector-html-runtime
+name:                  projector-html-runtime
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-html-runtime
+synopsis:              projector-html-runtime
 category:              System
 cabal-version:         >= 1.8
-build-type:            Custom
-description:           ambiata-projector-html-runtime
+build-type:            Simple
+description:           projector-html-runtime
 
 library
   build-depends:
@@ -24,8 +24,6 @@ library
                        src
 
   exposed-modules:
-                       Paths_ambiata_projector_html_runtime
-
                        Projector.Html.Runtime
                        Projector.Html.Runtime.Library
                        Projector.Html.Runtime.Prim

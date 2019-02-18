@@ -1,14 +1,14 @@
-name:                  ambiata-projector-core-test
+name:                  projector-core-test
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-core-test
+synopsis:              projector-core-test
 category:              System
 cabal-version:         >= 1.8
 build-type:            Simple
-description:           ambiata-projector-core-test
+description:           projector-core-test
 
 library
   ghc-options:
@@ -19,7 +19,8 @@ library
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
                      , ambiata-disorder-jack
-                     , ambiata-projector-core
+                     , projector-core
+                     , hedgehog                        == 0.6.*
                      , QuickCheck                      >= 2.8.2      && < 2.9
                      , quickcheck-instances            == 0.3.*
                      , comonad                         == 5.*

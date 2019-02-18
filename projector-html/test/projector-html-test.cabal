@@ -1,14 +1,14 @@
-name:                  ambiata-projector-html-test
+name:                  projector-html-test
 version:               0.0.1
 license:               BSD3
 author:                Ambiata <info@ambiata.com>
 maintainer:            Ambiata <info@ambiata.com>
 copyright:             (c) 2016 Ambiata.
-synopsis:              ambiata-projector-html-test
+synopsis:              projector-html-test
 category:              System
 cabal-version:         >= 1.8
 build-type:            Simple
-description:           ambiata-projector-html-test
+description:           projector-html-test
 
 library
   ghc-options:
@@ -16,15 +16,16 @@ library
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-projector-core
-                     , ambiata-projector-core-test
-                     , ambiata-projector-html
+                     , projector-core
+                     , projector-core-test
+                     , projector-html
                      , ambiata-disorder-core
                      , ambiata-disorder-corpus
                      , ambiata-disorder-jack
                      , containers
                      , directory
                      , filepath
+                     , hedgehog                        == 0.6.*
                      , quickcheck-text                 == 0.1.*
                      , semigroups
                      , syb

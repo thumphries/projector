@@ -3,8 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 
-import           BuildInfo_ambiata_projector_cli
-import           DependencyInfo_ambiata_projector_cli
+import           BuildInfo_projector_cli
+import           DependencyInfo_projector_cli
 
 import           Control.Monad.IO.Class (MonadIO(..))
 
