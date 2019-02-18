@@ -39,9 +39,8 @@ import           Projector.Core.Match
 import           Projector.Core.Syntax
 import           Projector.Core.Type (Constructor (..), TypeName (..))
 
-import           Umami.Monad.FixT (FixT (..))
-import qualified Umami.Monad.FixT as U
-
+import           Control.Monad.Trans.Fix (FixT (..))
+import qualified Control.Monad.Trans.Fix as Fix
 
 -- -----------------------------------------------------------------------------
 
@@ -86,7 +85,7 @@ next =
 -- | Apply 'beta' and 'eta' until in weak head normal form, i.e. not outwardly reducible.
 whnf' :: Expr l a -> Eval l a (Expr l a)
 whnf' =
-  U.once . whnf''
+  Fix.once . whnf''
 
 whnf'' :: Expr l a -> FixT (Eval l a) (Expr l a)
 whnf'' =
@@ -96,7 +95,7 @@ whnf'' =
 -- This includes reducing under abstractions.
 nf' :: Expr l a -> Eval l a (Expr l a)
 nf' =
-  U.once . nf'' whnf''
+  Fix.once . nf'' whnf''
 
 nf'' :: (Expr l a -> FixT (Eval l a) (Expr l a)) -> Expr l a -> FixT (Eval l a) (Expr l a)
 nf'' whnf''' expr = do
@@ -139,7 +138,7 @@ beta expr =
         (ELam _ x _ f) -> do
           -- Substitute e2 for x in the lambda body
           expr' <- lift (subst x e2 f)
-          U.progress (setAnnotation a expr')
+          Fix.progress (setAnnotation a expr')
         _ ->
           -- Try to make e1 reducible
           EApp a <$> beta e1 <*> pure e2
@@ -150,7 +149,7 @@ beta expr =
         (ELam _ x _ f, EList _ es) -> do
           -- Apply the function to every element in the list
           es' <- traverse (\e -> lift (subst x e f)) es
-          U.progress (EList a es')
+          Fix.progress (EList a es')
         _ ->
           -- Try to get to a redex
           EMap a <$> beta e1 <*> beta e2
@@ -159,7 +158,7 @@ beta expr =
     ECase a e pes ->
       case match e pes of
         Just (subs, alt) ->
-          lift (substAll subs alt) >>= U.progress
+          lift (substAll subs alt) >>= Fix.progress
         Nothing ->
           -- try to get the scrutinee to a redex
           ECase a <$> beta e <*> pure pes
@@ -170,7 +169,7 @@ beta expr =
         ERec _a _tn fes ->
           case find ((== fn) . fst) fes of
             Just (_fn, f) ->
-              U.progress f
+              Fix.progress f
             Nothing ->
               pure expr
         _ ->
@@ -266,7 +265,7 @@ eta expr =
   case expr of
     ELam a x _ (EApp _ f (EVar _ y)) ->
       if x == y && not (S.member x (gatherFree f))
-        then U.progress (setAnnotation a f)
+        then Fix.progress (setAnnotation a f)
         else pure expr
     _ ->
       pure expr
@@ -276,19 +275,19 @@ subst :: Name -> Expr l a -> Expr l a -> Eval l a (Expr l a)
 subst x y expr = do
   let free = S.singleton x <> gatherFree y <> gatherFree expr -- this is expensive and bad
       subs = M.singleton x y
-  U.fixpoint (subst' subs free) expr
+  Fix.fixpoint (subst' subs free) expr
 
 substAll :: Map Name (Expr l a) -> Expr l a -> Eval l a (Expr l a)
 substAll subs expr = do
   let free = S.fromList (M.keys subs) <> gatherFree expr
-  U.fixpoint (subst' subs free) expr
+  Fix.fixpoint (subst' subs free) expr
 
 -- | Batch substitution.
 subst' :: Map Name (Expr l a) -> Set Name -> Expr l a -> FixT (Eval l a) (Expr l a)
 subst' subs free expr =
   case expr of
     EVar a z ->
-      mcase (M.lookup z subs) (pure expr) (U.progress . fmap (const a))
+      mcase (M.lookup z subs) (pure expr) (Fix.progress . fmap (const a))
 
     ELam a z ty f ->
       if S.member z free
@@ -298,7 +297,7 @@ subst' subs free expr =
              -- worth a try once this implementation is demonstrably correct
              f' <- lift (subst z (EVar a z') f)
              r' <- subst' subs (S.insert z' free) f'
-             U.progress (ELam a z' ty r')
+             Fix.progress (ELam a z' ty r')
         else ELam a z ty <$> subst' subs (S.insert z free) f
 
     ECase a e pes ->
@@ -340,7 +339,7 @@ patFresh free patt =
       if S.member n free
         then
           do n' <- lift (fresh n free)
-             U.progress (PVar a n', M.singleton n n')
+             Fix.progress (PVar a n', M.singleton n n')
         else pure (PVar a n, mempty)
     PCon a c pats -> do
       pats' <- traverse (patFresh free) pats
@@ -356,15 +355,15 @@ fresh n@(Name nn) free =
          fresh (Name (nn <> renderIntegral i)) free
     else pure n
 
--- | Like 'U.fixpoint', but stays inside FixT.
+-- | Like 'Fix.fixpoint', but stays inside FixT.
 fixpoint' :: Monad m => (a -> FixT m a) -> a -> FixT m a
 fixpoint' f a = do
-  (a', prog) <- lift (U.runFixT $! f a)
+  (a', prog) <- lift (Fix.runFixT $! f a)
   case prog of
-    U.RunAgain -> do
+    Fix.RunAgain -> do
       -- the whole expression has progress
-      b' <- lift (U.fixpoint f a')
-      U.progress b'
-    U.NoProgress ->
+      b' <- lift (Fix.fixpoint f a')
+      Fix.progress b'
+    Fix.NoProgress ->
       pure a'
 {-# INLINE fixpoint' #-}

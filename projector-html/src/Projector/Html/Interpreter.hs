@@ -25,7 +25,7 @@ import qualified Projector.Html.Core.Prim as Prim
 import           Projector.Html.Data.Annotation
 import           Projector.Html.Data.Prim
 
-import qualified Umami.Monad.FixT as U
+import qualified Control.Monad.Trans.Fix as Fix
 
 
 data Html =
@@ -86,7 +86,7 @@ eval bnds =
   nf . Eval.substitute bnds'
   where
     bnds' = fmap snd Lib.exprs <> fmap snd Prim.exprs <> bnds
-    nf = fst . Eval.runEval (Eval.EvalState 0) . U.fixpoint
+    nf = fst . Eval.runEval (Eval.EvalState 0) . Fix.fixpoint
       (Eval.nf'' (Eval.fixpoint' (rewrite >=> Eval.beta >=> Eval.eta)))
     rewrite = flip Rewrite.applyRules Rewrite.globalRules
 

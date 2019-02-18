@@ -16,7 +16,6 @@ library
                      , ambiata-hydrant
                      , projector-core
                      , ambiata-machinator-core
-                     , ambiata-umami
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , Earley                          >= 0.11       && < 0.13
@@ -27,6 +26,7 @@ library
                      , template-haskell                >= 2.10       && < 2.14
                      , text                            == 1.2.*
                      , transformers                    >= 0.4        && < 0.6
+                     , transformers-fix                == 1.*
                      , comonad                         == 5.*
 
   ghc-options:
