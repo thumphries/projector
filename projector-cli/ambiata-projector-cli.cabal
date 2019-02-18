@@ -29,7 +29,7 @@ executable cinema
                      , directory                       == 1.*
                      , filepath                        == 1.*
                      , Glob                            == 0.7.*
-                     , optparse-applicative            == 0.12.*
+                     , optparse-applicative            == 0.13.*
                      , text                            == 1.2.*
                      , transformers
 
