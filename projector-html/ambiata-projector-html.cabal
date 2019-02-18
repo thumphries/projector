@@ -109,6 +109,15 @@ test-suite test
                      , pretty-show
                      , filepath
 
+  other-modules:
+                       Test.Projector.Html.Arbitrary
+                       Test.Projector.Html.Core.Elaborator
+                       Test.Projector.Html.Data.Prim
+                       Test.Projector.Html.Expect
+                       Test.Projector.Html.Interpreter
+                       Test.Projector.Html.ModuleGraph
+                       Test.Projector.Html.Syntax
+
 test-suite test-io
   type:                exitcode-stdio-1.0
 
@@ -142,3 +151,12 @@ test-suite test-io
                      , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*
                      , text
+
+  other-modules:
+                       Test.Projector.Html.Arbitrary
+                       Test.Projector.Html.Core.Elaborator
+                       Test.Projector.Html.Data.Prim
+                       Test.Projector.Html.Expect
+                       Test.Projector.Html.Interpreter
+                       Test.Projector.Html.ModuleGraph
+                       Test.Projector.Html.Syntax
