@@ -83,6 +83,8 @@ swapLibTypes ty =
       TList (swapLibTypes t2)
     TArrow t2 t3 ->
       TArrow (swapLibTypes t2) (swapLibTypes t3)
+    TApp t2 t3 ->
+      TApp (swapLibTypes t2) (swapLibTypes t3)
     TVar (TypeName "Html") ->
       TVar (TypeName "Projector.Html.Runtime.Html")
     TVar (TypeName "Attribute") ->
@@ -95,6 +97,10 @@ swapLibTypes ty =
       TVar (TypeName "Projector.Html.Runtime.Tag")
     TVar (TypeName "Bool") ->
       TVar (TypeName "Projector.Html.Runtime.Bool")
+    TVar (TypeName "Maybe") ->
+      TVar (TypeName "Projector.Html.Runtime.Maybe")
+    TVar (TypeName "Either") ->
+      TVar (TypeName "Projector.Html.Runtime.Either")
     _ ->
       ty
 {-# INLINE swapLibTypes #-}

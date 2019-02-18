@@ -152,14 +152,14 @@ typeCheckAll' decls known exprs = do
       used :: S.Set Name
       used = S.fromList (M.keys (M.filter (not . null) assums))
       -- all mystery free variables
-      free :: S.Set Name
-      free = used `S.difference` bound
+      frees :: S.Set Name
+      frees = used `S.difference` bound
       -- annotating mystery free variables with location info
       freeAt :: [(Name, a)]
-      freeAt = foldMap (\n -> maybe [] (fmap ((n,) . fst)) (M.lookup n assums)) (toList free)
+      freeAt = foldMap (\n -> maybe [] (fmap ((n,) . fst)) (M.lookup n assums)) (toList frees)
 
   -- throw errors for any undefined variables
-  if free == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
+  if frees == mempty then pure () else Left (fmap (uncurry FreeVariable) freeAt)
   -- solve all our constraints at once
   subs <- solveConstraints constraints
   -- substitute solved types, all at once

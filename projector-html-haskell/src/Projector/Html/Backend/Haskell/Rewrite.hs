@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 module Projector.Html.Backend.Haskell.Rewrite (
     rewriteModule
   , rewriteExpr
@@ -152,6 +153,14 @@ qualifyConstructor c =
       pure $ Constructor "Projector.Html.Runtime.True"
     Constructor "False" ->
       pure $ Constructor "Projector.Html.Runtime.False"
+    Constructor "Just" ->
+      pure $ Constructor "Projector.Html.Runtime.Just"
+    Constructor "Nothing" ->
+      pure $ Constructor "Projector.Html.Runtime.Nothing"
+    Constructor "Left" ->
+      pure $ Constructor "Projector.Html.Runtime.Left"
+    Constructor "Right" ->
+      pure $ Constructor "Projector.Html.Runtime.Right"
     _ ->
       empty
 
@@ -184,6 +193,7 @@ apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
 apply f =
   foldl' (EApp (extractAnnotation f)) f
 
+pattern RawTextNode :: forall a. a -> a -> a -> Text -> Expr PrimT a
 pattern RawTextNode a b c t =
   EApp a
     (EForeign b (Name "Projector.Html.Runtime.textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))

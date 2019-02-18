@@ -26,13 +26,18 @@ executable cinema
                      , ambiata-x-eithert
                      , ambiata-x-optparse
                      , containers
-                     , directory                       == 1.2.*
-                     , filepath                        == 1.4.*
+                     , directory                       == 1.*
+                     , filepath                        == 1.*
                      , Glob                            == 0.7.*
-                     , optparse-applicative            == 0.12.*
+                     , optparse-applicative            == 0.13.*
                      , text                            == 1.2.*
                      , transformers
-
+  other-modules:
+                       BuildInfo_ambiata_projector_cli
+                       DependencyInfo_ambiata_projector_cli
+  autogen-modules:
+                       BuildInfo_ambiata_projector_cli
+                       DependencyInfo_ambiata_projector_cli
 
 executable slideshow
   hs-source-dirs:     gen
@@ -52,3 +57,9 @@ executable slideshow
                      , pretty-show                     == 1.*
                      , text
                      , transformers
+  other-modules:
+                       BuildInfo_ambiata_projector_cli
+                       DependencyInfo_ambiata_projector_cli
+  autogen-modules:
+                       BuildInfo_ambiata_projector_cli
+                       DependencyInfo_ambiata_projector_cli

@@ -19,6 +19,8 @@ module Projector.Core.Type (
   , pattern TForall
   , pattern TApp
   , mapGroundType
+  , free
+  , freeInType
   -- *** Type functor
   , TypeF (..)
   -- ** Declared types
@@ -37,6 +39,8 @@ module Projector.Core.Type (
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import           Data.Set (Set)
+import qualified Data.Set as S
 
 import           P
 
@@ -104,6 +108,36 @@ data Decl l
   = DVariant [TypeName] [(Constructor, [Type l])]
   | DRecord [TypeName] [(FieldName, Type l)]
   deriving (Eq, Ord, Show)
+
+free :: Decl l -> Set TypeName
+free decl =
+  case decl of
+    DVariant bindings cs ->
+      fold . with cs $ \(_, ts) ->
+        S.fromList . mconcat . with ts $
+          freeInType (S.fromList bindings)
+    DRecord bindings fs ->
+      S.fromList . mconcat . with fs $ \(_, t) ->
+        freeInType (S.fromList bindings) t
+
+freeInType :: Set TypeName -> Type l -> [TypeName]
+freeInType bindings (Type t) =
+  case t of
+    TLitF _ ->
+      []
+    TVarF tn ->
+      if S.member tn bindings then
+        []
+      else
+        [tn]
+    TArrowF a b ->
+      freeInType bindings a <> freeInType bindings b
+    TListF a ->
+      freeInType bindings a
+    TForallF as bs ->
+      freeInType (bindings <> S.fromList as) bs
+    TAppF a b ->
+      freeInType bindings a <> freeInType bindings b
 
 -- | The class of user-supplied primitive types.
 class (Eq l, Ord l, Show l, Eq (Value l), Ord (Value l), Show (Value l)) => Ground l where
