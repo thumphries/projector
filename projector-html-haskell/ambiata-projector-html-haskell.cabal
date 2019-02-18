@@ -15,7 +15,6 @@ library
                        base                            >= 3          && < 5
                      , ambiata-projector-core
                      , ambiata-projector-html
-                     , ambiata-x-templatehaskell
                      , containers                      == 0.5.*
                      , text                            == 1.2.*
                      , template-haskell                >= 2.10       && < 2.14
@@ -33,6 +32,7 @@ library
                        Projector.Html.Backend.Haskell
                        Projector.Html.Backend.Haskell.Prim
                        Projector.Html.Backend.Haskell.Rewrite
+                       Projector.Html.Backend.Haskell.Syntax
 
 
 test-suite test-io
