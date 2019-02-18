@@ -26,12 +26,12 @@ import           Projector.Html.Backend.Purescript
 import qualified Projector.Html.Core.Machinator as HMC
 
 import           System.Directory
+import qualified System.Exit as Exit
 import qualified System.FilePath.Glob as Glob
 import           System.FilePath.Posix ((</>), makeRelative, takeDirectory)
 import           System.IO  (FilePath, IO)
 import qualified System.IO as IO
 
-import           X.Control.Monad.Trans.Either.Exit
 import           X.Options.Applicative (dispatch, safeCommand, RunType (..), SafeCommand (..))
 import qualified X.Options.Applicative as XO
 
@@ -275,3 +275,9 @@ stripPrefixP =
 stripPrefixR :: ReadM StripPrefix
 stripPrefixR =
   fmap StripPrefix O.str
+
+
+orDie :: (e -> Text) -> EitherT e IO a -> IO a
+orDie render e =
+  runEitherT e >>=
+    either (\err -> (IO.hPutStrLn IO.stderr . Text.unpack . render) err >> Exit.exitFailure) pure

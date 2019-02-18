@@ -16,7 +16,6 @@ library
                      , ambiata-hydrant
                      , ambiata-projector-core
                      , ambiata-machinator-core
-                     , ambiata-x-eithert
                      , ambiata-x-templatehaskell
                      , ambiata-umami
                      , containers                      == 0.5.*

@@ -22,7 +22,6 @@ executable cinema
                      , ambiata-projector-html-haskell
                      , ambiata-projector-html-purs
                      , ambiata-machinator-core
-                     , ambiata-x-eithert
                      , ambiata-x-optparse
                      , containers
                      , directory                       == 1.*
@@ -49,7 +48,6 @@ executable slideshow
                      , ambiata-projector-html
                      , ambiata-projector-html-haskell
                      , ambiata-projector-html-purs
-                     , ambiata-x-eithert
                      , containers
                      , haskeline                       == 0.7.*
                      , pretty-show                     == 1.*
