@@ -14,6 +14,7 @@ module Projector.Core.Prelude (
   , leftToMaybe
   , rightToMaybe
   , mcase
+  , ecase
   , renderIntegral
   , head
   ) where
@@ -91,6 +92,10 @@ leftToMaybe =
 rightToMaybe :: Either l r -> Maybe r
 rightToMaybe =
   either (const Nothing) Just
+
+ecase :: Either l r -> (l -> b) -> (r -> b) -> b
+ecase e l =
+  flip (either l) e
 
 mcase :: Maybe a -> b -> (a -> b) -> b
 mcase m b =

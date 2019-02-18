@@ -22,7 +22,6 @@ executable cinema
                      , ambiata-projector-html-haskell
                      , ambiata-projector-html-purs
                      , ambiata-machinator-core
-                     , ambiata-x-optparse
                      , containers
                      , directory                       == 1.*
                      , filepath                        == 1.*
