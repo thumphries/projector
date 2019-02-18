@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 module Projector.Html.Backend.Haskell.Rewrite (
     rewriteModule
   , rewriteExpr
@@ -192,6 +193,7 @@ apply :: Expr PrimT a -> [Expr PrimT a] -> Expr PrimT a
 apply f =
   foldl' (EApp (extractAnnotation f)) f
 
+pattern RawTextNode :: forall a. a -> a -> a -> Text -> Expr PrimT a
 pattern RawTextNode a b c t =
   EApp a
     (EForeign b (Name "Projector.Html.Runtime.textNodeUnescaped") (TArrow (TLit TString) (TVar (TypeName "Html"))))

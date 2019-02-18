@@ -147,6 +147,7 @@ test-suite test-io
                      , directory
                      , filepath
                      , containers
+                     , pretty-show
                      , syb
                      , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*

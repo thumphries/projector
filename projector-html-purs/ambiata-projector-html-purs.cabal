@@ -57,3 +57,6 @@ test-suite test-io
                      , containers
                      , process
                      , text
+
+  other-modules:
+                       Test.IO.Projector.Html.Backend.Purescript

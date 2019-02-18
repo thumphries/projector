@@ -35,7 +35,7 @@ library
                        Projector.Core
                        Projector.Core.Check
                        Projector.Core.Eval
-                       Projector.Core.Match     
+                       Projector.Core.Match
                        Projector.Core.Pretty
                        Projector.Core.Rewrite
                        Projector.Core.Syntax
@@ -68,6 +68,13 @@ test-suite test
                      , transformers
                      , semigroups
                      , pretty-show
+  other-modules:
+                       Test.Projector.Core.Arbitrary
+                       Test.Projector.Core.Check
+                       Test.Projector.Core.Eval
+                       Test.Projector.Core.Match
+                       Test.Projector.Core.Syntax
+                       Test.Projector.Core.Warn
 
 benchmark bench
   type:                exitcode-stdio-1.0
@@ -86,3 +93,11 @@ benchmark bench
                      , containers
                      , semigroups
                      , pretty-show
+                     , transformers
+  other-modules:
+                       Test.Projector.Core.Arbitrary
+                       Test.Projector.Core.Check
+                       Test.Projector.Core.Eval
+                       Test.Projector.Core.Match
+                       Test.Projector.Core.Syntax
+                       Test.Projector.Core.Warn

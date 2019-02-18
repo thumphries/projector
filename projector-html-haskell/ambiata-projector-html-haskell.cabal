@@ -62,3 +62,5 @@ test-suite test-io
                      , process
                      , containers
                      , text
+  other-modules:
+                       Test.IO.Projector.Html.Backend.Haskell
