@@ -3,13 +3,13 @@
 {-# LANGUAGE TupleSections #-}
 module Test.IO.Projector.Html.Backend.Property where
 
+import           Control.Monad.IO.Class (MonadIO (..))
 
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           Disorder.Core.IO
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Core.Prelude
 
@@ -26,7 +26,7 @@ import           System.IO (FilePath, IO)
 import           System.IO.Temp (withTempDirectory)
 
 
-processProp :: ([Char] -> Property) -> (ExitCode, [Char], [Char]) -> Property
+processProp :: ([Char] -> PropertyT IO ()) -> (ExitCode, [Char], [Char]) -> PropertyT IO ()
 processProp f (code, out, err) =
   case code of
     ExitSuccess ->
@@ -36,18 +36,19 @@ processProp f (code, out, err) =
               "Process exited with failing status: " <> T.unpack (renderIntegral i)
             , err
             ]
-      in counterexample errm (property False)
+      in annotate errm >> failure
 
 
-fileProp :: FilePath -> Text -> (FilePath -> IO a) -> (a -> Property) -> Property
-fileProp mname modl f g =
-  testIO . withTempDirectory "./dist/" "gen-XXXXXX" $ \tmpDir -> do
+fileProp :: FilePath -> Text -> (FilePath -> IO a) -> (a -> PropertyT IO ()) -> PropertyT IO ()
+fileProp mname modl f g = do
+  a <- liftIO $ withTempDirectory "./dist/" "gen-XXXXXX" $ \tmpDir -> do
     let path = tmpDir </> mname
         dir = takeDirectory path
     createDirectoryIfMissing True dir
     T.writeFile path modl
     path' <- makeAbsolute path
-    fmap g (f path')
+    f path'
+  g a
 
 
 helloWorld :: (Name, ModuleExpr (Maybe Prim.HtmlType) Prim.PrimT (Annotation a))

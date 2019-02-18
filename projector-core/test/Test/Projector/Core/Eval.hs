@@ -1,14 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Core.Eval where
-
 
 import qualified Data.Map as M
 
-import           Disorder.Core
-import           Disorder.Jack
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Projector.Core.Prelude
 
@@ -16,31 +15,41 @@ import           Projector.Core.Eval (nf, whnf)
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           Test.Projector.Core.Arbitrary
+import           System.IO (IO)
+
+import           Test.Projector.Core.Gen
 
 
 -- These normalisation props are also true for untyped terms (if nf
 -- terminates, and only up to alpha), but the generators sometimes
 -- spit out fixpoints.
+prop_nf_idem :: Property
 prop_nf_idem =
-  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+  property $ do
+    (_, _, e) <- forAll genWellTypedTestExpr'
     nf mempty (nf mempty e) === nf mempty e
 
+prop_whnf_idem :: Property
 prop_whnf_idem =
-  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+  property $ do
+    (_, _, e) <- forAll genWellTypedTestExpr'
     whnf mempty (whnf mempty e) === whnf mempty e
 
+prop_whnf_nf_idem :: Property
 prop_whnf_nf_idem =
-  gamble genWellTypedTestExpr' $ \(_, _, e) ->
+  property $ do
+    (_, _, e) <- forAll genWellTypedTestExpr'
     whnf mempty (nf mempty e) === nf mempty e
 
 -- -----------------------------------------------------------------------------
 -- church numerals
 
+prop_nf_church_mult :: Property
 prop_nf_church_mult =
-  gamble (chooseInt (0, 20)) $ \m ->
-    gamble (chooseInt (0, 20)) $ \n ->
-      nf mempty (mul m n) === nf mempty (nth (m * n))
+  property $ do
+    m <- forAll $ Gen.int (Range.linear 0 20)
+    n <- forAll $ Gen.int (Range.linear 0 20)
+    nf mempty (mul m n) === nf mempty (nth (m * n))
 
 unit :: Type TestLitT
 unit =
@@ -84,6 +93,7 @@ mul m n =
 -- -----------------------------------------------------------------------------
 -- dodgy unit test
 
+prop_nf_letrec_unit :: Property
 prop_nf_letrec_unit =
   once $
     nf known expr
@@ -99,6 +109,10 @@ prop_nf_letrec_unit =
     expr = var_ "foo"
     expected = lit (VString "foo")
 
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
 
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

@@ -3,18 +3,20 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-module Test.Projector.Html.Arbitrary where
+module Test.Projector.Html.Gen where
 
 
 import           Data.Generics.Aliases
 import           Data.Generics.Schemes
 import qualified Data.List as L
 import           Data.List.NonEmpty  (NonEmpty(..))
-import qualified Data.Text as T
-import           Data.Text.Arbitrary ()
+import           Data.String (IsString (..))
 
-import           Disorder.Corpus
-import           Disorder.Jack
+import qualified Data.Text as T
+
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Projector.Core.Prelude
 
@@ -26,24 +28,23 @@ import           Projector.Html.Data.Prim as Prim
 import           Projector.Html.Data.Template
 import           Projector.Html.Core (constructorFunctions, htmlTypes)
 
-import           Test.Projector.Core.Arbitrary
-import           Test.QuickCheck.Jack hiding (listOf1)
+import           Test.Projector.Core.Gen
 
 
 -- -----------------------------------------------------------------------------
 -- Generating core types and expressions
 
-genHtmlTypeDecls :: Jack HtmlDecls
+genHtmlTypeDecls :: Gen HtmlDecls
 genHtmlTypeDecls =
   genTypeDecls htmlTypes genHtmlLitT
 
-genWellTypedHtmlExpr :: HtmlDecls -> Jack (HtmlType, HtmlExpr ())
+genWellTypedHtmlExpr :: HtmlDecls -> Gen (HtmlType, HtmlExpr ())
 genWellTypedHtmlExpr ctx = do
   ty <- genHtmlType ctx
   ex <- genWellTypedExpr ctx ty (genHtmlType ctx) genWellTypedHtmlLit
   pure (ty, ex)
 
-genWellTypedHtmlModule :: Int -> HtmlDecls -> Jack (Module HtmlType PrimT (HtmlType, SrcAnnotation))
+genWellTypedHtmlModule :: Int -> HtmlDecls -> Gen (Module HtmlType PrimT (HtmlType, SrcAnnotation))
 genWellTypedHtmlModule n decls = do
   let ourDecls = subtractTypes decls htmlTypes
   modl <- Module
@@ -61,53 +62,51 @@ genWellTypedHtmlModule n decls = do
     pure
     (checkModule ourDecls mempty (fmap (const EmptyAnnotation) modl))
 
-genHtmlType :: HtmlDecls -> Jack HtmlType
+genHtmlType :: HtmlDecls -> Gen HtmlType
 genHtmlType ctx =
   genTypeFromContext ctx genHtmlLitT
 
-genWellTypedHtmlLit :: PrimT -> Jack HtmlLit
+genWellTypedHtmlLit :: PrimT -> Gen HtmlLit
 genWellTypedHtmlLit t =
   case t of
     Prim.TString ->
-      Prim.VString <$> elements boats
+      Prim.VString <$> Gen.element boats
 
-genHtmlLitT :: Jack PrimT
+genHtmlLitT :: Gen PrimT
 genHtmlLitT =
-  arbitraryBoundedEnum
-
+  Gen.enumBounded
 
 -- -----------------------------------------------------------------------------
 -- Generating untyped templates
 
-genTemplate :: Jack (Template ())
+genTemplate :: Gen (Template ())
 genTemplate =
-  sized $ \k -> do
-    j <- chooseInt (1, k+1)
+  Gen.sized $ \k -> do
+    j <- Gen.int (Range.linear 1 (fromIntegral k + 1))
     Template () <$> genTemplateTypeSig <*> genTemplateExpr j
 
-genTemplateTypeSig :: Jack (Maybe (TTypeSig ()))
+genTemplateTypeSig :: Gen (Maybe (TTypeSig ()))
 genTemplateTypeSig = do
-  k <- chooseInt (0, 20)
+  k <- Gen.int (Range.linear 0 20)
   case k of
     0 ->
       pure Nothing
     _ ->
       fmap Just . TTypeSig ()
-        <$> listOfN 0 k ((,) <$> (TId <$> elements muppets) <*> genTVar)
+        <$> Gen.list (Range.linear 0 k) ((,) <$> (TId <$> Gen.element muppets) <*> genTVar)
         <*> genTVar
 
-genTVar :: Jack (TType ())
+genTVar :: Gen (TType ())
 genTVar =
-  (TTVar () . TId . T.toTitle) <$> elements waters
+  (TTVar () . TId . T.toTitle) <$> Gen.element waters
 
-genHtml :: Int -> Jack (THtml ())
+genHtml :: Int -> Gen (THtml ())
 genHtml k =
   let j = k `div` 2
   in THtml () . everywhere (mkT mergePlain) <$>
-     listOfN
-       1
-       (k + 1)
-       (oneOf
+     Gen.list
+       (Range.linear 1 (k + 1))
+       (Gen.choice
           [ genElement j
           , genVoidElement j
           , genComment
@@ -116,15 +115,15 @@ genHtml k =
           , genHtmlTextExpr j
           ])
 
-genHtmlWS :: Int -> Jack (TNode ())
+genHtmlWS :: Int -> Gen (TNode ())
 genHtmlWS k =
   (\(THtml () nodes) -> THtmlWS () nodes)
     <$> genHtml k
 
-genElement :: Int -> Jack (TNode ())
+genElement :: Int -> Gen (TNode ())
 genElement k =
   let j = k `div` 2 in
-  reshrink
+  Gen.shrink
     (\node ->
       case node of
         TElement () _tag _attrs (THtml _ nodes) ->
@@ -133,30 +132,30 @@ genElement k =
           [node])
     (TElement ()
       <$> genTag
-      <*> listOfN 0 j (genAttribute (j `div` 2))
+      <*> Gen.list (Range.linear 0 j) (genAttribute (j `div` 2))
       <*> genHtml (j `div` 2))
 
-genVoidElement :: Int -> Jack (TNode ())
+genVoidElement :: Int -> Gen (TNode ())
 genVoidElement k =
   TVoidElement ()
     <$> genTag
-    <*> listOfN 0 k (genAttribute (k `div` 2))
+    <*> Gen.list (Range.linear 0 k) (genAttribute (k `div` 2))
 
-genComment :: Jack (TNode ())
+genComment :: Gen (TNode ())
 genComment =
   TComment () <$> genCommentText
 
-genPlain :: Jack (TNode ())
+genPlain :: Gen (TNode ())
 genPlain =
   TPlain () <$> genPlainText
 
-genCommentText :: Jack TPlainText
+genCommentText :: Gen TPlainText
 genCommentText =
-  TPlainText . T.replace "-" "a" . mangle <$> (arbitrary `suchThat` (/= T.empty))
+  TPlainText . T.replace "-" "a" . mangle <$> (Gen.text (Range.linear 1 25) Gen.unicode)
 
-genPlainText :: Jack TPlainText
+genPlainText :: Gen TPlainText
 genPlainText =
-  fmap (TPlainText . mangle) (arbitrary `suchThat` (/= T.empty))
+  fmap (TPlainText . mangle) (Gen.text (Range.linear 1 25) Gen.unicode)
 
 mangle :: Text -> Text
 mangle =
@@ -168,52 +167,52 @@ mangle =
   . T.replace "(" "e"
   . T.replace ")" "f"
 
-genHtmlExpr :: Int -> Jack (TNode ())
+genHtmlExpr :: Int -> Gen (TNode ())
 genHtmlExpr k =
   TExprNode () <$> genTemplateExpr k
 
-genHtmlTextExpr :: Int -> Jack (TNode ())
+genHtmlTextExpr :: Int -> Gen (TNode ())
 genHtmlTextExpr k =
   TTextExprNode () <$> genTemplateExpr k
 
-genAttribute :: Int -> Jack (TAttribute ())
+genAttribute :: Int -> Gen (TAttribute ())
 genAttribute k =
-  oneOf [
+  Gen.choice [
       TEmptyAttribute () <$> genAttributeName
     , TAttribute () <$> genAttributeName <*> genAttributeValue k
     ]
 
-genAttributeName :: Jack TAttrName
+genAttributeName :: Gen TAttrName
 genAttributeName =
-  TAttrName <$> oneOf [
+  TAttrName <$> Gen.choice [
       pure "enabled"
     , pure "display"
     , pure "style"
     , pure "src"
     , pure "href"
-    , elements boats
+    , Gen.element boats
     ]
 
-genAttributeValue :: Int -> Jack (TAttrValue ())
+genAttributeValue :: Int -> Gen (TAttrValue ())
 genAttributeValue k =
   if k <= 2
     then TQuotedAttrValue () <$> genInterpolatedString k
     else TAttrExpr () <$> genTemplateExpr k
 
-genInterpolatedString :: Int -> Jack (TIString ())
+genInterpolatedString :: Int -> Gen (TIString ())
 genInterpolatedString k = do
-  n <- chooseInt (0, k)
+  n <- Gen.int (Range.linear 0 k)
   (everywhere (mkT mergeTIChunk) . TIString ()) <$>
-    listOfN 0 n
-      (oneOf [genStringChunk, fmap (TExprChunk ()) (genTemplateExpr (k - n))])
+    Gen.list (Range.linear 0 n)
+      (Gen.choice [genStringChunk, fmap (TExprChunk ()) (genTemplateExpr (k - n))])
 
-genStringChunk :: Jack (TIChunk ())
+genStringChunk :: Gen (TIChunk ())
 genStringChunk =
-  TStringChunk () <$> oneOf [
+  TStringChunk () <$> Gen.choice [
       pure "true"
     , pure "false"
     , pure "0"
-    , elements muppets
+    , Gen.element muppets
     -- TODO arbitrary JS would be nice
     ]
 
@@ -225,9 +224,9 @@ mergeTIChunk (TIString () chunks) =
     go (TStringChunk _ a : TStringChunk _ b : xs) = go (TStringChunk () (a <> b) : xs)
     go (x:xs) = x : go xs
 
-genTag :: Jack (TTag ())
+genTag :: Gen (TTag ())
 genTag =
-  TTag () <$> elements [
+  TTag () <$> Gen.element [
       "a"
     , "html"
     , "span"
@@ -237,13 +236,13 @@ genTag =
     , "marquee"
     ]
 
-genVoidTag :: Jack (TTag ())
+genVoidTag :: Gen (TTag ())
 genVoidTag =
-  elements [
+  Gen.element [
       TTag () "img"
     ]
 
-genTemplateExpr :: Int -> Jack (TExpr ())
+genTemplateExpr :: Int -> Gen (TExpr ())
 genTemplateExpr k =
   let j = k `div` 2
       nonrec = [
@@ -253,48 +252,48 @@ genTemplateExpr k =
       recc = [
           TEApp () <$> genTemplateExpr j <*> genTemplateExpr j
         , TECase () <$> genTemplateExpr j <*> genTemplateAlts j
-        , TELam () <$> (listOf1 (TId <$> elements simpsons)) <*> genTemplateExpr j
+        , TELam () <$> (Gen.nonEmpty (Range.linear 1 10) (TId <$> Gen.element simpsons)) <*> genTemplateExpr j
         , TEString () <$> genInterpolatedString j
         , TEEach () <$> genTemplateExpr j <*> genTemplateExpr j
-        , TEList () <$> listOfN 0 (j `div` 2) (genTemplateExpr (j `div` 2))
+        , TEList () <$> Gen.list (Range.linear 0 (j `div` 2)) (genTemplateExpr (j `div` 2))
         , TEPrj () <$> genTemplateExpr j <*> genField
         , TENode () <$> genHtml j
         ]
-  in if k <= 2 then oneOf nonrec else oneOf recc
+  in if k <= 2 then Gen.choice nonrec else Gen.choice recc
 
-genTId :: Jack TId
+genTId :: Gen TId
 genTId =
-  TId <$> oneOf [
-      elements muppets
-    , elements (L.zipWith (\a b -> a <> "/" <> b) cooking muppets)
+  TId <$> Gen.choice [
+      Gen.element muppets
+    , Gen.element (L.zipWith (\a b -> a <> "/" <> b) cooking muppets)
     ]
 
-genTemplateAlts :: Int -> Jack (NonEmpty (TAlt ()))
+genTemplateAlts :: Int -> Gen (NonEmpty (TAlt ()))
 genTemplateAlts j = do
-  k <- chooseInt (1, 10)
-  (:|) <$> genTemplateAlt j <*> vectorOf k (genTemplateAlt (j `div` k))
+  k <- Gen.int (Range.linear 1 10)
+  (:|) <$> genTemplateAlt j <*> Gen.list (Range.singleton k) (genTemplateAlt (j `div` k))
 
-genTemplateAlt :: Int -> Jack (TAlt ())
+genTemplateAlt :: Int -> Gen (TAlt ())
 genTemplateAlt k =
   let j = k `div` 2 in
   TAlt () <$> genTemplatePattern j <*> genTemplateExpr j
 
-genField :: Jack TId
+genField :: Gen TId
 genField =
-  TId <$> elements (waters <> boats <> muppets)
+  TId <$> Gen.element (waters <> boats <> muppets)
 
-genTemplatePattern :: Int -> Jack (TPattern ())
+genTemplatePattern :: Int -> Gen (TPattern ())
 genTemplatePattern k =
   let j = k `div` 2
       nonrec = [
-          TPVar () <$> (TId <$> elements waters)
+          TPVar () <$> (TId <$> Gen.element waters)
         , pure (TPWildcard ())
         ]
       recc = [
-          TPCon () <$> ((TConstructor . T.toTitle) <$> elements muppets)
-                   <*> listOfN 0 k (genTemplatePattern j)
+          TPCon () <$> ((TConstructor . T.toTitle) <$> Gen.element muppets)
+                   <*> Gen.list (Range.linear 0 k) (genTemplatePattern j)
         ]
-  in if k <= 2 then oneOf nonrec else oneOf recc
+  in if k <= 2 then Gen.choice nonrec else Gen.choice recc
 
 mergePlain :: THtml () -> THtml ()
 mergePlain html =
@@ -309,3 +308,27 @@ mergePlain' =
     go ((TPlain _ (TPlainText b)) : (TPlain _ (TPlainText c)) : xs) = go (TPlain () (TPlainText (b <> c)) : xs)
     go (x:xs) = x : go xs
     go [] = []
+
+boats :: IsString a => [a]
+boats = [
+    "barge"
+  , "battleship"
+  , "canoe"
+  , "catamaran"
+  , "dinghy"
+  , "ferry"
+  , "gondola"
+  , "jetski"
+  , "kayak"
+  , "longship"
+  , "motorboat"
+  , "pontoon"
+  , "powerboat"
+  , "rowboat"
+  , "ship"
+  , "steamboat"
+  , "tanker"
+  , "trawler"
+  , "tugboat"
+  , "yacht"
+  ]

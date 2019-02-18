@@ -98,20 +98,13 @@ test-suite test
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-eithert
-                     , ambiata-disorder-jack
                      , projector-core
                      , projector-core-test
                      , projector-html
                      , projector-html-runtime
                      , hedgehog                        == 0.6.*
-                     , QuickCheck                      >= 2.8.2      && < 2.9
-                     , quickcheck-instances            == 0.3.*
                      , string-qq                       == 0.0.*
                      , syb
-                     , quickcheck-text                 == 0.1.*
                      , semigroups                      == 0.18.*
                      , text
                      , containers
@@ -119,56 +112,7 @@ test-suite test
                      , filepath
 
   other-modules:
-                       Test.Projector.Html.Arbitrary
-                       Test.Projector.Html.Core.Elaborator
-                       Test.Projector.Html.Data.Prim
-                       Test.Projector.Html.Expect
-                       Test.Projector.Html.Interpreter
-                       Test.Projector.Html.ModuleGraph
-                       Test.Projector.Html.Syntax
-                       Test.Projector.Html.Machinator.Gen
-                       Test.Projector.Html.Machinator.Graph
-                       Test.Projector.Html.Machinator.Lexer
-                       Test.Projector.Html.Machinator.Parser
-
-
-test-suite test-io
-  type:                exitcode-stdio-1.0
-
-  main-is:             test-io.hs
-
-  ghc-options:         -Wall -threaded -O2
-
-  hs-source-dirs:
-                       test
-
-  build-depends:
-                       base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-eithert
-                     , ambiata-disorder-jack
-                     , projector-core
-                     , projector-core-test
-                     , projector-html
-                     , projector-html-runtime
-                     , hedgehog                        == 0.6.*
-                     , QuickCheck                      >= 2.8.2      && < 2.9
-                     , quickcheck-instances            == 0.3.*
-                     , temporary                       == 1.2.*
-                     , process
-                     , text
-                     , directory
-                     , filepath
-                     , containers
-                     , pretty-show
-                     , syb
-                     , quickcheck-text                 == 0.1.*
-                     , semigroups                      == 0.18.*
-                     , text
-
-  other-modules:
-                       Test.Projector.Html.Arbitrary
+                       Test.Projector.Html.Gen
                        Test.Projector.Html.Core.Elaborator
                        Test.Projector.Html.Data.Prim
                        Test.Projector.Html.Expect

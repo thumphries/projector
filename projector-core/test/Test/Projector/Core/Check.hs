@@ -1,15 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Core.Check where
 
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
-import           Disorder.Core
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Core.Prelude
 
@@ -17,38 +15,38 @@ import           Projector.Core.Check
 import           Projector.Core.Syntax
 import           Projector.Core.Type
 
-import           Test.Projector.Core.Arbitrary
+import           System.IO (IO)
+
+import           Test.Projector.Core.Gen
 
 import           Text.Show.Pretty (ppShow)
 
 
+prop_welltyped :: Property
 prop_welltyped =
-  gamble genWellTypedTestExpr' $ \(ty, ctx, e) ->
+  property $ do
+    (ty, ctx, e) <- forAll genWellTypedTestExpr'
     typeCheck ctx e === pure ty
 
-prop_welltyped_shrink =
-  jackShrinkProp 5 genWellTypedTestExpr' $ \(ty, ctx, e) ->
-    typeCheck ctx e === pure ty
-
+prop_welltyped_letrec :: Property
 prop_welltyped_letrec =
-  gamble genWellTypedTestLetrec $ \(ctx, mexps) ->
+  property $ do
+    (ctx, mexps) <- forAll genWellTypedTestLetrec
     let etypes = fmap fst mexps
         exprs = fmap snd mexps
         atypes = fmap (fmap (fst . extractAnnotation)) (typeCheckAll ctx exprs)
-    in atypes === pure etypes
+    atypes === pure etypes
 
+prop_illtyped :: Property
 prop_illtyped =
-  gamble genIllTypedTestExpr' $ \(ctx, e) ->
-    property
-      (case typeCheck ctx e of
-         Left _ ->
-           property True
-         Right ty ->
-           counterexample (ppShow ty) (property False))
-
-prop_illtyped_shrink =
-  jackShrinkProp 5 genIllTypedTestExpr' $ \(ctx, e) ->
-    property (isLeft (typeCheck ctx e))
+  property $ do
+    (ctx, e) <- forAll genIllTypedTestExpr'
+    case typeCheck ctx e of
+      Left _ ->
+        success
+      Right ty -> do
+        annotate (ppShow ty)
+        failure
 
 -- these are disabled until we can represent type schemes
 -- (sometimes functions will simplify into id, which we can't type)
@@ -83,6 +81,7 @@ dRecord :: TypeDecls TestLitT
 dRecord =
   declareType nRecord tRecord mempty
 
+prop_record_unit_empty :: Property
 prop_record_unit_empty =
   once $
     first (const ()) (typeCheck dRecord expr)
@@ -92,6 +91,7 @@ prop_record_unit_empty =
     expr = ERec () nRecord [
       ]
 
+prop_record_unit_missing :: Property
 prop_record_unit_missing =
   once $
     typeCheck dRecord expr
@@ -103,6 +103,7 @@ prop_record_unit_missing =
       , (FieldName "baz", lit (VInt 43))
       ]
 
+prop_record_unit_complete :: Property
 prop_record_unit_complete =
   once $
     typeCheck dRecord expr
@@ -115,6 +116,7 @@ prop_record_unit_complete =
       , (FieldName "baz", lit (VInt 43))
       ]
 
+prop_record_unit_extra :: Property
 prop_record_unit_extra =
   once $
     typeCheck dRecord expr
@@ -128,6 +130,7 @@ prop_record_unit_extra =
       , (FieldName "quux", lit (VBool False))
       ]
 
+prop_record_unit_duplicate :: Property
 prop_record_unit_duplicate =
   once $
     typeCheck dRecord expr
@@ -141,6 +144,7 @@ prop_record_unit_duplicate =
       , (FieldName "bar", lit (VString "bar!"))
       ]
 
+prop_record_unit_prj_extra :: Property
 prop_record_unit_prj_extra =
   once $
     typeCheck dRecord rexpr
@@ -159,6 +163,7 @@ prop_record_unit_prj_extra =
           (FieldName "quux"))
 
 -- 'id' typechecks on its own
+prop_forall_unit_id :: Property
 prop_forall_unit_id =
   once $
     typeCheck mempty expr
@@ -177,6 +182,7 @@ prop_forall_unit_id =
       ELam () (Name "x") Nothing (EVar () (Name "x"))
 
 -- 'id' is usable below
+prop_forall_unit_id_app :: Property
 prop_forall_unit_id_app =
   once $
     typeCheckIncremental mempty known exprs
@@ -212,6 +218,7 @@ prop_forall_unit_id_app =
         ]
 
 -- 'id' gets monomorphised within its own declaration scope in absence of explicit constraint
+prop_forall_unit_id_app_mono :: Property
 prop_forall_unit_id_app_mono =
   once $
     typeCheckAll mempty exprs
@@ -251,6 +258,7 @@ prop_forall_unit_id_app_mono =
 -}
 
 -- 'id' with explicit user-provided type annotation that is too general
+prop_forall_unit_id_explicit_neg :: Property
 prop_forall_unit_id_explicit_neg =
   once $
     typeCheckIncremental mempty known exprs
@@ -285,6 +293,7 @@ prop_forall_unit_id_explicit_neg =
 -- -----------------------------------------------------------------------------
 -- maybe
 
+prop_maybe_unit_just :: Property
 prop_maybe_unit_just =
   once $
     typeCheck maybeDecls expr
@@ -294,6 +303,7 @@ prop_maybe_unit_just =
     expr =
       ECon () (Constructor "Just") (TypeName "Maybe") [ELit () (VBool True)]
 
+prop_maybe_unit_nothing :: Property
 prop_maybe_unit_nothing =
   once $
     typeCheck maybeDecls expr
@@ -304,6 +314,7 @@ prop_maybe_unit_nothing =
     expr =
       ECon () (Constructor "Nothing") (TypeName "Maybe") []
 
+prop_maybe_unit_case :: Property
 prop_maybe_unit_case =
   once $
     typeCheck maybeDecls expr
@@ -319,6 +330,7 @@ prop_maybe_unit_case =
         ]
 
 
+maybeDecls :: TypeDecls TestLitT
 maybeDecls =
   TypeDecls $ M.fromList [
      (TypeName "Maybe", DVariant [TypeName "a"] [
@@ -328,7 +340,7 @@ maybeDecls =
    ]
 
 -- -----------------------------------------------------------------------------
-
+prop_either_unit_right :: Property
 prop_either_unit_right =
   once $
     typeCheck eitherDecls expr
@@ -338,6 +350,7 @@ prop_either_unit_right =
     expr =
       ECon () (Constructor "Right") (TypeName "Either") [ELit () (VString "foobar")]
 
+prop_either_unit_left :: Property
 prop_either_unit_left =
   once $
     typeCheck eitherDecls expr
@@ -347,6 +360,7 @@ prop_either_unit_left =
     expr =
       ECon () (Constructor "Left") (TypeName "Either") [ELit () (VBool True)]
 
+prop_either_unit_case :: Property
 prop_either_unit_case =
   once $
     typeCheck eitherDecls expr
@@ -361,6 +375,7 @@ prop_either_unit_case =
         , (PCon () (Constructor "Right") [PVar () (Name "x")], ELit () (VBool False))
         ]
 
+eitherDecls :: TypeDecls TestLitT
 eitherDecls =
   TypeDecls $ M.fromList [
       (TypeName "Either", DVariant [TypeName "a", TypeName "b"] [
@@ -372,6 +387,7 @@ eitherDecls =
 -- -----------------------------------------------------------------------------
 -- quantified record
 
+prop_blob_unit_rec :: Property
 prop_blob_unit_rec =
   once $
     typeCheck blobDecls expr
@@ -383,6 +399,7 @@ prop_blob_unit_rec =
           (FieldName "value", ELit () (VBool False))
         ]
 
+prop_blob_unit_prj :: Property
 prop_blob_unit_prj =
   once $
     typeCheck blobDecls expr
@@ -396,6 +413,7 @@ prop_blob_unit_prj =
           ])
         (FieldName "value")
 
+blobDecls :: TypeDecls TestLitT
 blobDecls =
   TypeDecls $ M.fromList [
       (TypeName "Blob", DRecord [TypeName "a"] [
@@ -403,5 +421,10 @@ blobDecls =
         ])
     ]
 
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
+
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

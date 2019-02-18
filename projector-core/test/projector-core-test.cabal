@@ -16,13 +16,8 @@ library
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-jack
                      , projector-core
                      , hedgehog                        == 0.6.*
-                     , QuickCheck                      >= 2.8.2      && < 2.9
-                     , quickcheck-instances            == 0.3.*
                      , comonad                         == 5.*
                      , mtl
                      , containers                      == 0.5.*
@@ -31,4 +26,4 @@ library
                      , pretty-show
 
   exposed-modules:
-                     Test.Projector.Core.Arbitrary
+                     Test.Projector.Core.Gen

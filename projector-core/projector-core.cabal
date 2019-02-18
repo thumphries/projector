@@ -54,13 +54,8 @@ test-suite test
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-jack
                      , projector-core
                      , hedgehog                        == 0.6.*
-                     , QuickCheck                      >= 2.8.2      && < 2.9
-                     , quickcheck-instances            == 0.3.*
                      , comonad
                      , mtl
                      , containers
@@ -69,7 +64,7 @@ test-suite test
                      , semigroups
                      , pretty-show
   other-modules:
-                       Test.Projector.Core.Arbitrary
+                       Test.Projector.Core.Gen
                        Test.Projector.Core.Check
                        Test.Projector.Core.Eval
                        Test.Projector.Core.Match
@@ -83,9 +78,6 @@ benchmark bench
   ghc-options:         -Wall -threaded -O2
   build-depends:       base
                      , projector-core
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-jack
                      , criterion                       == 1.1.*
                      , hedgehog                        == 0.6.*
                      , text
@@ -95,7 +87,7 @@ benchmark bench
                      , pretty-show
                      , transformers
   other-modules:
-                       Test.Projector.Core.Arbitrary
+                       Test.Projector.Core.Gen
                        Test.Projector.Core.Check
                        Test.Projector.Core.Eval
                        Test.Projector.Core.Match

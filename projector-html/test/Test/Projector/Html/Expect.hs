@@ -3,11 +3,12 @@
 module Test.Projector.Html.Expect where
 
 
+import           Control.Monad.IO.Class (MonadIO (..))
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-import           Disorder.Core.IO (testIO)
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Core.Prelude
 
@@ -19,16 +20,17 @@ import           Text.Show.Pretty (ppShow)
 
 expectFile :: Show a => FilePath -> FilePath -> (x -> Text) -> (Text -> Either x a) -> Property
 expectFile root fp e f =
-  once . testIO $ do
-    fin <- T.readFile (root </> fp <.> "in")
-    out <- T.readFile (root </> fp <.> "out")
-    pure $
-      let result = fmap (T.pack . ppShow) (f fin) in
-        (either
-          (counterexample . T.unpack . e)
-          (counterexample . T.unpack . textDiff out)
-          result)
-        (property (either (const False) (== out) result))
+  once $ do
+    fin <- liftIO $ T.readFile (root </> fp <.> "in")
+    out <- liftIO $ T.readFile (root </> fp <.> "out")
+    let result = fmap (T.pack . ppShow) (f fin)
+    case result of
+      Left err -> do
+        annotate . T.unpack $ e err
+        failure
+      Right v -> do
+        annotate . T.unpack $ textDiff out v
+        v === out
 
 mkExpect :: Show a => FilePath -> FilePath -> Text -> a -> IO ()
 mkExpect root fp fin out = do
@@ -56,3 +58,7 @@ textDiff a b =
         acc <> if x == y
                  then [" " <> x]
                  else ["-" <> x, "+" <> y]
+
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
