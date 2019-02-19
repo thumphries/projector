@@ -15,7 +15,6 @@ library
                        base                            >= 3          && < 5
                      , projector-hydrant
                      , projector-core
-                     , ambiata-machinator-core
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , Earley                          >= 0.11       && < 0.13
@@ -71,6 +70,19 @@ library
                        Projector.Html.Syntax.Parser
                        Projector.Html.Syntax.Token
                        Projector.Html.Syntax.QQ
+
+                       Projector.Html.Machinator
+
+                       Projector.Html.Machinator.Data.Definition
+                       Projector.Html.Machinator.Data.Position
+                       Projector.Html.Machinator.Data.Token
+                       Projector.Html.Machinator.Data.Version
+
+                       Projector.Html.Machinator.Graph
+
+                       Projector.Html.Machinator.Lexer
+                       Projector.Html.Machinator.Parser
+                       Projector.Html.Machinator.Pretty
 
 
 test-suite test

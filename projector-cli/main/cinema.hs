@@ -14,7 +14,7 @@ import qualified Data.Text.IO as T
 import           Options.Applicative (Parser, ReadM, long, short, help, hidden)
 import qualified Options.Applicative as O
 
-import qualified Machinator.Core as MC
+import qualified Projector.Html.Machinator as MC
 
 import           Projector.Core.Prelude
 

@@ -21,7 +21,6 @@ executable cinema
                      , projector-html
                      , projector-html-haskell
                      , projector-html-purs
-                     , ambiata-machinator-core
                      , containers
                      , directory                       == 1.*
                      , filepath                        == 1.*
