@@ -90,7 +90,7 @@ We are not limited to `String`! Let's write some datatypes::
   data Greeting =
       Hello Name
     | Goodbye
-   
+
   record Name = {
       is : String
     }
@@ -217,3 +217,7 @@ Footnotes
 .. [#higherordertypes] The core calculus supports parameterised types
   just fine. Syntactic restrictions prevent users from creating their
   own. This restriction may be lifted at some point.
+
+
+.. image:: https://circleci.com/gh/thumphries/projector.svg?style=svg
+    :target: https://circleci.com/gh/thumphries/projector
