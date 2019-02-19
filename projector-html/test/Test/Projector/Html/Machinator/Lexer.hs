@@ -1,13 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Html.Machinator.Lexer where
 
 import qualified Data.Text as T
 
-import           Disorder.Core hiding (tripping)
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Html.Machinator.Data.Position
 import           Projector.Html.Machinator.Data.Token
@@ -15,8 +13,10 @@ import           Projector.Html.Machinator.Data.Version
 import           Projector.Html.Machinator.Lexer
 
 import           Projector.Core.Prelude
+import           System.IO (IO)
 
 
+prop_lexer_v1_no_comments :: Property
 prop_lexer_v1_no_comments =
   let
     r =
@@ -26,9 +26,9 @@ prop_lexer_v1_no_comments =
           , "data Bar = Bar " <> "-" <> "- data Foo"
           ]
   in
-    once $
-      isLeft r
+    once . assert $ isLeft r
 
+prop_lexer_v2_comments :: Property
 prop_lexer_v2_comments =
   let
     r =
@@ -49,6 +49,10 @@ prop_lexer_v2_comments =
         , TData , TIdent "Bar" , TEquals , TIdent "Bar"
         ])
 
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
 
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

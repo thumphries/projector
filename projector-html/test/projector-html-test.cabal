@@ -19,14 +19,10 @@ library
                      , projector-core
                      , projector-core-test
                      , projector-html
-                     , ambiata-disorder-core
-                     , ambiata-disorder-corpus
-                     , ambiata-disorder-jack
                      , containers
                      , directory
                      , filepath
                      , hedgehog                        == 0.6.*
-                     , quickcheck-text                 == 0.1.*
                      , semigroups
                      , syb
                      , text
@@ -34,4 +30,4 @@ library
 
   exposed-modules:
                      Test.IO.Projector.Html.Backend.Property
-                     Test.Projector.Html.Arbitrary
+                     Test.Projector.Html.Gen

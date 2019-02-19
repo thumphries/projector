@@ -8,8 +8,7 @@ import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import           Disorder.Core
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Html.Machinator.Data.Definition
 import           Projector.Html.Machinator.Graph
@@ -60,6 +59,10 @@ testGraph =
     , ("pel.mcn", S.fromList ["foo.mcn", "heck.mcn"])
     ]
 
-return []
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
+
 tests :: IO Bool
-tests = $disorderCheckEnvAll TestRunNormal
+tests =
+  checkParallel $$(discover)

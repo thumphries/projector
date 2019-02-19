@@ -1,15 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Html.ModuleGraph where
+
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
-import           Disorder.Core hiding (vectorOfUnique)
-import           Disorder.Jack
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Projector.Core.Prelude
 
@@ -19,65 +20,72 @@ import           Projector.Html.Data.Module
 import           Projector.Html.Data.Prim
 import           Projector.Html.ModuleGraph
 
-import           Test.Projector.Core.Arbitrary (genName)
+import           Test.Projector.Core.Gen (genName)
 
+import           System.IO (IO)
 
+prop_cycles :: Property
 prop_cycles =
-  neg . gamble genCyclicExprs $ \me ->
-    detectCycles (buildModuleGraph (deriveImports (buildSingletonModules me))) === pure ()
+  property $ do
+    me <- forAll genCyclicExprs
+    detectCycles (buildModuleGraph (deriveImports (buildSingletonModules me))) /== pure ()
 
+prop_no_cycles :: Property
 prop_no_cycles =
-  gamble genAcyclicExprs $ \me ->
+  property $ do
+    me <- forAll genAcyclicExprs
     detectCycles (buildModuleGraph (deriveImports (buildSingletonModules me))) === pure ()
 
+prop_dependencies :: Property
 prop_dependencies =
-  gamble genAcyclicSet $ \(me, order) ->
+  property $ do
+    (me, order) <- forAll genAcyclicSet
     dependencyOrder (buildDependencyGraph (buildModuleGraph (deriveImports (buildSingletonModules me))))
-    ===
-    fmap (ModuleName . unName) order
+      ===
+        fmap (ModuleName . unName) order
 
 -- generate a set of exprs where all branches in the dependency forest have cycles
-genCyclicExprs :: Jack (Map Name (HtmlExpr ()))
+genCyclicExprs :: Gen (Map Name (HtmlExpr ()))
 genCyclicExprs =
-  sized $ \n -> do
-    k <- chooseInt (2, n+2)
+  Gen.sized $ \n -> do
+    k <- Gen.int (Range.linear 2 (fromIntegral n + 2))
     names <- vectorOfUnique k genName
     -- take partitions of at least two
     sets <- partition 2 names
     pure (fold (fmap genCycle sets))
 
 -- generate a set of independent dependency forests, all of which have no cycles
-genAcyclicExprs :: Jack (Map Name (HtmlExpr ()))
+genAcyclicExprs :: Gen (Map Name (HtmlExpr ()))
 genAcyclicExprs =
-  sized $ \n -> do
-    k <- chooseInt (0, n)
+  Gen.sized $ \n -> do
+    k <- Gen.int (Range.linear 0 (fromIntegral n))
     names <- vectorOfUnique k genName
     sets <- partition 1 names
     pure (fold (fmap genAcycle sets))
 
 -- like above but only one unbroken dependency tree, not a forest
 -- (this makes it easier to reason about the precise dep order)
-genAcyclicSet :: Jack (Map Name (HtmlExpr ()), [Name])
+genAcyclicSet :: Gen (Map Name (HtmlExpr ()), [Name])
 genAcyclicSet =
-  sized $ \n -> do
-    k <- chooseInt (0, n)
+  Gen.sized $ \n -> do
+    k <- Gen.int (Range.linear 0 (fromIntegral n))
     names <- vectorOfUnique k genName
     pure (genAcycle names, names)
 
-vectorOfUnique :: Ord a => Int -> Jack a -> Jack [a]
+vectorOfUnique :: Ord a => Int -> Gen a -> Gen [a]
 vectorOfUnique k gen =
   go k gen mempty
   where
     go 0 _ set = pure (toList set)
     go n g set = do
-      a <- g `suchThat` (\b -> not (S.member b set))
+      a <- Gen.filter (\b -> not (S.member b set)) g
       go (n-1) g (S.insert a set)
 
-partition :: Int -> [a] -> Jack [[a]]
+partition :: Int -> [a] -> Gen [[a]]
 partition _ [] = pure []
 partition i xs =
-  sized $ \n -> do
-    k <- chooseInt (i, n+i)
+  Gen.sized $ \n -> do
+    k <- Gen.int (Range.linear i (fromIntegral n + i))
     let (y, ys) = L.splitAt k xs
     fmap (y:) (partition i ys)
 
@@ -116,8 +124,9 @@ genAcycle names =
       (y, var x) : genem y ys
 
 
+prop_unit_simple_cycle :: Property
 prop_unit_simple_cycle =
-  once (isLeft (detectCycles (buildModuleGraph (deriveImports testModuleSet))))
+  once $ assert (isLeft (detectCycles (buildModuleGraph (deriveImports testModuleSet))))
 
 testModuleSet :: Map ModuleName (Module () PrimT ())
 testModuleSet =
@@ -166,5 +175,10 @@ testModuleSet =
     ]
 
 
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
+
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

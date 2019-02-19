@@ -1,40 +1,48 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Core.Match where
 
 
-import           Disorder.Core
-import           Disorder.Jack
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Projector.Core.Prelude
 
 import           Projector.Core.Match
 
-import           Test.Projector.Core.Arbitrary
+import           System.IO (IO)
+
+import           Test.Projector.Core.Gen
 
 
+prop_matchtree_monoid_assoc :: Property
 prop_matchtree_monoid_assoc =
-  gamble genMatchTree $ \x ->
-  gamble genMatchTree $ \y ->
-  gamble genMatchTree $ \z ->
+  withTests 20 . property $ do
+    x <- forAll genMatchTree
+    y <- forAll genMatchTree
+    z <- forAll genMatchTree
     (x <> y) <> z === x <> (y <> z)
 
+prop_matchtree_monoid_left_id :: Property
 prop_matchtree_monoid_left_id =
-  gamble genMatchTree $ \x ->
+  withTests 20 . property $ do
+    x <- forAll genMatchTree
     mempty <> x === x
 
+prop_matchtree_monoid_right_id :: Property
 prop_matchtree_monoid_right_id =
-  gamble genMatchTree $ \x ->
+  withTests 20 . property $ do
+    x <- forAll genMatchTree
     x <> mempty === x
 
-genMatchTree :: Jack MatchTree
+genMatchTree :: Gen MatchTree
 genMatchTree =
-  sized $ \n -> do
-    k <- chooseInt (0, n)
-    buildMatchTree <$> (listOfN 0 k (genPattern genConstructor genName))
+  Gen.sized $ \n -> do
+    k <- Gen.int (Range.linear 0 (fromIntegral n))
+    buildMatchTree <$> (Gen.list (Range.linear 0 k) (genPattern genConstructor genName))
 
-
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

@@ -1,15 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Core.Warn where
 
 
 import qualified Data.List as L
 import qualified Data.Set as S
 
-import           Disorder.Core
-import           Disorder.Jack
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Projector.Core.Prelude
 
@@ -17,7 +17,9 @@ import           Projector.Core.Syntax
 import           Projector.Core.Type
 import           Projector.Core.Warn
 
-import           Test.Projector.Core.Arbitrary
+import           System.IO (IO)
+
+import           Test.Projector.Core.Gen
 
 
 -- big lambda billy
@@ -30,12 +32,15 @@ buildExpr n = case n of
         (pvar_ "billy",  (buildExpr (m - 1)))
       ])
 
+prop_warn_shadowing :: Property
 prop_warn_shadowing =
-  gamble (chooseInt (1, 1000)) $ \n ->
+  property $ do
+    n <- forAll $ Gen.int (Range.linear 1 1000)
     warnShadowing (S.singleton (Name "billy")) (buildExpr n)
-    ===
-    Left (L.take (n*2) (L.repeat (ShadowedName () (Name "billy"))))
+      ===
+        Left (L.take (n*2) (L.repeat (ShadowedName () (Name "billy"))))
 
+prop_warn_shadowing_vac :: Property
 prop_warn_shadowing_vac =
   once $
     warnShadowing (S.singleton (Name "billy")) (buildExpr 0)
@@ -44,19 +49,25 @@ prop_warn_shadowing_vac =
 
 -- -----------------------------------------------------------------------------
 
+prop_warn_exhaustivity :: Property
 prop_warn_exhaustivity =
-  gamble genWellTypedTestExpr' $ \(_ty, decls, expr) ->
+  property $ do
+    (_ty, decls, expr) <- forAll genWellTypedTestExpr'
     warnExhaustivity decls expr === Right ()
 
+prop_warn_exhaustivity_casey_pos :: Property
 prop_warn_exhaustivity_casey_pos =
-  gamble (chooseInt (0, 1000)) $ \n ->
+  property $ do
+    n <- forAll $ Gen.int (Range.linear 0 1000)
     warnExhaustivity caseyCtx (buildCase n) === Right ()
 
+prop_warn_exhaustivity_casey_neg :: Property
 prop_warn_exhaustivity_casey_neg =
-  gamble (chooseInt (1, 1000)) $ \n ->
+  property $ do
+    n <- forAll $ Gen.int (Range.linear 1 1000)
     warnExhaustivity caseyCtx (buildCaseInex n)
-    ===
-    Left (L.take n (L.repeat (InexhaustiveCase () [ Constructor "Foo" ] )))
+      ===
+        Left (L.take n (L.repeat (InexhaustiveCase () [ Constructor "Foo" ] )))
 
 
 buildCase :: Int -> Expr TestLitT ()
@@ -92,7 +103,10 @@ caseyCtx :: TypeDecls TestLitT
 caseyCtx =
   declareType (TypeName "Casey") tcasey mempty
 
+once :: PropertyT IO () -> Property
+once =
+  withTests 1 . property
 
-
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

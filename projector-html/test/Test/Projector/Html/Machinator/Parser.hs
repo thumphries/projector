@@ -1,25 +1,31 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Test.Projector.Html.Machinator.Parser (tests) where
 
-import           Disorder.Core hiding (tripping)
-import           Disorder.Jack
+import           Hedgehog
 
 import           Projector.Html.Machinator
 
 import           Projector.Core.Prelude
 
+import           System.IO (IO)
+
 import           Test.Projector.Html.Machinator.Gen
 
 
+prop_tripping_v1 :: Property
 prop_tripping_v1 =
-  gamble genDefinitionFileV1 $ \vdf ->
-    tripping ppDefinitionFile (parseDefinitionFile "Test.Projector.Html.Machinator.Arbitrary") vdf
+  property $ do
+    vdf <- forAll genDefinitionFileV1
+    tripping vdf ppDefinitionFile (parseDefinitionFile "Test.Projector.Html.Machinator.Arbitrary")
 
+prop_tripping_v2 :: Property
 prop_tripping_v2 =
-  gamble genDefinitionFileV2 $ \vdf ->
-    tripping ppDefinitionFile (parseDefinitionFile "Test.Projector.Html.Machinator.Arbitrary") vdf
-return []
-tests = $disorderCheckEnvAll TestRunNormal
+  property $ do
+    vdf <- forAll genDefinitionFileV2
+    tripping vdf ppDefinitionFile (parseDefinitionFile "Test.Projector.Html.Machinator.Arbitrary")
+
+tests :: IO Bool
+tests =
+  checkParallel $$(discover)

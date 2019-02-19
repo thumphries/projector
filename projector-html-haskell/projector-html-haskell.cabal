@@ -45,9 +45,6 @@ test-suite test-io
 
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-disorder-core
-                     , ambiata-disorder-eithert
-                     , ambiata-disorder-jack
                      , projector-core
                      , projector-core-test
                      , projector-html

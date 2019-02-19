@@ -15,7 +15,7 @@ import           Projector.Core
 
 import           System.IO (IO)
 
-import           Test.Projector.Core.Arbitrary
+import           Test.Projector.Core.Gen
 
 
 -- big lambda billy
