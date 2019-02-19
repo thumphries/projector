@@ -156,6 +156,27 @@ jobs:
       - run:
           name: 'test'
           command: 'cd projector-html-runtime-hs && mafia test'
+  cabal-check:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: 'cabal-check'
+          command: './bin/check'
+  cabal-new-build:
+    docker:
+      - image: markhibberd/haskell-circleci:latest
+    resource_class: large
+    steps:
+      - checkout
+      - run:
+          name: 'cabal-update'
+          command: 'cabal update'
+      - run:
+          name: 'cabal-new-build-sanity-check'
+          command: './bin/cabal-new-build'
 workflows:
   version: 2
   all:
@@ -166,3 +187,5 @@ workflows:
       - projector-html-haskell
       - projector-html-purs
       - projector-html-runtime-hs
+      - cabal-check
+      - cabal-new-build

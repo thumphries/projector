@@ -1,0 +1,10 @@
+#!/bin/sh -eu
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+(cd "$ROOT" && cabal new-build all --enable-test --enable-benchmarks)
+
+if [ $? -ne 0 ]; then
+    echo 2>&1 "$x failed cabal new-build"
+    exit 1
+fi
