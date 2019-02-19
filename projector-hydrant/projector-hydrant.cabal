@@ -1,0 +1,73 @@
+name:                projector-hydrant
+version:             0.1.0.0
+synopsis:            Simple HTML combinators
+license:             BSD3
+author:              Ambiata
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  build-depends:
+                     base             >= 3      && < 5
+                   , bytestring       >= 0.10.4 && < 0.11
+                   , text             == 1.2.*
+
+  default-language:
+                     Haskell2010
+
+  ghc-options:
+                     -Wall
+
+  hs-source-dirs:
+                     src
+
+  exposed-modules:
+                     Projector.Hydrant
+                     Projector.Hydrant.Data
+                     Projector.Hydrant.Raw
+
+test-suite test
+  type:
+                     exitcode-stdio-1.0
+
+  main-is:
+                     test.hs
+
+  hs-source-dirs:
+                     test
+
+  default-language:
+                     Haskell2010
+
+  build-depends:
+                     base
+                   , projector-hydrant
+                   , containers                == 0.5.*
+                   , hedgehog                  == 0.6.*
+                   , tagsoup                   == 0.14.*
+                   , text                      == 1.2.*
+
+  other-modules:
+                     Test.Projector.Hydrant
+                     Test.Projector.Hydrant.Gen
+
+
+benchmark bench
+  type:
+                     exitcode-stdio-1.0
+
+  main-is:
+                     test/bench.hs
+
+  default-language:
+                     Haskell2010
+
+  ghc-options:
+                     -Wall -threaded -O2
+
+  build-depends:
+                     base
+                   , projector-hydrant
+                   , criterion                 == 1.1.*
+                   , text                      == 1.2.*
