@@ -170,3 +170,7 @@ test-suite test-io
                        Test.Projector.Html.Interpreter
                        Test.Projector.Html.ModuleGraph
                        Test.Projector.Html.Syntax
+                       Test.Projector.Html.Machinator.Gen
+                       Test.Projector.Html.Machinator.Graph
+                       Test.Projector.Html.Machinator.Lexer
+                       Test.Projector.Html.Machinator.Parser
