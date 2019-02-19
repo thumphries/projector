@@ -52,7 +52,7 @@ prop_hello_world =
     (=== "Hello, world!<div class=\"table\"></div>")
   where
     (name, text) =
-      either (fail . T.unpack) id $ do
+      either (fail . T.unpack) id . fmap pluck $ do
         let modl = Module {
                 moduleTypes = mempty
               , moduleImports = M.fromList [
@@ -82,7 +82,7 @@ baseDecls =
 
 modulePropCheck :: HtmlDecls -> ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> PropertyT IO ()
 modulePropCheck decls mn modl@(Module tys _ _) =
-  uncurry ghcProp . either (fail . T.unpack) id $ do
+  uncurry ghcProp . either (fail . T.unpack) id . fmap pluck $ do
     modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
     first renderHaskellError (Html.codeGenModule haskellBackend decls mn modl')
 
@@ -90,6 +90,7 @@ moduleProp :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, SrcAnn
 moduleProp decls mn =
   uncurry ghcProp .
   either (fail . T.unpack) id .
+  fmap pluck .
   first renderHaskellError . Html.codeGenModule haskellBackend decls mn
 
 -- Compiles with GHC in the current sandbox, failing if exit status is nonzero.
@@ -104,6 +105,10 @@ runProp mname modl cb =
   fileProp mname modl
     (\path -> readProcessWithExitCode "cabal" ["exec", "--", "runhaskell", path] "")
     (processProp cb)
+
+pluck :: (a, b, c) -> (b, c)
+pluck (_, b, c) =
+  (b, c)
 
 once :: PropertyT IO () -> Property
 once =

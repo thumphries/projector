@@ -1,0 +1,12 @@
+#!/bin/sh -eu
+
+rm -rf test/haskell test/html
+
+dist/build/projector/projector \
+  -t test/templates \
+  -e test/examples \
+  -o test/haskell \
+  -h test/html \
+  -m Example.Project \
+  -v \
+  -w

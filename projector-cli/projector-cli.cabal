@@ -70,6 +70,36 @@ executable slideshow
                        BuildInfo_projector_cli
                        DependencyInfo_projector_cli
 
+executable projector
+  hs-source-dirs:     gen
+  main-is:            ../main/projector.hs
+  ghc-options:         -Wall -threaded
+
+  build-depends:
+                       base
+                     , projector-core
+                     , projector-html
+                     , projector-html-haskell
+                     , projector-html-purs
+                     , bytestring
+                     , containers
+                     , directory
+                     , exceptions
+                     , filepath
+                     , filemanip                       == 0.3.*
+                     , fsnotify                        == 0.2.*
+                     , text
+                     , transformers
+                     , optparse-applicative            >= 0.11 && < 0.15
+
+  other-modules:
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli
+  autogen-modules:
+                       BuildInfo_projector_cli
+                       DependencyInfo_projector_cli
+
+
 custom-setup
   setup-depends:
     base, Cabal

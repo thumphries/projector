@@ -64,11 +64,11 @@ baseDecls =
 
 moduleProp :: HtmlDecls -> ModuleName -> Module HtmlType PrimT (HtmlType, a) -> PropertyT IO ()
 moduleProp decls mn =
-  uncurry pscProp . either (fail . show) id . Html.codeGenModule purescriptBackend decls mn
+  uncurry pscProp . either (fail . show) id . fmap pluck . Html.codeGenModule purescriptBackend decls mn
 
 modulePropCheck :: HtmlDecls -> ModuleName -> Module (Maybe HtmlType) PrimT SrcAnnotation -> PropertyT IO ()
 modulePropCheck decls mn modl@(Module tys _ _) =
-  uncurry pscProp . either (fail . T.unpack) id $ do
+  uncurry pscProp . either (fail . T.unpack) id . fmap pluck $ do
     modl' <- first Html.renderHtmlError (Html.checkModule tys mempty modl)
     first renderPurescriptError (Html.codeGenModule purescriptBackend decls mn modl')
 
@@ -80,6 +80,9 @@ pscProp mname modl =
       in readCreateProcessWithExitCode crpr [])
     (processProp (const success))
 
+pluck :: (a, b, c) -> (b, c)
+pluck (_, b, c) =
+  (b, c)
 
 once :: PropertyT IO () -> Property
 once =
