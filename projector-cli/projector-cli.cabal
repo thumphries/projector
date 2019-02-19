@@ -1,22 +1,33 @@
 name:                  projector-cli
 version:               0.0.1
 license:               BSD3
-author:                Ambiata <info@ambiata.com>
-maintainer:            Ambiata <info@ambiata.com>
-copyright:             (c) 2016 Ambiata.
-synopsis:              projector-cli
-category:              System
+license-file:          LICENSE
+author:                Tim Humphries <tim@utf8.me>
+maintainer:            Tim Humphries <tim@utf8.me>, Mark Hibberd <mark@hibberd.id.au>
+copyright:             (c) 2016 Ambiata. (c) 2018-2019 Tim Humphries, Mark Hibberd
+synopsis:              Projector is a typed, total HTML templating language.
+category:              Web, Text, Template
 cabal-version:         >= 1.8
 build-type:            Custom
-description:           projector-cli
+description:
+  Projector is a typed, total HTML templating language.
+
+  Projector templates can be typechecked, statically analyzed, partially
+  evaluated, optimised via rewrite rules, and compiled to any sensible
+  DOM representation.
+
+  Projector was designed to enable progressive enhancement, but is also
+  useful as a general-purpose type-safe templating system. It provides a
+  number of static guarantees and a fast feedback cycle, while also
+  decoupling your views from your current choice of framework.
 
 executable cinema
   hs-source-dirs:     gen
   main-is:            ../main/cinema.hs
-  ghc-options:         -Wall -threaded -O2
+  ghc-options:         -Wall -threaded
 
   build-depends:
-                       base
+                       base                            >= 3 && < 5
                      , projector-core
                      , projector-html
                      , projector-html-haskell
@@ -35,10 +46,11 @@ executable cinema
                        BuildInfo_projector_cli
                        DependencyInfo_projector_cli
 
+
 executable slideshow
   hs-source-dirs:     gen
   main-is:            ../main/slideshow.hs
-  ghc-options:         -Wall -threaded -O2
+  ghc-options:         -Wall -threaded
 
   build-depends:
                        base
@@ -57,3 +69,7 @@ executable slideshow
   autogen-modules:
                        BuildInfo_projector_cli
                        DependencyInfo_projector_cli
+
+custom-setup
+  setup-depends:
+    base, Cabal
