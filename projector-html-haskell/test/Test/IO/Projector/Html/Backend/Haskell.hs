@@ -44,7 +44,7 @@ prop_library_runtime =
     }
 
 prop_hello_world =
-  once $ runProp name (text <> "\nmain = putStr (Hydrant.toText helloWorld)\n")
+  once $ runProp name (text <> "\nmain = putStr (Projector.Hydrant.toText helloWorld)\n")
     (=== "Hello, world!<div class=\"table\"></div>")
   where
     (name, text) =
@@ -53,7 +53,7 @@ prop_hello_world =
                 moduleTypes = mempty
               , moduleImports = M.fromList [
                     (ModuleName "Data.Text.IO", OnlyImport [Name "putStr"])
-                  , (ModuleName "Hydrant", ImportQualified)
+                  , (ModuleName "Projector.Hydrant", ImportQualified)
                   ]
               , moduleExprs = M.fromList [
                     helloWorld

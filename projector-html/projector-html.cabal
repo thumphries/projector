@@ -13,7 +13,7 @@ description:           projector-html
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-hydrant
+                     , projector-hydrant
                      , projector-core
                      , ambiata-machinator-core
                      , containers                      == 0.5.*

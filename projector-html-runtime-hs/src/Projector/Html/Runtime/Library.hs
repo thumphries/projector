@@ -26,7 +26,7 @@ module Projector.Html.Runtime.Library (
 import qualified Data.Foldable as F
 import           Data.Functor (fmap)
 import           Data.Monoid (Monoid (..))
-import qualified Hydrant
+import qualified Projector.Hydrant as Hydrant
 import           Projector.Html.Runtime.Prim
 
 -- FIX Unfortunately inlining this function results in _inevitable_ GHC 7.10.2 panics.
