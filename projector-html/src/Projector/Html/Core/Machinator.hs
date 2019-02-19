@@ -6,8 +6,8 @@ module Projector.Html.Core.Machinator (
   ) where
 
 
-import           Machinator.Core (Definition (..))
-import qualified Machinator.Core.Data.Definition as MC
+import           Projector.Html.Machinator (Definition (..))
+import qualified Projector.Html.Machinator.Data.Definition as MC
 
 import           Projector.Core.Prelude
 

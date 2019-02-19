@@ -15,7 +15,7 @@ library
                        base                            >= 3          && < 5
                      , projector-hydrant
                      , projector-core
-                     , ambiata-machinator-core
+                     , annotated-wl-pprint             == 0.7.*
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , Earley                          >= 0.11       && < 0.13
@@ -72,6 +72,19 @@ library
                        Projector.Html.Syntax.Token
                        Projector.Html.Syntax.QQ
 
+                       Projector.Html.Machinator
+
+                       Projector.Html.Machinator.Data.Definition
+                       Projector.Html.Machinator.Data.Position
+                       Projector.Html.Machinator.Data.Token
+                       Projector.Html.Machinator.Data.Version
+
+                       Projector.Html.Machinator.Graph
+
+                       Projector.Html.Machinator.Lexer
+                       Projector.Html.Machinator.Parser
+                       Projector.Html.Machinator.Pretty
+
 
 test-suite test
   type:                exitcode-stdio-1.0
@@ -113,6 +126,11 @@ test-suite test
                        Test.Projector.Html.Interpreter
                        Test.Projector.Html.ModuleGraph
                        Test.Projector.Html.Syntax
+                       Test.Projector.Html.Machinator.Gen
+                       Test.Projector.Html.Machinator.Graph
+                       Test.Projector.Html.Machinator.Lexer
+                       Test.Projector.Html.Machinator.Parser
+
 
 test-suite test-io
   type:                exitcode-stdio-1.0
@@ -157,3 +175,7 @@ test-suite test-io
                        Test.Projector.Html.Interpreter
                        Test.Projector.Html.ModuleGraph
                        Test.Projector.Html.Syntax
+                       Test.Projector.Html.Machinator.Gen
+                       Test.Projector.Html.Machinator.Graph
+                       Test.Projector.Html.Machinator.Lexer
+                       Test.Projector.Html.Machinator.Parser
