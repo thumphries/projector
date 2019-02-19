@@ -26,7 +26,7 @@ import           Projector.Core.Prelude
 -- instead of having separate implementations per version
 
 genDefinitionFilesV1 :: Gen [Versioned DefinitionFile]
-genDefinitionFilesV1 =
+genDefinitionFilesV1 = do
   Gen.sized $ \n -> do
     k <- Gen.int (Range.linear 1 10)
     fns <- genFree k genName mempty
@@ -43,12 +43,12 @@ genDefinitionFileV2 =
   genDefinitionFileV1
 
 genDefinitionFileV1 :: Gen (Versioned DefinitionFile)
-genDefinitionFileV1 =
-  Gen.sized $ \n ->
-    fmap
-      (Versioned MachinatorV1 . DefinitionFile "Test.Projector.Html.Machinator.Arbitrary") $ do
-        (def, _, _) <- genDefinitionFileV1' (fromIntegral n) mempty mempty
-        pure def
+genDefinitionFileV1 = do
+  n <- Gen.int (Range.linear 1 25)
+  fmap
+    (Versioned MachinatorV1 . DefinitionFile "Test.Projector.Html.Machinator.Arbitrary") $ do
+      (def, _, _) <- genDefinitionFileV1' n mempty mempty
+      pure def
 
 genDefinitionFileV1' :: Int -> Set Name -> Set Name -> Gen ([Definition], Set Name, Set Name)
 genDefinitionFileV1' n kts kcs = do
