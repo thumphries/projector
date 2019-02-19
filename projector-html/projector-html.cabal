@@ -15,6 +15,7 @@ library
                        base                            >= 3          && < 5
                      , projector-hydrant
                      , projector-core
+                     , annotated-wl-pprint             == 0.7.*
                      , containers                      == 0.5.*
                      , dlist                           == 0.8.*
                      , Earley                          >= 0.11       && < 0.13
