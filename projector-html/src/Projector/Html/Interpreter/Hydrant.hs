@@ -9,7 +9,7 @@ module Projector.Html.Interpreter.Hydrant (
 
 import qualified Data.Text.Lazy as LT
 
-import qualified Hydrant as H
+import qualified Projector.Hydrant as H
 
 import           Projector.Core.Prelude
 

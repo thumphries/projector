@@ -13,7 +13,7 @@ description:           projector-html-runtime
 library
   build-depends:
                        base                            >= 3          && < 5
-                     , ambiata-hydrant
+                     , projector-hydrant
                      , text                            == 1.2.*
                      , bytestring                      >= 0.10.2     && < 0.11
 
