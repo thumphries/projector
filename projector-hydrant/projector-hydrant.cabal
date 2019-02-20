@@ -1,11 +1,15 @@
 name:                projector-hydrant
 version:             0.1.0.0
-synopsis:            Simple HTML combinators
+synopsis:            Simple HTML combinators.
 license:             BSD3
-author:              Ambiata
-category:            Web
+license-file:        LICENSE
+author:              Tim Humphries <tim@utf8.me>
+maintainer:          Tim Humphries <tim@utf8.me>, Mark Hibberd <mark@hibberd.id.au>
+copyright:           (c) 2016 Ambiata. (c) 2018-2019 Tim Humphries, Mark Hibberd
+category:            Web, Text, Template
 build-type:          Simple
 cabal-version:       >=1.10
+description:         Simple HTML combinators for use in projector runtime.
 
 library
   build-depends:
@@ -64,7 +68,7 @@ benchmark bench
                      Haskell2010
 
   ghc-options:
-                     -Wall -threaded -O2
+                     -Wall -threaded
 
   build-depends:
                      base

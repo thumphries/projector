@@ -1,0 +1,8 @@
+packages:
+  projector-core
+  projector-hydrant
+  projector-html
+  projector-html-haskell
+  projector-html-purs
+  projector-html-runtime-hs
+  projector-cli
