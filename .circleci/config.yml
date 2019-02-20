@@ -172,6 +172,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: 'libtinfo'
+          command: 'apt-get install -y libtinfo-dev'
+      - run:
           name: 'cabal-update'
           command: 'cabal update'
       - run:
