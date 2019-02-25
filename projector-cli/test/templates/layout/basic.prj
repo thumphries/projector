@@ -1,0 +1,10 @@
+\ body : Html -> Html =
+
+<html lang="en">
+  <head>
+    <title>Projector Test</title>
+  </head>
+  <body>
+    { body }
+  </body>
+</html>

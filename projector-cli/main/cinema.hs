@@ -135,7 +135,7 @@ cinemaBuild b mb msp tg mdg o = do
   ba <- hoistEither (first BuildError (runBuild b udts mempty rts))
   out <- maybe (pure mempty) (\b' -> hoistEither (first BackendError (codeGen (getBackend b') codeGenNamerSimple mempty ba))) mb
   -- Write out any artefacts
-  liftIO . for_ out $ \(f, body) -> do
+  liftIO . for_ out $ \(_, f, body) -> do
     let ofile = o </> f
     IO.putStrLn ("Generating " <> ofile)
     createDirectoryIfMissing True (takeDirectory ofile)

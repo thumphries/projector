@@ -1,0 +1,6 @@
+-- machinator @ v3
+
+
+record Message = {
+    content : String
+  }

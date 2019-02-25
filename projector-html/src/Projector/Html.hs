@@ -43,6 +43,8 @@ module Projector.Html (
   , HtmlExpr
   , moduleNamerSimple
   , codeGenNamerSimple
+  , filePathToModuleNameSimple
+  , filePathToExprNameSimple
   ) where
 
 
@@ -211,7 +213,7 @@ codeGen ::
   -> CodeGenNamer
   -> PlatformConstants
   -> BuildArtefacts
-  -> Either [e] [(FilePath, Text)]
+  -> Either [e] [(HB.ModuleName, FilePath, Text)]
 codeGen backend cgn pcons (BuildArtefacts decls nmap checked) = do
   -- Run the backend's validation predicates
   validateModules backend checked
@@ -225,9 +227,12 @@ codeGenModule ::
   -> HtmlDecls
   -> HB.ModuleName
   -> HB.Module HtmlType PrimT (HtmlType, a)
-  -> Either e (FilePath, Text)
-codeGenModule =
-  HB.renderModule
+  -> Either e (HB.ModuleName, FilePath, Text)
+codeGenModule b decls name m =
+  let
+    includeModuleName (p, t) = (name, p, t)
+  in
+    includeModuleName <$> HB.renderModule b decls name m
 
 -- | Apply a 'CodeGenNamer' to some module.
 codeGenRename :: TemplateNameMap -> CodeGenNamer -> HB.Module a b c -> HB.Module a b c
